@@ -382,6 +382,7 @@
   align-items: center;
 }
 .immersive-augment-stage .tarot-spread--2 { grid-template-columns: minmax(0, 1.1fr) minmax(0, .8fr); }
+.immersive-augment-stage .tarot-spread--1 { grid-template-columns: minmax(0, 1fr); }
 .immersive-augment-stage .tarot-echo__number,
 .immersive-augment-stage .tarot-spread .deck-choice__number { display: none; }
 .immersive-augment-stage .tarot-spread > .tarot-echo {
