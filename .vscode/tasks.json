@@ -1,0 +1,22 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "firebase-emulators",
+      "type": "shell",
+      "command": "node scripts/ensure-emulators.mjs",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "dev" },
+      "problemMatcher": {
+        "owner": "firebase",
+        "pattern": { "regexp": "^__never_matches__$" },
+        "background": {
+          "activesAt": ".",
+          "beginsPattern": ".",
+          "endsPattern": "All emulators ready"
+        }
+      }
+    }
+  ]
+}

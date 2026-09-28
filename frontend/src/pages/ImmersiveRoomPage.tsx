@@ -94,7 +94,7 @@ export default function ImmersiveRoomPage({ practice = false }: { practice?: boo
     audio.stop();
     if (s.room.phase === "topic") {
       audio.playCue("topic");
-      if (s.room.topic) audio.narrate(`오늘의 주제. 오늘 밤, 테이블에 오른 안건. ${s.room.topic.title}`);
+      if (s.room.topic) audio.narrate(`오늘의 주제입니다. ${s.room.topic.title}`);
     } else if (s.room.phase === "role") {
       audio.playCue("role");
       audio.narrate("당신의 비밀 역할이 도착했습니다. 카드를 확인하세요.");
@@ -240,7 +240,7 @@ export default function ImmersiveRoomPage({ practice = false }: { practice?: boo
     audio.unlock();
     if (s.room.phase === "topic" && s.room.topic) {
       audio.playCue("topic");
-      audio.narrate(`오늘의 주제. 오늘 밤, 테이블에 오른 안건. ${s.room.topic.title}`);
+      audio.narrate(`오늘의 주제입니다. ${s.room.topic.title}`);
     } else if (s.room.phase === "role") {
       audio.playCue("role");
       audio.narrate("당신의 비밀 역할이 도착했습니다. 카드를 확인하세요.");
@@ -302,7 +302,7 @@ export default function ImmersiveRoomPage({ practice = false }: { practice?: boo
             onClick={() => {
               audio.toggle();
               if (!audio.enabled && s.room.phase === "topic" && s.room.topic) {
-                audio.narrate(`오늘의 주제. 오늘 밤, 테이블에 오른 안건. ${s.room.topic.title}`);
+                audio.narrate(`오늘의 주제입니다. ${s.room.topic.title}`);
               }
             }}
           >
@@ -391,7 +391,7 @@ export default function ImmersiveRoomPage({ practice = false }: { practice?: boo
                 if (!audio.musicEnabled) audio.toggleMusic();
                 audio.unlock();
                 audio.playCue("topic");
-                audio.narrate("오늘 밤, 테이블의 선택을 시작합니다.");
+                audio.narrate("안녕하세요, 오늘 게임을 안내해 드릴 진행자입니다.");
               }}>남성 내레이션 · 배경음 미리 듣기</button>}
               {!canStart && !practice && <small className="immersive-wait-note">4명 이상 입장하고 모두 준비해야 시작할 수 있어요.</small>}
             </section>
