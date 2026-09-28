@@ -1,0 +1,34 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(roomId) {
+      return signedIn() && exists(/databases/$(database)/documents/rooms/$(roomId)/participants/$(request.auth.uid));
+    }
+    match /rooms/{roomId} {
+      allow get: if member(roomId);
+      allow list, write: if false;
+      match /participants/{uid} {
+        allow read: if member(roomId);
+        allow write: if false;
+      }
+      match /publicRounds/{roundId} {
+        allow read: if member(roomId);
+        allow write: if false;
+      }
+      match /privatePlayers/{uid} {
+        allow get: if member(roomId) && request.auth.uid == uid;
+        allow list, write: if false;
+      }
+      match /results/{uid} {
+        allow get: if member(roomId) && request.auth.uid == uid;
+        allow list, write: if false;
+      }
+      // The aggregate includes pending submissions, guesses, ratings and reports.
+      // It is accessible only through the Admin SDK server.
+      match /internal/{document} { allow read, write: if false; }
+      match /{document=**} { allow read, write: if false; }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

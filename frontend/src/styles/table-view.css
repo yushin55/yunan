@@ -1,0 +1,427 @@
+/* Layout for switching between the mission card and the players around the table.
+   The mission stage stays mounted while stowed, so half-written answers survive a look around. */
+.immersive-room { --rail-w: 208px; --side-gap: 24px; --top-row: 118px; }
+
+/* Side columns: players on the left, table tools on the right. */
+.immersive-room .table-rail {
+  position: absolute;
+  z-index: 12;
+  top: var(--top-row);
+  left: var(--side-gap);
+  width: var(--rail-w);
+  animation: immersive-fade-in .4s ease-out both;
+}
+.immersive-room .immersive-tools,
+.immersive-room.immersive-room--card-open .immersive-tools {
+  z-index: 12;
+  top: var(--top-row);
+  right: var(--side-gap);
+  display: grid;
+  gap: 6px;
+}
+.immersive-room .immersive-tools button,
+.immersive-room.immersive-room--card-open .immersive-tools button {
+  justify-content: flex-start;
+  gap: 9px;
+  width: 146px;
+  height: auto;
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .2s, border-color .2s, transform .2s;
+}
+.immersive-room .immersive-tools button svg { flex: none; color: #e3bb7c; }
+.immersive-room .immersive-tools button span { display: inline; }
+.immersive-room .immersive-tools button:hover { transform: translateX(-3px); }
+
+/* Keep the mission cards between the two columns instead of under them. */
+.immersive-room--mission .immersive-action-dock.immersive-augment-stage,
+.immersive-room--mission .immersive-action-dock.immersive-augment-stage.is-open {
+  width: min(900px, calc(100% - 2 * (var(--side-gap) + var(--rail-w) + 20px)));
+}
+
+/* View switch, bottom-left under the roster. */
+.immersive-view-switch {
+  position: absolute;
+  z-index: 12;
+  left: var(--side-gap);
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: var(--rail-w);
+  padding: 3px;
+  border: 1px solid #d8c29363;
+  border-radius: 8px;
+  background: #0f1917e0;
+  box-shadow: 0 10px 28px #0008;
+  backdrop-filter: blur(10px);
+}
+.immersive-view-switch button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #cfc8b2;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .25s, color .25s, box-shadow .25s;
+}
+.immersive-view-switch button:hover { color: #fff0cf; }
+.immersive-view-switch button[aria-pressed="true"] {
+  background: linear-gradient(115deg, #c29b63, #e6be80);
+  color: #1b231f;
+  box-shadow: 0 3px 12px #0006, inset 0 1px #fff7;
+}
+
+/* The mission card lifts away to reveal the table, then drops back in. */
+.immersive-room--mission .immersive-augment-shade {
+  animation-fill-mode: backwards;
+  transition: opacity .45s ease;
+}
+.immersive-room--table-view .immersive-augment-shade { opacity: 0; }
+.immersive-action-dock.immersive-augment-stage {
+  transform-origin: 50% 100%;
+  transition: opacity .38s ease, transform .52s cubic-bezier(.2, .8, .2, 1), filter .42s ease;
+}
+.immersive-action-dock.immersive-augment-stage.is-open.is-stowed {
+  opacity: 0;
+  transform: translateY(16%) scale(.9) rotateX(10deg);
+  filter: blur(7px);
+  pointer-events: none;
+}
+
+/* A fresh phase card fades up out of the table. */
+.immersive-augment-stage .action-panel.stage-panel,
+.immersive-augment-stage .waiting-panel { animation: mission-card-in .55s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes mission-card-in {
+  from { opacity: 0; transform: translateY(22px) scale(.985); filter: blur(5px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+.immersive-hud__chapter { animation: chapter-in .5s ease-out both; }
+@keyframes chapter-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+
+/* In-world nameplates would sit on top of the mission text; the roster replaces them there. */
+.immersive-room .immersive-scene__labels { transition: opacity .35s ease, visibility 0s linear 0s; }
+.immersive-room--mission:not(.immersive-room--table-view) .immersive-scene__labels {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s ease, visibility 0s linear .25s;
+}
+@media (min-width: 761px) {
+  .immersive-room--card-open .immersive-scene__name { margin-top: 0; }
+}
+
+/* The scene's own drag hint would sit under the view switch. */
+.immersive-room--mission .immersive-scene__hint { visibility: hidden; }
+
+/* Close-up of the focused player: a dialogue box under their face. */
+.immersive-room--table-view .table-dossier {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: 92px;
+  width: min(780px, calc(100% - 2 * (var(--side-gap) + var(--rail-w) + 20px)));
+  max-height: min(44dvh, 420px);
+  transform: translateX(-50%);
+  animation-name: dossier-in-centered;
+}
+@keyframes dossier-in-centered {
+  from { opacity: 0; transform: translate(-50%, 22px) scale(.97); filter: blur(4px); }
+  to { opacity: 1; transform: translate(-50%, 0); filter: none; }
+}
+/* Outside a mission (lobby) the dossier sits under the tools instead. */
+.immersive-room:not(.immersive-room--mission) .table-dossier {
+  position: absolute;
+  z-index: 12;
+  top: 330px;
+  right: var(--side-gap);
+  width: min(330px, calc(100% - 48px));
+  max-height: calc(100dvh - 350px);
+}
+.immersive-room:not(.immersive-room--mission) .table-dossier__body { grid-template-columns: 1fr; overflow-y: auto; }
+
+.immersive-mission-pill {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  min-width: min(340px, calc(100% - 20px));
+  padding: 9px 20px 9px 12px;
+  transform: translateX(-50%);
+  border: 1px solid #e8c58d;
+  border-radius: 999px;
+  background: linear-gradient(115deg, #1b2923f2, #111b19f2);
+  box-shadow: 0 12px 34px #000a, 0 0 0 0 #e6be8066;
+  color: #fbeed2;
+  text-align: left;
+  cursor: pointer;
+  animation: pill-in .45s cubic-bezier(.2, .8, .2, 1) both, pill-glow 2.6s ease-in-out .6s infinite;
+  transition: background .2s;
+}
+.immersive-mission-pill:hover { background: linear-gradient(115deg, #2b3a31f2, #18241ff2); }
+.immersive-mission-pill__phase {
+  grid-row: 1 / 3;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: linear-gradient(115deg, #c29b63, #e6be80);
+  color: #1b231f;
+  font-size: 10px;
+  font-weight: 800;
+}
+.immersive-mission-pill strong { font-size: 13px; }
+.immersive-mission-pill small { color: #c9c6b3; font-size: 10px; }
+@keyframes pill-in { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes pill-glow {
+  0%, 100% { box-shadow: 0 12px 34px #000a, 0 0 0 0 #e6be8000; }
+  50% { box-shadow: 0 12px 34px #000a, 0 0 0 5px #e6be8030; }
+}
+
+/* Medium widths: compact avatar column and icon tools. */
+@media (max-width: 1279px) and (min-width: 761px) {
+  .immersive-room { --rail-w: 52px; --side-gap: 18px; }
+  .immersive-room .table-rail__head,
+  .immersive-room .table-rail__text,
+  .immersive-room .table-rail__marks,
+  .immersive-room .table-rail__notes span { display: none; }
+  .immersive-room .table-rail__player { grid-template-columns: 34px; justify-content: center; padding: 8px; }
+  .immersive-room .table-rail__player:hover { transform: translateX(2px); }
+  .immersive-room .table-rail__notes { min-height: 38px; }
+  .immersive-room .immersive-tools button,
+  .immersive-room.immersive-room--card-open .immersive-tools button { justify-content: center; width: 40px; min-height: 40px; padding: 0; }
+  .immersive-room .immersive-tools button span { display: none; }
+  .immersive-view-switch { width: auto; }
+  .immersive-view-switch button span { display: none; }
+  .immersive-view-switch button { width: 40px; padding: 0; }
+  .immersive-room--table-view .table-dossier { width: min(720px, calc(100% - 2 * (var(--side-gap) + var(--rail-w) + 16px))); }
+}
+
+@media (max-height: 640px) and (min-width: 761px) {
+  .immersive-room { --top-row: 96px; }
+  .immersive-room--table-view .table-dossier { bottom: 74px; max-height: 50dvh; }
+  .immersive-room:not(.immersive-room--mission) .table-dossier { top: 96px; right: calc(var(--side-gap) + 160px); max-height: calc(100dvh - 116px); }
+}
+
+/* Phones: one control row under the HUD, roster only when looking at the table. */
+@media (max-width: 760px) {
+  .immersive-room { --top-row: 116px; --side-gap: 10px; }
+  .immersive-room .immersive-tools,
+  .immersive-room.immersive-room--card-open .immersive-tools { display: flex; gap: 4px; }
+  .immersive-room .immersive-tools button,
+  .immersive-room.immersive-room--card-open .immersive-tools button { justify-content: center; width: 32px; min-height: 32px; height: 32px; padding: 0; }
+  .immersive-room .immersive-tools button span { display: none; }
+  .immersive-view-switch {
+    top: var(--top-row);
+    bottom: auto;
+    width: auto;
+    padding: 2px;
+  }
+  .immersive-view-switch button { min-height: 28px; padding: 0 9px; font-size: 10px; }
+  .immersive-room .table-rail {
+    top: calc(var(--top-row) + 42px);
+    left: var(--side-gap);
+    right: var(--side-gap);
+    width: auto;
+  }
+  .immersive-room--mission:not(.immersive-room--table-view) .table-rail { display: none; }
+  .immersive-room .table-rail__head,
+  .immersive-room .table-rail__notes { display: none; }
+  .immersive-room .table-rail ul {
+    display: flex;
+    gap: 6px;
+    padding: 2px 2px 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .immersive-room .table-rail ul::-webkit-scrollbar { display: none; }
+  .immersive-room .table-rail li { flex: none; }
+  .immersive-room .table-rail__player { grid-template-columns: 28px auto; gap: 7px; width: auto; padding: 4px 10px 4px 4px; border-radius: 999px; }
+  .immersive-room .table-rail__player:hover { transform: none; }
+  .immersive-room .table-rail__avatar { width: 28px; height: 28px; font-size: 12px; }
+  .immersive-room .table-rail__text small,
+  .immersive-room .table-rail__marks { display: none; }
+  .immersive-room .table-rail__text strong { max-width: 72px; font-size: 11px; }
+
+  .immersive-room--mission .immersive-action-dock.immersive-augment-stage,
+  .immersive-room--mission .immersive-action-dock.immersive-augment-stage.is-open {
+    inset: calc(var(--top-row) + 40px) 0 max(5px, env(safe-area-inset-bottom));
+    width: calc(100% - 12px);
+  }
+  .immersive-augment-stage .tarot-spread { margin-top: 12px; }
+
+  .immersive-room--table-view .table-dossier {
+    left: 8px;
+    right: 8px;
+    bottom: 74px;
+    width: auto;
+    max-height: min(48dvh, 440px);
+    transform: none;
+    animation-name: dossier-in;
+  }
+  .immersive-room:not(.immersive-room--mission) .table-dossier {
+    top: calc(var(--top-row) + 86px);
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-height: 34dvh;
+  }
+  .immersive-mission-pill {
+    left: 8px;
+    right: 56px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    min-width: 0;
+    transform: none;
+    animation: immersive-fade-in .35s ease-out both, pill-glow 2.6s ease-in-out .6s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .immersive-room .table-rail,
+  .immersive-mission-pill,
+  .immersive-hud__chapter,
+  .immersive-augment-stage .action-panel.stage-panel,
+  .immersive-augment-stage .waiting-panel { animation: none; }
+  .immersive-room--table-view .table-dossier { animation: none; }
+  .immersive-action-dock.immersive-augment-stage,
+  .immersive-room--mission .immersive-augment-shade { transition: none; }
+}
+
+/* Lobby entry to the narrated rule briefing. */
+.immersive-briefing-button {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid #e6be80a8;
+  border-radius: 6px;
+  background: linear-gradient(115deg, #0b1311e6, #1d2b24e6);
+  color: #f7ecd4;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+}
+.immersive-briefing-button:hover { border-color: #f0c987; box-shadow: 0 0 20px #e6be8033; }
+.immersive-briefing-button span {
+  grid-row: 1 / 3;
+  padding: 5px 7px;
+  border: 1px solid #e6be80;
+  color: #f0c987;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .2em;
+}
+.immersive-briefing-button strong { font-size: 14px; }
+.immersive-briefing-button small { color: #c9c6b3; font-size: 10px; }
+
+/* ---------- Mission focus: one topic line, one title, one deck in front. ---------- */
+/* Quiet the room behind the card so the cards are the only busy thing on screen.
+   A dense overlay, not a CSS blur: blurring a live WebGL canvas is too slow on school laptops. */
+.immersive-room--mission .immersive-augment-shade {
+  background:
+    linear-gradient(180deg, #060c10b8 0%, #060c10d1 45%, #04090de8 100%),
+    radial-gradient(ellipse 75% 65% at 50% 55%, #0a1a1733, transparent 70%);
+}
+
+/* HUD keeps only round + phase; the topic moves onto the card, the prompt repeats the card title. */
+.immersive-room--mission .immersive-hud__chapter > span { display: none; }
+.immersive-room--mission .immersive-hud__chapter strong { margin: 2px 0 0; font-size: clamp(17px, 1.8vw, 22px); }
+
+.mission-topic {
+  display: flex;
+  flex: none;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  width: min(760px, 100%);
+  margin: 0 auto 12px;
+  padding: 9px 16px;
+  border: 1px solid #e6be8055;
+  border-radius: 6px;
+  background: #0b1311e0;
+  box-shadow: 0 10px 26px #0008;
+  animation: immersive-fade-in .4s ease-out both;
+}
+.mission-topic span { flex: none; color: #e1b87b; font-size: 10px; font-weight: 800; letter-spacing: .14em; }
+.mission-topic strong {
+  color: #fff1d6;
+  font: 600 clamp(13px, 1.35vw, 16px)/1.45 "Noto Serif KR", serif;
+  letter-spacing: -.03em;
+  word-break: keep-all;
+}
+
+/* One heading per card: drop the English overline and step labels the progress bar already shows. */
+.immersive-augment-stage .action-panel.stage-panel > .eyebrow,
+.immersive-augment-stage .stage-intro .eyebrow { display: none; }
+.immersive-augment-stage .action-panel.stage-panel > h2 { margin: 0 0 10px; font-size: clamp(21px, 2.3vw, 29px); }
+.immersive-augment-stage .stage-intro { margin-bottom: 4px; }
+.immersive-augment-stage .stage-intro p { margin-top: 0; font-size: 12px; }
+
+.immersive-augment-stage .stage-progress { max-width: 480px; padding: 2px; }
+.immersive-augment-stage .stage-progress button { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 5px 6px; }
+.immersive-augment-stage .stage-progress button small { width: auto; font-size: 10px; }
+
+/* The middle card is the choice; the neighbours are quieter previews. */
+.immersive-augment-stage .tarot-spread {
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.1fr) minmax(0, .8fr);
+  align-items: center;
+}
+.immersive-augment-stage .tarot-spread--2 { grid-template-columns: minmax(0, 1.1fr) minmax(0, .8fr); }
+.immersive-augment-stage .tarot-echo__number,
+.immersive-augment-stage .tarot-spread .deck-choice__number { display: none; }
+.immersive-augment-stage .tarot-spread > .tarot-echo {
+  min-height: 240px;
+  opacity: .7;
+  animation-name: augment-echo-drop;
+  animation-fill-mode: backwards;
+  transition: opacity .2s, border-color .2s, filter .2s;
+}
+.immersive-augment-stage .tarot-spread > .tarot-echo:hover,
+.immersive-augment-stage .tarot-spread > .tarot-echo:focus-visible { opacity: .92; }
+.immersive-augment-stage .tarot-spread .tarot-echo .tarot-sigil { width: 54px; height: 54px; margin-top: 18px; }
+@keyframes augment-echo-drop {
+  0% { opacity: 0; transform: translateY(-60px) scale(.86); }
+  100% { opacity: .7; transform: none; }
+}
+
+@media (max-width: 760px) {
+  .immersive-room--mission { --top-row: 100px; }
+  .immersive-room--mission .immersive-hud__chapter strong { font-size: 17px; }
+  .mission-topic { flex-direction: column; align-items: center; gap: 2px; margin-bottom: 8px; padding: 7px 12px; text-align: center; }
+  .mission-topic span { font-size: 9px; }
+  .mission-topic strong { font-size: 13px; }
+  .immersive-augment-stage .action-panel.stage-panel > h2 { margin-bottom: 7px; font-size: 19px; }
+  .immersive-augment-stage .stage-intro p { font-size: 11px; }
+  .immersive-augment-stage .stage-progress button:not(.active) small { display: none; }
+  .immersive-augment-stage .stage-progress button.active { flex: 2.6; }
+  .immersive-augment-stage .tarot-spread { gap: 6px; }
+  .immersive-augment-stage .tarot-spread > .tarot-echo { min-height: 170px; }
+  .immersive-augment-stage .tarot-spread .tarot-echo .tarot-sigil { display: none; }
+  .immersive-augment-stage .tarot-spread :is(.tarot-echo strong) { margin-top: 18px; font-size: 11px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mission-topic { animation: none; }
+}
+
+/* Review phases: the HUD's prompt line would sit under the live reaction feed. */
+.immersive-room--review .immersive-hud__chapter > span:last-child { display: none; }
+.immersive-room--review .reaction-feed { top: 120px; }
+@media (max-width: 760px) {
+  .immersive-room--review .reaction-feed { top: calc(var(--top-row) + 84px); }
+}

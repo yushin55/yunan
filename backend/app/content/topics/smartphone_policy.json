@@ -1,0 +1,267 @@
+{
+  "topicId": "smartphone_policy",
+  "title": "학교에서 학생의 스마트폰 사용을 더 강하게 제한해야 할까?",
+  "shortTitle": "학교 스마트폰 제한",
+  "background": "토론을 위한 가상 학교 규칙입니다. 한 학교가 수업 시간 사용 제한을 넘어 등교부터 하교까지 스마트폰을 보관하는 방안을 논의합니다. 집중할 환경, 긴급 연락, 학습 보조 기능, 학생의 자율성, 보관 책임을 함께 고려해야 합니다.",
+  "question": "학생의 스마트폰을 학교가 더 강하게 제한한다면, 어디까지 제한하고 어떤 예외를 두어야 할까요?",
+  "tags": [
+    "교육",
+    "기술",
+    "자율성"
+  ],
+  "isHypothetical": true,
+  "status": "editorial_reviewed",
+  "active": true,
+  "version": 1,
+  "sourceStatus": "discussion_only",
+  "sources": [],
+  "roles": [
+    {
+      "id": "smartphone_policy_student",
+      "name": "학생 대표",
+      "goal": "학생이 규칙을 함께 만들고 필요한 연락과 도구 사용을 스스로 관리하게 한다.",
+      "priority": "자율성과 규칙 참여",
+      "stance": "oppose",
+      "cards": [
+        {
+          "id": "smartphone_policy_student_card_1",
+          "title": "규칙의 공동 작성자",
+          "text": "따를 규칙을 만드는 과정에 학생이 참여하면 무엇이 달라질까요? 수업 중 사용 기준과 위반 시 대응을 함께 정하는 방안을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_student_card_2",
+          "title": "자율을 연습할 기회",
+          "text": "휴대폰을 보지 않을 능력도 연습할 수 있습니다. 전면 수거 외에 알림 끄기, 가방 보관, 사용 시간 약속을 어떻게 평가할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_student_card_3",
+          "title": "말하기 어려운 예외",
+          "text": "건강이나 가족 사정 때문에 연락이 필요한 학생이 이유를 모두에게 설명해야 할까요? 사생활을 지키는 예외 신청 방식을 생각하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "smartphone_policy_teacher",
+      "name": "수업 담당 교사",
+      "goal": "학생과 교사가 반복되는 사용 제지 없이 수업에 집중할 수 있게 한다.",
+      "priority": "학습 집중과 일관된 지도",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "smartphone_policy_teacher_card_1",
+          "title": "한 사람의 화면, 교실의 주의",
+          "text": "기기 사용이 주변 학생의 집중에도 영향을 줄 수 있다는 우려를 다뤄 보세요. 개인의 선택과 공동 학습 환경의 경계를 어디에 둘까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_teacher_card_2",
+          "title": "제지하는 시간",
+          "text": "매번 사용 목적을 확인하는 방식도 교사의 시간을 씁니다. 단순한 공통 규칙과 꼭 필요한 예외를 함께 설계해 보세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_teacher_card_3",
+          "title": "수업 도구로 쓰는 날",
+          "text": "스마트폰을 활용하는 수업과 보관 규칙이 충돌할 수 있습니다. 교사가 사용을 허용하는 기준과 대체 도구 제공을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "smartphone_policy_parent",
+      "name": "긴급 연락을 중시하는 학부모",
+      "goal": "필요할 때 자녀와 연락할 수 있다는 신뢰를 유지하면서 학습 환경을 지킨다.",
+      "priority": "긴급 연락과 돌봄의 연속성",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "smartphone_policy_parent_card_1",
+          "title": "급한 연락의 통로",
+          "text": "긴급 상황에 학교 대표 번호만 이용한다면 연결되지 않을 때의 대안이 필요합니다. 연락 전달 시간과 책임자를 어떻게 정할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_parent_card_2",
+          "title": "하교 직전의 변경",
+          "text": "돌봄·통학 일정이 바뀌는 학생에게 어떤 연락 시간을 보장할까요? 수업 중 집중과 하교 준비를 구분해서 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_parent_card_3",
+          "title": "신뢰할 수 있는 안내",
+          "text": "보관 규칙에 동의하려면 보호자가 무엇을 알아야 할까요? 분실 대응, 긴급 반환 절차, 예외 기준 중 우선순위를 정하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "smartphone_policy_school_manager",
+      "name": "학교 운영 담당자",
+      "goal": "학생 수와 인력에 맞는 규칙을 만들고 보관·분실·위반 처리 책임을 명확히 한다.",
+      "priority": "집행 가능성과 일관성",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "smartphone_policy_school_manager_card_1",
+          "title": "누가 보관 책임을 질까",
+          "text": "기기를 일괄 수거하면 보관과 반환 업무가 생깁니다. 분실·파손 책임과 관리 인력을 정하지 않은 규칙이 실행 가능할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_school_manager_card_2",
+          "title": "예외도 운영의 일부",
+          "text": "예외가 필요한 학생을 매번 따로 호출하지 않고 확인할 수 있는 방식은 무엇일까요? 사생활과 현장 집행을 함께 고려하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_school_manager_card_3",
+          "title": "작게 시작하는 기준",
+          "text": "먼저 일부 수업에서 규칙을 적용한다면 무엇을 관찰할까요? 학생 경험과 교사 업무를 확인한 뒤 수정하는 일정을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "smartphone_policy_rights_advocate",
+      "name": "디지털 권리 옹호자",
+      "goal": "교육 목적에 필요한 만큼만 제한하고 기기·통신 내용에 대한 사생활을 보호한다.",
+      "priority": "최소한의 제한과 사생활",
+      "stance": "oppose",
+      "cards": [
+        {
+          "id": "smartphone_policy_rights_advocate_card_1",
+          "title": "보관과 검사는 다른 일",
+          "text": "기기를 보관하는 것과 메시지·사진을 확인하는 것은 다른 권한입니다. 기기 수거가 내용 검사로 이어지지 않게 경계를 정하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_rights_advocate_card_2",
+          "title": "덜 제한적인 선택지",
+          "text": "수업 중 방해를 줄이는 목표에 하루 종일 수거가 꼭 필요한가요? 같은 목적을 이룰 수 있는 제한 범위를 비교해 보세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_rights_advocate_card_3",
+          "title": "기기 없는 학생도",
+          "text": "수업에서 스마트폰 사용을 허용할 때 기기가 없거나 다른 기기를 쓰는 학생은 어떨까요? 제한 규칙과 접근 기회를 함께 논의하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "smartphone_policy_counselor",
+      "name": "학생 상담 전문가",
+      "goal": "획일적인 처벌보다 사용 맥락을 살피고 도움이 필요한 학생에게 지원을 연결한다.",
+      "priority": "정서적 안전과 개별 지원",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "smartphone_policy_counselor_card_1",
+          "title": "사용 뒤에 있는 이유",
+          "text": "불안, 습관, 가족 연락처럼 같은 행동에도 이유가 다를 수 있습니다. 규칙 위반을 확인한 뒤 어떤 질문을 먼저 할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_counselor_card_2",
+          "title": "공개 망신 없는 지도",
+          "text": "반 친구들 앞에서 휴대폰 사용을 지적하는 방식이 꼭 필요할까요? 규칙을 유지하면서 학생의 체면을 지키는 대응을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "smartphone_policy_counselor_card_3",
+          "title": "제한 이후의 지원",
+          "text": "휴대폰을 치운 뒤에도 집중이 어려운 학생이 있을 수 있습니다. 쉬는 시간 활동이나 상담 지원을 규칙과 어떻게 연결할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    }
+  ],
+  "scenario": {
+    "id": "smartphone_policy_scenario_1",
+    "title": "수거 첫날, 하나의 예외가 규칙을 흔든다",
+    "description": "가상 사건입니다. 전면 보관 시범 운영 첫날, 한 학생이 가족의 돌봄 사정으로 메시지를 확인해야 한다고 요청합니다. 주변 학생들은 자신들도 예외를 원하고, 담당 교사는 이유를 공개적으로 확인할 수 없다고 말합니다.",
+    "options": [
+      {
+        "id": "smartphone_policy_option_1",
+        "text": "사유를 비공개로 확인하고 필요한 시간에만 사용할 수 있게 한다."
+      },
+      {
+        "id": "smartphone_policy_option_2",
+        "text": "모든 학생에게 정해진 연락 시간을 주고 수업 중에는 보관한다."
+      },
+      {
+        "id": "smartphone_policy_option_3",
+        "text": "전면 보관을 중단하고 수업 중 가방 보관 규칙으로 바꾼다."
+      },
+      {
+        "id": "smartphone_policy_option_4",
+        "text": "시범 운영을 유지하며 긴급 연락 전담 창구와 신속 반환 절차를 마련한다."
+      }
+    ]
+  },
+  "questions": [
+    "수업 시간과 쉬는 시간에 같은 제한이 필요한 이유가 있나요?",
+    "다른 학생에게 사정을 공개하지 않고 예외를 운영할 방법은 무엇인가요?",
+    "보관 중 기기가 분실되면 어떤 절차로 책임을 확인하나요?",
+    "규칙을 어긴 학생에게 처벌 외에 어떤 지원을 제공하나요?",
+    "학교 연락 창구가 즉시 응답하지 못할 때 대안은 무엇인가요?",
+    "제한을 강화하거나 완화할 판단 기준에 학생의 경험을 어떻게 반영하나요?"
+  ]
+}

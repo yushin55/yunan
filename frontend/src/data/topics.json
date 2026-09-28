@@ -1,0 +1,1317 @@
+[
+  {
+    "topicId": "teacher_protection",
+    "title": "교육청에 가상의 교권보호국을 신설해야 할까?",
+    "shortTitle": "교권보호국 신설",
+    "background": "토론을 위한 가상 정책 제안입니다. 한 교육청이 교사의 교육활동 침해 신고, 학생의 소명, 학부모의 민원을 전담하는 ‘교권보호국’ 신설을 검토합니다. 보호 조치와 조사 권한을 어디까지 맡길지, 서로 다른 권리가 충돌할 때 어떤 절차를 둘지 결정해야 합니다.",
+    "question": "교사 보호와 학생·학부모의 권리를 함께 보장하려면, 새로운 전담 조직이 필요할까요?",
+    "tags": ["교육", "권리", "정책"],
+    "isHypothetical": true,
+    "status": "editorial_reviewed",
+    "active": true,
+    "version": 1,
+    "sourceStatus": "discussion_only",
+    "sources": [],
+    "roles": [
+      {
+        "id": "teacher_protection_teacher",
+        "name": "현장교사",
+        "goal": "교사가 위협을 견디며 혼자 대응하지 않아도 수업을 이어갈 수 있게 한다.",
+        "priority": "신속한 보호와 수업의 지속",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "teacher_protection_teacher_card_1",
+            "title": "도움을 요청하는 순간",
+            "text": "신고 뒤에도 교사가 혼자 당사자를 응대해야 한다면 보호는 늦을 수 있습니다. 조사 결론 전에도 가능한 임시 지원의 범위를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_teacher_card_2",
+            "title": "보호와 면책의 경계",
+            "text": "교사 보호가 모든 지도 방식의 정당화를 뜻하지는 않습니다. 지원을 받으면서도 자신의 행동을 설명할 책임은 어떻게 유지할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_teacher_card_3",
+            "title": "교실에 남은 학생들",
+            "text": "갈등 당사자 외 학생들의 수업도 고려해야 합니다. 대체 수업이나 업무 지원 중 무엇을 먼저 제공할지 이유를 붙여 말하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "teacher_protection_student_advocate",
+        "name": "학생인권 변호인",
+        "goal": "학생이 불이익을 두려워하지 않고 자기 경험을 말하며 절차에 참여하게 한다.",
+        "priority": "소명권과 권한의 통제",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "teacher_protection_student_advocate_card_1",
+            "title": "누가 먼저 들리는가",
+            "text": "학생의 설명을 듣기 전에 ‘침해자’로 분류하지 않도록 어떤 절차가 필요할까요? 보호 조치와 최종 판단을 구분해 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_student_advocate_card_2",
+            "title": "지원과 조사의 거리",
+            "text": "교사를 지원하는 조직이 사실 조사까지 맡으면 공정성을 의심받을 수 있습니다. 담당 분리나 외부 재검토 장치를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_student_advocate_card_3",
+            "title": "기록에 반박할 기회",
+            "text": "학생이 자신의 사건 기록을 이해하고 오류에 이의를 제기할 길이 필요합니다. 미성년자도 이용하기 쉬운 소명 방식을 말하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "teacher_protection_parent",
+        "name": "학부모 대표",
+        "goal": "정당한 질문과 민원이 위협 행위와 구분되어 안전하게 전달되도록 한다.",
+        "priority": "접근 가능한 민원과 상호 존중",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "teacher_protection_parent_card_1",
+            "title": "민원을 막지 않는 창구",
+            "text": "반복 연락을 줄이는 일과 문제 제기를 가로막는 일은 다릅니다. 정해진 상담 시간과 답변 기한으로 둘을 구분할 수 있을까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_parent_card_2",
+            "title": "판단 기준을 함께 보기",
+            "text": "불편한 의견과 위협적인 행동을 누가 어떤 기준으로 나눌까요? 처리 기준과 이의 제기 경로를 먼저 공개하는 방안을 검토하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_parent_card_3",
+            "title": "응답 없는 기다림",
+            "text": "민원이 접수됐다는 안내만으로는 갈등이 풀리지 않을 수 있습니다. 처리 상황을 알 권리와 교사의 업무 부담을 함께 고려하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "teacher_protection_administrator",
+        "name": "교육청 담당자",
+        "goal": "한정된 예산 안에서 실제로 작동하며 책임 소재가 분명한 제도를 설계한다.",
+        "priority": "명확한 권한과 책임 있는 예산",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "teacher_protection_administrator_card_1",
+            "title": "조직보다 먼저 업무",
+            "text": "신설 기구가 맡을 일과 기존 부서가 계속 맡을 일을 나누어 보세요. 같은 사건을 여러 곳에 설명해야 하는 중복을 어떻게 줄일까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_administrator_card_2",
+            "title": "무엇으로 평가할까",
+            "text": "신고 건수 감소만으로 성공을 판단하면 신고가 어려워진 상황을 놓칠 수 있습니다. 접근성·처리 시간·절차 만족도 중 무엇을 볼까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_administrator_card_3",
+            "title": "시범 운영의 조건",
+            "text": "일부 학교에서 먼저 운영한다면 종료·확대 기준을 미리 정해야 합니다. 성과가 부족할 때 예산을 되돌리는 기준도 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "teacher_protection_school_leader",
+        "name": "학교 관리자",
+        "goal": "사건 처리 중에도 학교가 안전하게 운영되고 역할 분담이 분명하게 유지되도록 한다.",
+        "priority": "현장 대응과 운영의 연속성",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "teacher_protection_school_leader_card_1",
+            "title": "오늘의 수업은 누가",
+            "text": "조사가 길어져도 교실은 운영되어야 합니다. 임시 분리, 대체 인력, 학생 학습 지원을 한 묶음으로 제안할 수 있을까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_school_leader_card_2",
+            "title": "넘기면 끝일까",
+            "text": "전담 기구에 사건을 넘긴 뒤 학교가 손을 놓아도 될까요? 현장 확인과 일상 회복에 대한 학교의 책임을 구체화하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_school_leader_card_3",
+            "title": "작은 갈등의 출구",
+            "text": "모든 이견을 공식 사건으로 만들면 관계 회복이 어려울 수 있습니다. 학교 안에서 풀 일과 즉시 외부에 요청할 일의 기준을 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "teacher_protection_mediator",
+        "name": "갈등조정 전문가",
+        "goal": "안전을 먼저 확보하되 당사자가 원할 때 관계를 회복할 수 있는 선택지를 만든다.",
+        "priority": "자발적 중재와 재발 방지",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "teacher_protection_mediator_card_1",
+            "title": "중재는 선택이어야",
+            "text": "불리한 위치의 당사자에게 화해를 강요하지 않아야 합니다. 중재를 거절해도 보호와 정식 절차를 이용할 수 있게 설계하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_mediator_card_2",
+            "title": "안전이 먼저인 경우",
+            "text": "모든 갈등이 대화만으로 해결되지는 않습니다. 위협이 계속될 때 중재를 멈추고 보호 절차로 옮기는 조건을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "teacher_protection_mediator_card_3",
+            "title": "사건 다음 날",
+            "text": "합의서 작성 뒤에도 같은 교실에서 생활해야 할 수 있습니다. 재발 확인, 상담, 일정 기간 점검 중 무엇이 필요할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      }
+    ],
+    "scenario": {
+      "id": "teacher_protection_scenario_1",
+      "title": "보호 요청과 소명 요구가 동시에 도착했다",
+      "description": "가상 사건입니다. 한 교사가 반복되는 고성 민원으로 당장 응대 중단과 지원을 요청했습니다. 학생과 보호자는 수업 중 부당한 대우가 있었다며 먼저 설명할 기회를 요구합니다. 사실관계는 아직 확인되지 않았고, 임시 담당 인력은 한 팀뿐입니다.",
+      "options": [
+        {
+          "id": "teacher_protection_option_1",
+          "text": "교사 보호 인력을 먼저 배치하고 학생·보호자의 소명 일정을 동시에 확정한다."
+        },
+        {
+          "id": "teacher_protection_option_2",
+          "text": "지원 담당과 조사 담당을 분리한 임시 공동팀을 구성한다."
+        },
+        {
+          "id": "teacher_protection_option_3",
+          "text": "독립된 외부 검토 창구에 사건을 맡기고 학교는 수업 유지 지원을 한다."
+        },
+        {
+          "id": "teacher_protection_option_4",
+          "text": "안전을 확보한 뒤 양측이 동의하는 경우에만 중재를 먼저 제안한다."
+        }
+      ]
+    },
+    "questions": [
+      "교사를 즉시 보호하면서도 학생을 가해자로 미리 단정하지 않을 방법은 무엇인가요?",
+      "정당한 민원과 위협 행동을 구분하는 기준을 누가 검토해야 하나요?",
+      "신설 조직이 편향됐다는 이의가 제기되면 어디에 재검토를 요청하나요?",
+      "예산이 한정된다면 조사 인력과 현장 지원 중 무엇에 먼저 배분하나요?",
+      "중재를 원하지 않는 당사자에게 어떤 대안을 보장하나요?",
+      "제도가 효과가 있는지 확인할 기준과 중단할 기준을 하나씩 말해 주세요."
+    ]
+  },
+  {
+    "topicId": "smartphone_policy",
+    "title": "학교에서 학생의 스마트폰 사용을 더 강하게 제한해야 할까?",
+    "shortTitle": "학교 스마트폰 제한",
+    "background": "토론을 위한 가상 학교 규칙입니다. 한 학교가 수업 시간 사용 제한을 넘어 등교부터 하교까지 스마트폰을 보관하는 방안을 논의합니다. 집중할 환경, 긴급 연락, 학습 보조 기능, 학생의 자율성, 보관 책임을 함께 고려해야 합니다.",
+    "question": "학생의 스마트폰을 학교가 더 강하게 제한한다면, 어디까지 제한하고 어떤 예외를 두어야 할까요?",
+    "tags": ["교육", "기술", "자율성"],
+    "isHypothetical": true,
+    "status": "editorial_reviewed",
+    "active": true,
+    "version": 1,
+    "sourceStatus": "discussion_only",
+    "sources": [],
+    "roles": [
+      {
+        "id": "smartphone_policy_student",
+        "name": "학생 대표",
+        "goal": "학생이 규칙을 함께 만들고 필요한 연락과 도구 사용을 스스로 관리하게 한다.",
+        "priority": "자율성과 규칙 참여",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "smartphone_policy_student_card_1",
+            "title": "규칙의 공동 작성자",
+            "text": "따를 규칙을 만드는 과정에 학생이 참여하면 무엇이 달라질까요? 수업 중 사용 기준과 위반 시 대응을 함께 정하는 방안을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_student_card_2",
+            "title": "자율을 연습할 기회",
+            "text": "휴대폰을 보지 않을 능력도 연습할 수 있습니다. 전면 수거 외에 알림 끄기, 가방 보관, 사용 시간 약속을 어떻게 평가할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_student_card_3",
+            "title": "말하기 어려운 예외",
+            "text": "건강이나 가족 사정 때문에 연락이 필요한 학생이 이유를 모두에게 설명해야 할까요? 사생활을 지키는 예외 신청 방식을 생각하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "smartphone_policy_teacher",
+        "name": "수업 담당 교사",
+        "goal": "학생과 교사가 반복되는 사용 제지 없이 수업에 집중할 수 있게 한다.",
+        "priority": "학습 집중과 일관된 지도",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "smartphone_policy_teacher_card_1",
+            "title": "한 사람의 화면, 교실의 주의",
+            "text": "기기 사용이 주변 학생의 집중에도 영향을 줄 수 있다는 우려를 다뤄 보세요. 개인의 선택과 공동 학습 환경의 경계를 어디에 둘까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_teacher_card_2",
+            "title": "제지하는 시간",
+            "text": "매번 사용 목적을 확인하는 방식도 교사의 시간을 씁니다. 단순한 공통 규칙과 꼭 필요한 예외를 함께 설계해 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_teacher_card_3",
+            "title": "수업 도구로 쓰는 날",
+            "text": "스마트폰을 활용하는 수업과 보관 규칙이 충돌할 수 있습니다. 교사가 사용을 허용하는 기준과 대체 도구 제공을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "smartphone_policy_parent",
+        "name": "긴급 연락을 중시하는 학부모",
+        "goal": "필요할 때 자녀와 연락할 수 있다는 신뢰를 유지하면서 학습 환경을 지킨다.",
+        "priority": "긴급 연락과 돌봄의 연속성",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "smartphone_policy_parent_card_1",
+            "title": "급한 연락의 통로",
+            "text": "긴급 상황에 학교 대표 번호만 이용한다면 연결되지 않을 때의 대안이 필요합니다. 연락 전달 시간과 책임자를 어떻게 정할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_parent_card_2",
+            "title": "하교 직전의 변경",
+            "text": "돌봄·통학 일정이 바뀌는 학생에게 어떤 연락 시간을 보장할까요? 수업 중 집중과 하교 준비를 구분해서 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_parent_card_3",
+            "title": "신뢰할 수 있는 안내",
+            "text": "보관 규칙에 동의하려면 보호자가 무엇을 알아야 할까요? 분실 대응, 긴급 반환 절차, 예외 기준 중 우선순위를 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "smartphone_policy_school_manager",
+        "name": "학교 운영 담당자",
+        "goal": "학생 수와 인력에 맞는 규칙을 만들고 보관·분실·위반 처리 책임을 명확히 한다.",
+        "priority": "집행 가능성과 일관성",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "smartphone_policy_school_manager_card_1",
+            "title": "누가 보관 책임을 질까",
+            "text": "기기를 일괄 수거하면 보관과 반환 업무가 생깁니다. 분실·파손 책임과 관리 인력을 정하지 않은 규칙이 실행 가능할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_school_manager_card_2",
+            "title": "예외도 운영의 일부",
+            "text": "예외가 필요한 학생을 매번 따로 호출하지 않고 확인할 수 있는 방식은 무엇일까요? 사생활과 현장 집행을 함께 고려하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_school_manager_card_3",
+            "title": "작게 시작하는 기준",
+            "text": "먼저 일부 수업에서 규칙을 적용한다면 무엇을 관찰할까요? 학생 경험과 교사 업무를 확인한 뒤 수정하는 일정을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "smartphone_policy_rights_advocate",
+        "name": "디지털 권리 옹호자",
+        "goal": "교육 목적에 필요한 만큼만 제한하고 기기·통신 내용에 대한 사생활을 보호한다.",
+        "priority": "최소한의 제한과 사생활",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "smartphone_policy_rights_advocate_card_1",
+            "title": "보관과 검사는 다른 일",
+            "text": "기기를 보관하는 것과 메시지·사진을 확인하는 것은 다른 권한입니다. 기기 수거가 내용 검사로 이어지지 않게 경계를 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_rights_advocate_card_2",
+            "title": "덜 제한적인 선택지",
+            "text": "수업 중 방해를 줄이는 목표에 하루 종일 수거가 꼭 필요한가요? 같은 목적을 이룰 수 있는 제한 범위를 비교해 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_rights_advocate_card_3",
+            "title": "기기 없는 학생도",
+            "text": "수업에서 스마트폰 사용을 허용할 때 기기가 없거나 다른 기기를 쓰는 학생은 어떨까요? 제한 규칙과 접근 기회를 함께 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "smartphone_policy_counselor",
+        "name": "학생 상담 전문가",
+        "goal": "획일적인 처벌보다 사용 맥락을 살피고 도움이 필요한 학생에게 지원을 연결한다.",
+        "priority": "정서적 안전과 개별 지원",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "smartphone_policy_counselor_card_1",
+            "title": "사용 뒤에 있는 이유",
+            "text": "불안, 습관, 가족 연락처럼 같은 행동에도 이유가 다를 수 있습니다. 규칙 위반을 확인한 뒤 어떤 질문을 먼저 할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_counselor_card_2",
+            "title": "공개 망신 없는 지도",
+            "text": "반 친구들 앞에서 휴대폰 사용을 지적하는 방식이 꼭 필요할까요? 규칙을 유지하면서 학생의 체면을 지키는 대응을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "smartphone_policy_counselor_card_3",
+            "title": "제한 이후의 지원",
+            "text": "휴대폰을 치운 뒤에도 집중이 어려운 학생이 있을 수 있습니다. 쉬는 시간 활동이나 상담 지원을 규칙과 어떻게 연결할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      }
+    ],
+    "scenario": {
+      "id": "smartphone_policy_scenario_1",
+      "title": "수거 첫날, 하나의 예외가 규칙을 흔든다",
+      "description": "가상 사건입니다. 전면 보관 시범 운영 첫날, 한 학생이 가족의 돌봄 사정으로 메시지를 확인해야 한다고 요청합니다. 주변 학생들은 자신들도 예외를 원하고, 담당 교사는 이유를 공개적으로 확인할 수 없다고 말합니다.",
+      "options": [
+        {
+          "id": "smartphone_policy_option_1",
+          "text": "사유를 비공개로 확인하고 필요한 시간에만 사용할 수 있게 한다."
+        },
+        {
+          "id": "smartphone_policy_option_2",
+          "text": "모든 학생에게 정해진 연락 시간을 주고 수업 중에는 보관한다."
+        },
+        {
+          "id": "smartphone_policy_option_3",
+          "text": "전면 보관을 중단하고 수업 중 가방 보관 규칙으로 바꾼다."
+        },
+        {
+          "id": "smartphone_policy_option_4",
+          "text": "시범 운영을 유지하며 긴급 연락 전담 창구와 신속 반환 절차를 마련한다."
+        }
+      ]
+    },
+    "questions": [
+      "수업 시간과 쉬는 시간에 같은 제한이 필요한 이유가 있나요?",
+      "다른 학생에게 사정을 공개하지 않고 예외를 운영할 방법은 무엇인가요?",
+      "보관 중 기기가 분실되면 어떤 절차로 책임을 확인하나요?",
+      "규칙을 어긴 학생에게 처벌 외에 어떤 지원을 제공하나요?",
+      "학교 연락 창구가 즉시 응답하지 못할 때 대안은 무엇인가요?",
+      "제한을 강화하거나 완화할 판단 기준에 학생의 경험을 어떻게 반영하나요?"
+    ]
+  },
+  {
+    "topicId": "cctv_policy",
+    "title": "공공장소의 CCTV 설치를 확대해야 할까?",
+    "shortTitle": "공공장소 CCTV 확대",
+    "background": "토론을 위한 가상 지역 정책입니다. 한 지자체가 야간 보행로와 상점가의 CCTV 추가 설치를 검토합니다. 주민의 안전 요구와 함께 촬영 범위, 영상 접근 권한, 보관 기간, 관리 비용, 다른 안전 대책의 우선순위를 결정해야 합니다.",
+    "question": "공공장소의 안전을 위해 CCTV를 더 설치한다면, 어디에 어떤 통제 조건으로 설치해야 할까요?",
+    "tags": ["지역사회", "안전", "개인정보"],
+    "isHypothetical": true,
+    "status": "editorial_reviewed",
+    "active": true,
+    "version": 1,
+    "sourceStatus": "discussion_only",
+    "sources": [],
+    "roles": [
+      {
+        "id": "cctv_policy_resident",
+        "name": "야간 통행이 잦은 주민",
+        "goal": "어두운 길을 이용하는 주민이 안심하고 이동할 수 있도록 한다.",
+        "priority": "생활 속 안전과 신속한 도움",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "cctv_policy_resident_card_1",
+            "title": "매일 지나가는 길",
+            "text": "낮에 보기 편한 장소와 밤에 불안을 느끼는 장소는 다를 수 있습니다. 실제 이용자의 동선을 설치 논의에 어떻게 반영할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_resident_card_2",
+            "title": "보이는 카메라, 실제 대응",
+            "text": "카메라가 있어도 도움을 요청할 길이 분명하지 않으면 불안이 남을 수 있습니다. 비상 연락과 현장 대응을 함께 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_resident_card_3",
+            "title": "안전 대책의 조합",
+            "text": "같은 예산으로 조명이나 보행로 정비를 할 수도 있습니다. CCTV가 꼭 필요한 상황과 다른 대책이 나은 상황을 구분해 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "cctv_policy_safety_officer",
+        "name": "범죄 예방 담당자",
+        "goal": "필요한 장소를 합리적으로 선정하고 사건 확인과 대응에 쓸 수 있는 체계를 만든다.",
+        "priority": "대응 가능성과 목적의 명확성",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "cctv_policy_safety_officer_card_1",
+            "title": "설치 목적부터",
+            "text": "사건 확인, 실시간 대응, 이용자의 안심은 서로 다른 목적입니다. 어느 목적을 우선할지 정하고 그에 맞는 운영 조건을 제시하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_safety_officer_card_2",
+            "title": "카메라 밖의 대응",
+            "text": "촬영만 하고 확인·연락 절차가 없다면 기대한 기능을 못 할 수 있습니다. 영상 확인 요청을 누가 처리할지 구체화하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_safety_officer_card_3",
+            "title": "필요한 범위만 보기",
+            "text": "넓게 찍는 것과 필요한 장면을 확보하는 것은 다를 수 있습니다. 주거 창문 등 불필요한 영역을 제외하는 기준을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "cctv_policy_privacy",
+        "name": "개인정보 보호 활동가",
+        "goal": "일상적인 이동이 과도하게 기록되지 않게 하고 영상의 오용을 막는다.",
+        "priority": "사생활과 감시 권한의 통제",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "cctv_policy_privacy_card_1",
+            "title": "목적이 넓어질 때",
+            "text": "안전 목적으로 모은 영상을 다른 목적으로 사용하자는 요청이 생길 수 있습니다. 목적 변경과 제공을 제한할 기준을 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_privacy_card_2",
+            "title": "언제 지워지는가",
+            "text": "영상을 오래 남길수록 활용 기회와 노출 위험을 함께 고려해야 합니다. 보관 기간과 자동 삭제 확인 절차를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_privacy_card_3",
+            "title": "누가 열어 보았나",
+            "text": "담당자라는 이유만으로 모든 영상을 볼 수 있어야 할까요? 접근 기록, 승인 절차, 오용 시 책임을 어떻게 공개할지 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "cctv_policy_municipal",
+        "name": "지자체 예산 담당자",
+        "goal": "설치 이후의 운영비까지 감당하면서 지역별 우선순위를 설명할 수 있게 한다.",
+        "priority": "지속 가능한 관리와 예산 배분",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "cctv_policy_municipal_card_1",
+            "title": "설치 이후의 비용",
+            "text": "카메라 구매 외에도 점검·저장·민원 처리에 자원이 필요합니다. 처음 설치 수량보다 장기 운영 계획을 먼저 따져 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_municipal_card_2",
+            "title": "목소리 크기와 필요",
+            "text": "민원을 많이 낸 곳만 설치 대상이 되면 의견을 내기 어려운 지역이 빠질 수 있습니다. 선정 기준과 재검토 경로를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_municipal_card_3",
+            "title": "계속 둘 이유",
+            "text": "한 번 설치한 카메라도 필요성을 다시 판단할 수 있어야 합니다. 유지·이전·철거를 검토하는 시점과 기준을 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "cctv_policy_merchant",
+        "name": "늦게까지 일하는 상인",
+        "goal": "손님과 종사자의 안전을 지키되 상점 안과 고객의 일상까지 과하게 노출하지 않는다.",
+        "priority": "영업 공간의 안전과 신뢰",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "cctv_policy_merchant_card_1",
+            "title": "닫는 시간의 안전",
+            "text": "문을 닫고 이동하는 종사자의 동선까지 고려해야 할까요? 유동 인구가 많은 시간만 보고 설치하는 방식의 빈틈을 짚어 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_merchant_card_2",
+            "title": "가게 앞과 안의 경계",
+            "text": "공공 보행로를 촬영하다 상점 내부나 계산대가 담길 수 있습니다. 안전 목적을 유지하며 촬영 각도를 제한할 방법을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_merchant_card_3",
+            "title": "영상 요청의 절차",
+            "text": "상인이나 고객이 영상을 달라고 요청하면 어디까지 허용할까요? 필요한 장면 확인과 타인의 사생활을 함께 보호하는 절차를 말하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "cctv_policy_youth",
+        "name": "청소년 대표",
+        "goal": "청소년의 안전과 자유로운 공공장소 이용을 함께 보장한다.",
+        "priority": "낙인 없는 안전과 참여",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "cctv_policy_youth_card_1",
+            "title": "모여 있다는 이유만으로",
+            "text": "청소년이 모여 있다는 사실만으로 집중 감시 대상이 되어도 될까요? 행동에 근거한 대응과 집단에 대한 추측을 구분하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_youth_card_2",
+            "title": "안전한 머무를 곳",
+            "text": "어른이 생각하는 위험 장소와 청소년이 필요로 하는 쉼터가 겹칠 수 있습니다. 감시 외에 안전하게 머무를 공간을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "cctv_policy_youth_card_3",
+            "title": "설치 전에 들을 목소리",
+            "text": "해당 장소를 쓰는 청소년도 촬영 대상입니다. 설치 안내와 의견 수렴을 이용자가 이해할 수 있는 방식으로 만들 수 있을까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      }
+    ],
+    "scenario": {
+      "id": "cctv_policy_scenario_1",
+      "title": "두 골목, 한 곳을 고를 예산",
+      "description": "가상 사건입니다. 카메라 한 곳을 설치·관리할 예산이 남았습니다. 상점가 주민은 반복된 소란으로 설치를 요청하고, 외곽 보행로 이용자는 어두운 귀갓길의 불안을 호소합니다. 두 장소의 위험도를 비교할 자료는 아직 충분하지 않습니다.",
+      "options": [
+        {
+          "id": "cctv_policy_option_1",
+          "text": "이용자 의견과 현장 조사를 먼저 모아 공개된 기준으로 장소를 정한다."
+        },
+        {
+          "id": "cctv_policy_option_2",
+          "text": "야간 외곽 보행로에 우선 설치하고 촬영 범위와 보관 기간을 제한한다."
+        },
+        {
+          "id": "cctv_policy_option_3",
+          "text": "상점가에 제한 기간 설치한 뒤 운영 결과와 이용자 경험을 검토한다."
+        },
+        {
+          "id": "cctv_policy_option_4",
+          "text": "이번 예산을 조명·비상 연락 등 다른 안전 대책에 사용하고 설치는 재검토한다."
+        }
+      ]
+    },
+    "questions": [
+      "CCTV 확대가 해결하려는 문제를 한 가지로 정의하면 무엇인가요?",
+      "촬영 장소의 필요성을 주민 민원 외에 어떻게 확인하나요?",
+      "누가 영상을 볼 수 있고 그 접근을 누가 점검해야 하나요?",
+      "안전 효과를 아직 모르는 상황에서 시범 운영을 허용할 조건은 무엇인가요?",
+      "카메라 대신 조명이나 공간 정비를 택할 기준은 무엇인가요?",
+      "촬영 대상이 되는 청소년과 주민에게 어떤 의견 제기 권한을 보장하나요?"
+    ]
+  },
+  {
+    "topicId": "transit_support",
+    "title": "청년 대중교통 요금 지원을 확대해야 할까?",
+    "shortTitle": "청년 교통비 지원",
+    "background": "토론을 위한 가상 지역 정책입니다. 한 지자체가 청년의 대중교통 요금 지원을 늘리려 합니다. 모든 청년에게 같은 한도를 적용할지, 이동 필요나 경제적 여건을 반영할지, 대중교통 자체가 부족한 지역은 어떻게 지원할지 논의합니다.",
+    "question": "청년의 이동을 지원하는 한정된 예산을 누구에게 어떤 방식으로 배분해야 할까요?",
+    "tags": ["지역사회", "이동권", "예산"],
+    "isHypothetical": true,
+    "status": "editorial_reviewed",
+    "active": true,
+    "version": 1,
+    "sourceStatus": "discussion_only",
+    "sources": [],
+    "roles": [
+      {
+        "id": "transit_support_student",
+        "name": "통학하는 대학생",
+        "goal": "반복되는 통학 비용이 학업과 학교 활동 참여를 제약하지 않게 한다.",
+        "priority": "예측 가능한 이동 지원",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "transit_support_student_card_1",
+            "title": "매일의 왕복",
+            "text": "통학은 한 번의 특별한 이동보다 반복 비용이 중요할 수 있습니다. 이용 횟수와 거리를 지원에 반영할지 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_student_card_2",
+            "title": "수업 밖의 참여",
+            "text": "지원 대상을 정규 수업 이동으로만 제한하면 동아리·도서관 이용은 어떻게 될까요? 이동 목적을 어디까지 확인할지 생각하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_student_card_3",
+            "title": "먼저 내야 하는 돈",
+            "text": "사후 환급은 신청 전에 요금을 낼 수 있어야 이용할 수 있습니다. 즉시 할인과 환급의 장단점을 이 역할에서 비교하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "transit_support_job_seeker",
+        "name": "취업 준비생",
+        "goal": "소득이 불안정해도 면접·훈련·구직 활동에 필요한 이동을 지속할 수 있게 한다.",
+        "priority": "필요할 때 끊기지 않는 접근",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "transit_support_job_seeker_card_1",
+            "title": "일정이 불규칙한 이동",
+            "text": "정기 통학과 달리 구직 이동은 횟수와 경로가 바뀔 수 있습니다. 정기권과 이용액 지원 중 어떤 방식이 적합할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_job_seeker_card_2",
+            "title": "증명하기 어려운 활동",
+            "text": "면접 확인서처럼 증빙을 많이 요구하면 신청이 부담스러울 수 있습니다. 부정 이용 대응과 간단한 신청 사이의 기준을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_job_seeker_card_3",
+            "title": "경계에 선 신청자",
+            "text": "단기 근로 중인 사람이나 졸업을 미룬 사람을 어떻게 다룰까요? 신분보다 이동 필요를 기준으로 삼을 수 있는지 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "transit_support_budget",
+        "name": "지자체 예산 담당자",
+        "goal": "다른 사업과의 균형을 지키며 예산 한도 안에서 예측 가능한 지원을 설계한다.",
+        "priority": "재정 지속성과 설명 가능한 기준",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "transit_support_budget_card_1",
+            "title": "지원이 늘어나는 만큼",
+            "text": "교통비 지원을 늘릴 때 조정할 다른 지출이나 재원이 필요합니다. 확대 목표와 함께 감당할 수 있는 한도를 제시하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_budget_card_2",
+            "title": "신청이 예상보다 많다면",
+            "text": "예산 소진 시 선착순으로 끊으면 신청 시점에 따라 차이가 생깁니다. 일괄 조정, 우선순위, 추가 재원 중 기준을 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_budget_card_3",
+            "title": "나이만으로 충분할까",
+            "text": "나이는 간단하지만 같은 나이의 여건이 모두 같지는 않습니다. 신청 부담을 크게 늘리지 않고 필요를 반영할 방법을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "transit_support_operator",
+        "name": "교통 운영기관 담당자",
+        "goal": "요금 지원이 실제 이용으로 이어지고 운행·정산 체계가 감당할 수 있게 한다.",
+        "priority": "서비스의 지속성과 실행 가능성",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "transit_support_operator_card_1",
+            "title": "탈 수 있는 차가 먼저",
+            "text": "요금이 낮아져도 필요한 시간에 노선이 없으면 이동하기 어렵습니다. 요금 지원과 배차 개선의 우선순위를 어떻게 정할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_operator_card_2",
+            "title": "지원금의 정산",
+            "text": "할인 방식이라면 운영기관이 비용을 언제 어떻게 보전받을지 정해야 합니다. 이용자 편의와 안정적인 정산을 함께 설계하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_operator_card_3",
+            "title": "경계를 넘는 통행",
+            "text": "한 사람의 이동이 여러 지자체나 교통수단에 걸칠 수 있습니다. 환승과 지역 간 정산 기준이 없는 지원의 한계를 짚어 보세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "transit_support_regional_youth",
+        "name": "비수도권 청년",
+        "goal": "대중교통 접근성이 낮은 지역의 청년도 이동 지원에서 배제되지 않게 한다.",
+        "priority": "지역 간 형평성과 실질적 이용",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "transit_support_regional_youth_card_1",
+            "title": "쓸 노선이 없다면",
+            "text": "교통비 환급만 받는 제도는 버스가 드문 곳에서 도움이 제한될 수 있습니다. 서비스 공급과 비용 지원을 함께 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_regional_youth_card_2",
+            "title": "같은 금액, 다른 기회",
+            "text": "같은 지원금이라도 이동 거리와 환승 여건에 따라 가능한 활동이 달라질 수 있습니다. 똑같이 지급하는 것과 공평한 지원을 구분하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_regional_youth_card_3",
+            "title": "생활권과 주소지",
+            "text": "사는 곳과 공부하거나 일자리를 찾는 곳이 다를 수 있습니다. 주소지 중심 신청이 놓치는 이동을 어떻게 포함할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "transit_support_civic",
+        "name": "이동권 시민단체 활동가",
+        "goal": "지원이 필요한 사람에게 닿으면서 신청 과정의 배제와 낙인을 줄인다.",
+        "priority": "접근성·형평성·쉬운 신청",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "transit_support_civic_card_1",
+            "title": "신청할 수 있어야 지원",
+            "text": "복잡한 온라인 인증이나 서류 제출이 이용 장벽이 될 수 있습니다. 대면 신청과 안내 지원을 포함할지 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_civic_card_2",
+            "title": "청년 밖의 어려움",
+            "text": "청년 지원의 목적을 분명히 하면서 비슷한 어려움을 겪는 다른 연령도 고려해야 합니다. 대상 선정 이유를 어떻게 설명할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "transit_support_civic_card_3",
+            "title": "개인 이동 기록의 경계",
+            "text": "지원 확인을 위해 모든 이동 경로를 계속 저장할 필요가 있을까요? 정산에 필요한 정보와 불필요한 사생활 정보를 구분하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      }
+    ],
+    "scenario": {
+      "id": "transit_support_scenario_1",
+      "title": "신청은 늘고, 쓸 수 없는 지원도 생겼다",
+      "description": "가상 사건입니다. 시범 지원 신청이 편성 예산을 넘어섰습니다. 동시에 외곽 지역 청년들은 이용할 노선이 적어 환급 한도를 쓰기 어렵다고 말합니다. 이번 기간에는 전체 예산을 바로 늘릴 수 없습니다.",
+      "options": [
+        {
+          "id": "transit_support_option_1",
+          "text": "모든 신청자의 지원 한도를 같은 비율로 조정하고 다음 예산 기준을 공개한다."
+        },
+        {
+          "id": "transit_support_option_2",
+          "text": "경제적 여건과 이동 필요를 반영해 우선 지원하되 신청·이의 제기를 간단히 한다."
+        },
+        {
+          "id": "transit_support_option_3",
+          "text": "지원 일부를 외곽 노선·연계 교통 개선에 배분하고 나머지는 요금을 지원한다."
+        },
+        {
+          "id": "transit_support_option_4",
+          "text": "이동 유형별로 정기권·이용액 지원을 나누고 일정 기간 뒤 배분을 다시 검토한다."
+        }
+      ]
+    },
+    "questions": [
+      "지원 확대의 목표는 비용 절감, 활동 참여, 이동 기회 중 무엇인가요?",
+      "신청자가 예상을 넘으면 어떤 기준으로 배분해야 공정할까요?",
+      "노선이 없는 지역에도 같은 형태의 지원을 제공하는 것이 충분한가요?",
+      "지원 대상을 증명하는 부담을 낮추면서 제도를 운영할 방법은 무엇인가요?",
+      "주소지와 실제 생활권이 다른 청년은 어떻게 포함하나요?",
+      "지원 확대를 지속하거나 조정할 때 무엇을 확인해야 하나요?"
+    ]
+  },
+  {
+    "topicId": "ai_assignment",
+    "title": "학교 과제에 생성형 AI를 사용했다면 사용 사실을 공개해야 할까?",
+    "shortTitle": "과제의 AI 사용 공개",
+    "background": "토론을 위한 가상 학사 규칙입니다. 한 학교가 생성형 AI를 활용한 과제에 사용 목적과 범위를 밝히는 항목을 도입하려 합니다. 아이디어 탐색, 문장 교정, 결과물 생성, 학습 보조를 어떻게 구분할지와 공개 범위·평가 방식·접근성을 함께 논의합니다.",
+    "question": "과제에서 AI를 사용했다면 무엇을 누구에게 공개하고, 그 정보를 평가에 어떻게 사용해야 할까요?",
+    "tags": ["교육", "AI", "공정성"],
+    "isHypothetical": true,
+    "status": "editorial_reviewed",
+    "active": true,
+    "version": 1,
+    "sourceStatus": "discussion_only",
+    "sources": [],
+    "roles": [
+      {
+        "id": "ai_assignment_student",
+        "name": "도구를 활용하는 학생",
+        "goal": "허용 범위를 미리 알고 정직한 공개가 부당한 불이익으로 이어지지 않게 한다.",
+        "priority": "명확한 규칙과 도구 활용의 자율성",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "ai_assignment_student_card_1",
+            "title": "어디부터 사용일까",
+            "text": "맞춤법 제안과 본문 생성까지 모두 같은 공개 항목으로 묶어야 할까요? 학생이 스스로 적용할 수 있을 만큼 구체적인 기준을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_student_card_2",
+            "title": "밝히면 손해라는 걱정",
+            "text": "AI 사용을 공개했다는 이유만으로 낮게 평가한다면 정직한 신고가 어려워질 수 있습니다. 공개와 채점의 관계를 먼저 명확히 하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_student_card_3",
+            "title": "기록할 시간도 과제",
+            "text": "모든 대화와 수정 내역을 제출하는 일은 별도의 부담이 될 수 있습니다. 학습 과정을 설명하는 데 충분한 최소 기록은 무엇일까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "ai_assignment_instructor",
+        "name": "교수자",
+        "goal": "학생이 무엇을 직접 이해하고 수행했는지 확인하고 필요한 피드백을 제공한다.",
+        "priority": "학습 목표와 수행의 확인",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "ai_assignment_instructor_card_1",
+            "title": "무엇을 배운 과제인가",
+            "text": "같은 도구라도 글쓰기 연습과 자료 비교 과제에서 의미가 다를 수 있습니다. 학습 목표에 따라 허용·공개 범위를 달리할지 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_instructor_card_2",
+            "title": "결과물 뒤의 이해",
+            "text": "잘 다듬어진 결과물만으로 학생의 이해를 모두 알기 어렵습니다. 짧은 설명이나 수정 이유를 어떻게 확인할지 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_instructor_card_3",
+            "title": "수업 시작 전에",
+            "text": "제출 직전에 공개 기준을 알리면 학생이 작업 방식을 바꾸기 어렵습니다. 과제 안내에 어떤 예시와 기준을 함께 제공할까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "ai_assignment_learning_support",
+        "name": "학습 지원 담당자",
+        "goal": "도구 사용 경험과 학습 여건이 다른 학생도 규칙을 이해하고 도움을 받게 한다.",
+        "priority": "쉬운 안내와 학습 기회의 균형",
+        "stance": "neutral",
+        "cards": [
+          {
+            "id": "ai_assignment_learning_support_card_1",
+            "title": "익숙함의 차이",
+            "text": "도구 사용 경험이 다른 학생에게 같은 안내문만 주면 충분할까요? 공개 예시, 실습, 질문 창구 중 필요한 지원을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_learning_support_card_2",
+            "title": "유료 도구의 경계",
+            "text": "특정 유료 도구를 써야 좋은 결과를 낼 수 있는 과제라면 어떤 대안이 필요할까요? 학교 제공 도구와 비사용 선택지를 함께 고려하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_learning_support_card_3",
+            "title": "실수와 은폐를 구분",
+            "text": "공개 항목을 잘못 이해한 경우와 의도적으로 속인 경우를 같은 방식으로 다뤄야 할까요? 수정 기회와 설명 절차를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "ai_assignment_ethicist",
+        "name": "AI 윤리 연구자",
+        "goal": "생성된 내용에 대한 책임을 유지하고 공개가 보여주기식 체크에 그치지 않게 한다.",
+        "priority": "책임 있는 사용과 설명 가능성",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "ai_assignment_ethicist_card_1",
+            "title": "도구가 써도 제출은 나",
+            "text": "AI가 만든 문장의 오류를 누가 확인해야 할까요? 사용 사실의 공개와 별개로 제출자가 져야 할 검토 책임을 말하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_ethicist_card_2",
+            "title": "체크 하나로 충분할까",
+            "text": "‘사용함’ 표시만으로 도움받은 범위를 이해할 수 있을까요? 작업 목적과 본인이 검토·수정한 부분을 짧게 설명하는 방안을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_ethicist_card_3",
+            "title": "입력한 정보도 중요하다",
+            "text": "사용 공개를 위해 대화 내용을 모두 제출하면 제삼자의 정보가 포함될 수 있습니다. 학습 확인과 정보 최소 수집을 함께 고려하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "ai_assignment_accessibility",
+        "name": "장애학생 지원 담당자",
+        "goal": "필요한 학습 보조를 유지하면서 장애나 건강 정보가 불필요하게 드러나지 않게 한다.",
+        "priority": "접근성과 민감 정보의 보호",
+        "stance": "oppose",
+        "cards": [
+          {
+            "id": "ai_assignment_accessibility_card_1",
+            "title": "공개가 사정을 드러낼 때",
+            "text": "보조 도구의 사용 이유를 자세히 쓰라는 요구가 개인의 사정을 드러낼 수 있습니다. 기능만 밝히고 이유는 비공개로 둘 수 있을까요?",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_accessibility_card_2",
+            "title": "도움과 대필의 구분",
+            "text": "읽기·표현을 돕는 기능과 과제의 핵심 수행을 대신하는 기능은 다를 수 있습니다. 도구 이름보다 실제 기능을 기준으로 논의하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_accessibility_card_3",
+            "title": "모두에게 같은 형식인가",
+            "text": "한 가지 공개 양식이 모든 학생에게 접근 가능할까요? 별도 지원 창구와 대체 제출 형식을 규칙 안에 마련할 방법을 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      },
+      {
+        "id": "ai_assignment_assessment",
+        "name": "평가 설계 담당자",
+        "goal": "공개 여부를 단정적인 판별 수단으로 쓰지 않고 일관되고 설명 가능한 평가를 만든다.",
+        "priority": "평가의 신뢰성과 이의 제기",
+        "stance": "support",
+        "cards": [
+          {
+            "id": "ai_assignment_assessment_card_1",
+            "title": "알고 싶은 능력을 평가",
+            "text": "결과물만 보는 평가와 과정 설명을 함께 보는 평가는 확인할 수 있는 것이 다릅니다. AI 공개가 어떤 평가 정보를 보완할지 정하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_assessment_card_2",
+            "title": "의심은 결론이 아니다",
+            "text": "문체 변화나 자동 탐지 결과만으로 부정 사용을 확정해도 될까요? 학생의 설명과 추가 확인을 받을 절차를 제안하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          },
+          {
+            "id": "ai_assignment_assessment_card_3",
+            "title": "같은 기준, 다른 과제",
+            "text": "모든 과제에 동일한 금지·공개 규칙을 적용하는 것이 공정할까요? 공통 원칙과 과제별 기준을 함께 안내하는 방안을 검토하세요.",
+            "type": "perspective",
+            "label": "토론용 관점 카드",
+            "sources": [],
+            "sourceStatus": "discussion_only"
+          }
+        ]
+      }
+    ],
+    "scenario": {
+      "id": "ai_assignment_scenario_1",
+      "title": "같은 결과물, 다른 사용 설명",
+      "description": "가상 사건입니다. 한 학생은 AI로 개요를 만들었다고 공개했고, 다른 학생은 표현을 다듬는 데 도움을 받았지만 공개 범위를 몰랐다고 말합니다. 한 학생은 학습 보조의 구체적인 이유가 공개되는 것을 걱정합니다. 과제 안내에는 사용 여부만 적으라고 되어 있었습니다.",
+      "options": [
+        {
+          "id": "ai_assignment_option_1",
+          "text": "이번 과제는 목적·범위를 추가 설명할 기회를 주고 구체적인 기준은 다음 과제부터 적용한다."
+        },
+        {
+          "id": "ai_assignment_option_2",
+          "text": "모든 학생에게 핵심 내용의 이해와 수정 과정을 짧게 설명하게 한다."
+        },
+        {
+          "id": "ai_assignment_option_3",
+          "text": "학습 보조 사유는 비공개 창구에서 다루고 과제에는 사용 기능만 표시한다."
+        },
+        {
+          "id": "ai_assignment_option_4",
+          "text": "과제별 학습 목표에 맞춘 공개 양식을 학생과 함께 정하고 재제출 기회를 준다."
+        }
+      ]
+    },
+    "questions": [
+      "AI를 사용했다고 공개하면 채점에서 구체적으로 무엇이 달라지나요?",
+      "맞춤법 교정과 핵심 내용 생성을 어떻게 구분해 안내하나요?",
+      "사용 내역을 어디까지 남겨야 하며 누가 볼 수 있어야 하나요?",
+      "학습 보조가 필요한 사정을 드러내지 않고 공개 의무를 지킬 방법은 무엇인가요?",
+      "공개 누락이 의심될 때 학생에게 어떤 설명 기회를 보장하나요?",
+      "AI를 쓰지 않는 학생도 동등하게 수행할 수 있는 과제인가요?"
+    ]
+  }
+]

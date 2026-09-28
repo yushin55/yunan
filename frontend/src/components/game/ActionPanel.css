@@ -1,0 +1,467 @@
+.stage-panel {
+  --stage-gold: #eac990;
+  --stage-ink: #172320;
+  isolation: isolate;
+}
+.stage-panel > h2 {
+  font-family: "Noto Serif KR", serif;
+  font-size: clamp(20px, 2vw, 25px);
+  color: #f7ecda;
+  letter-spacing: -.055em;
+}
+.stage-flow { margin-top: 16px; }
+.stage-progress {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+  padding: 3px;
+  border: 1px solid #a18b6549;
+  border-radius: 5px;
+  background: #0c1817a8;
+}
+.stage-progress button {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #b7baa8;
+  cursor: pointer;
+}
+.stage-progress button.active {
+  border-color: #e3c58a8c;
+  background: linear-gradient(130deg, #755d3eaa, #322f25bf);
+  color: #fff0cf;
+  box-shadow: inset 0 1px #fff3;
+}
+.stage-progress button:hover:not(.active) { background: #d7c29520; color: #fff2d8; }
+.stage-progress button span { font-size: 10px; font-weight: 700; letter-spacing: .12em; }
+.stage-progress button small { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.stage-card-content { min-height: 175px; padding: 17px 0 10px; animation: stage-turn .22s ease-out; }
+.stage-intro { margin-bottom: 14px; }
+.stage-intro .eyebrow { font-size: 9px; letter-spacing: .14em; color: var(--stage-gold); }
+.stage-intro p { margin: 7px 0 0; color: #d4d0bc; font-size: 11px; line-height: 1.65; }
+.stage-panel .text-field { margin: 0 0 12px; }
+.stage-panel .text-field textarea {
+  min-height: 94px;
+  padding: 13px;
+  border: 1px solid #ad987058;
+  border-radius: 5px;
+  background: #101d1beb;
+  color: #f7efdf;
+  line-height: 1.7;
+  resize: vertical;
+}
+.stage-panel .text-field textarea:focus { border-color: #e8c68d; box-shadow: 0 0 0 2px #eac99033; outline: none; }
+.stage-panel .text-field .char-count { color: #b8b5a5; }
+.stage-panel .field-label { display: block; margin-bottom: 8px; color: #ecd6ad; font-size: 10px; }
+.stage-footer { display: flex; align-items: stretch; gap: 8px; border-top: 1px solid #d7bb8550; padding-top: 13px; }
+.stage-footer button { min-height: 41px; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.stage-back { width: 95px; border: 1px solid #a99e7c70; background: #14221fe0; color: #e5dcc8; }
+.stage-back:hover:not(:disabled) { background: #304037; }
+.stage-forward { display: flex; align-items: center; justify-content: center; gap: 8px; flex: 1; border: 1px solid #f0d4a6; background: linear-gradient(120deg, #d2a96e, #eed19b); color: #202a25; box-shadow: 0 5px 17px #0005, inset 0 1px #fff8; }
+.stage-forward:hover:not(:disabled) { filter: brightness(1.09); }
+.stage-footer button:disabled { opacity: .42; cursor: not-allowed; box-shadow: none; }
+.stage-submit { letter-spacing: -.02em; }
+
+.deck { width: 100%; }
+.deck-choice {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 174px;
+  padding: 19px 18px 15px;
+  border: 1px solid #b2976d9c;
+  border-radius: 7px;
+  background:
+    linear-gradient(137deg, #ffffff11 0%, transparent 32%),
+    radial-gradient(circle at 80% 10%, #8a754330, transparent 42%),
+    linear-gradient(145deg, #354136, #1a2927);
+  box-shadow: 0 10px 24px #0007, inset 0 0 0 5px #141d1a75, inset 0 1px #fff3;
+  overflow: hidden;
+  animation: deck-turn .22s cubic-bezier(.2, .7, .2, 1) both;
+}
+.deck-choice::before {
+  content: "";
+  position: absolute;
+  width: 155px;
+  height: 155px;
+  right: -56px;
+  top: -55px;
+  border: 1px solid #e2c58c20;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.deck-choice.is-selected { border-color: #eecb8a; box-shadow: 0 10px 25px #0009, 0 0 0 2px #ebc88834, inset 0 0 0 5px #141d1a75; }
+.deck-choice__label { color: #e8c893; font-size: 9px; letter-spacing: .15em; text-transform: uppercase; }
+.deck-choice__number { position: absolute; top: 16px; right: 18px; color: #e7c79182; font: 500 26px/1 "Noto Serif KR", serif; }
+.deck-choice h3 {
+  position: relative;
+  margin: 16px 24px 7px 0;
+  color: #fff3dc;
+  font: 600 clamp(16px, 2vw, 21px)/1.45 "Noto Serif KR", serif;
+  letter-spacing: -.045em;
+  overflow-wrap: anywhere;
+}
+.deck-choice p {
+  position: relative;
+  margin: 0 0 14px;
+  color: #d9dbc9;
+  font-size: 10px;
+  line-height: 1.65;
+}
+.deck-choice__select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  margin-top: auto;
+  padding: 7px 10px;
+  border: 1px solid #d7bd8d8c;
+  border-radius: 4px;
+  background: #b9996140;
+  color: #f7ddb0;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: left;
+}
+.deck-choice__select:hover { background: #c2a06a70; }
+.deck-choice__select[aria-pressed="true"] { background: #d4b57f; color: #1a2923; }
+.deck-arrows { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 10px 0 0; color: #d7c9aa; font-size: 10px; font-variant-numeric: tabular-nums; }
+.deck-arrows button,
+.stage-incoming__top button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #baa37378;
+  border-radius: 4px;
+  background: #172621;
+  color: #f2daa7;
+  font: 22px/1 Arial, sans-serif;
+  cursor: pointer;
+}
+.deck-arrows button:hover,
+.stage-incoming__top button:hover { background: #6c5c40; }
+.stage-selection-summary { margin: 11px 0 0; color: #e4cb9f; font-size: 10px; line-height: 1.6; text-align: center; }
+.stage-review { padding: 18px; border: 1px solid #c6ac7c90; border-radius: 5px; background: #14231fe8; }
+.stage-review > div { display: grid; grid-template-columns: 75px 1fr; gap: 8px; padding: 11px 0; border-bottom: 1px solid #d9c39534; }
+.stage-review small { color: #d0b585; font-size: 10px; }
+.stage-review strong { color: #f1e8d6; font-size: 11px; font-weight: 500; line-height: 1.6; overflow-wrap: anywhere; }
+.stage-review p { display: flex; gap: 6px; align-items: center; color: #c7ceb4; font-size: 9px; }
+.stage-spotlight { padding: 20px; border: 1px solid #d8bc8588; border-radius: 6px; background: radial-gradient(circle at center top, #ad874a38, #19251f); text-align: center; }
+.stage-spotlight > span { color: #e8c587; font-size: 9px; letter-spacing: .13em; }
+.stage-spotlight h3 { margin: 15px 0; color: #fff2d7; font: 600 23px/1.4 "Noto Serif KR", serif; }
+.stage-spotlight p { color: #e0dbc9; font-size: 11px; line-height: 1.75; }
+.stage-action-button { margin-top: 15px; }
+.stage-scenario { margin: 0 0 16px; padding: 14px; }
+.stage-scenario h3 { margin: 7px 0; }
+.stage-scenario p { max-height: 90px; overflow-y: auto; }
+.stage-role-reveal { margin: 18px 0; padding: 24px 17px; }
+.stage-role-reveal h3 { margin: 9px 0; }
+.stage-role-reveal p { line-height: 1.7; }
+.stage-waiting { padding: 27px 16px; }
+.stage-waiting .waiting-icon { margin-bottom: 13px; width: 48px; height: 48px; }
+.stage-waiting h3 { margin: 0 0 9px; }
+.stage-waiting p { line-height: 1.7; }
+.stage-waiting .subtle { display: inline-flex; gap: 6px; align-items: center; font-size: 9px; }
+.stage-incoming { margin-top: 19px; padding-top: 15px; border-top: 1px solid #d7bb8550; }
+.stage-incoming__top { display: flex; align-items: center; justify-content: space-between; }
+.stage-incoming__top > span:last-child { display: flex; gap: 5px; }
+.stage-incoming .answer-card { margin: 8px 0 0; }
+.stage-incoming .answer-card > p:first-child { line-height: 1.7; }
+.stage-reveal-card { padding: 19px; border: 1px solid #e0bd827a; border-radius: 5px; background: radial-gradient(circle at top, #895d3d52, #172420); text-align: center; }
+.stage-reveal-card > span { display: block; color: #dfd6be; font-size: 11px; }
+.stage-reveal-card > strong { display: block; margin: 10px 0; color: #fff0d7; font: 500 23px/1.4 "Noto Serif KR", serif; }
+.stage-reveal-card > em { display: inline-block; padding: 4px 9px; border: 1px solid #ddba7d8c; border-radius: 30px; color: #f7d49d; font-size: 10px; font-style: normal; }
+.stage-complete { display: flex; align-items: center; gap: 8px; padding: 16px; color: #d5ebca; font-size: 12px; }
+.stage-criterion { padding: 17px; border: 1px solid #baa77b81; border-radius: 6px; background: #192820; }
+.stage-criterion h3 { margin: 12px 0 7px; color: #f1dfbc; font: 500 17px/1.45 "Noto Serif KR", serif; }
+.stage-criterion p { color: #c5d0bd; font-size: 10px; line-height: 1.7; }
+.stage-criterion .rating-row { justify-content: center; margin: 13px 0 0; }
+.stage-criterion .rating-row > div { gap: 7px; }
+.stage-criterion .rating-row button { width: 39px; height: 38px; font-size: 12px; }
+.stage-private-card { display: grid; gap: 15px; padding: 22px 18px; min-height: 225px; border: 1px solid #d8b9789c; border-radius: 6px; background: radial-gradient(circle at 85% 0%, #ab8b515c, transparent 43%), linear-gradient(145deg, #354235, #17241f); box-shadow: 0 14px 28px #0007, inset 0 0 0 5px #13221b80; }
+.stage-private-card > span { color: #ebc987; font-size: 9px; letter-spacing: .14em; }
+.stage-private-card strong { color: #fff0d5; font: 500 22px/1.4 "Noto Serif KR", serif; }
+.stage-private-card p { color: #d6dcc7; font-size: 12px; line-height: 1.8; margin: 0; }
+.stage-private-card small { color: #c8b990; font-size: 9px; text-align: right; }
+.stage-role-cards .small-section-heading { margin: 18px 0; }
+.stage-role-cards .deck-arrows { margin-top: 15px; }
+
+@keyframes stage-turn { from { opacity: .45; transform: translateY(8px) rotateX(-5deg); } to { opacity: 1; transform: none; } }
+@keyframes deck-turn { from { opacity: .45; transform: translateX(12px) rotate(1deg) scale(.985); } to { opacity: 1; transform: none; } }
+@media (max-width: 520px) {
+  .immersive-action-dock .action-panel.stage-panel { padding: 8px 16px 12px; }
+  .immersive-action-dock .action-panel.stage-panel > h2 { margin: 2px 0 5px; font-size: 19px; line-height: 1.35; }
+  .stage-flow { margin-top: 5px; }
+  .stage-progress button { padding: 5px 2px; }
+  .stage-progress button small { font-size: 8px; }
+  .stage-card-content { min-height: 0; padding: 10px 0 8px; }
+  .stage-intro { margin-bottom: 5px; }
+  .stage-intro p {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    margin: 4px 0 0;
+    line-height: 1.35;
+  }
+  .deck { position: relative; }
+  .deck-choice { min-height: 110px; padding: 8px; touch-action: pan-y; }
+  .deck-choice__number { top: 12px; right: 76px; font-size: 21px; }
+  .deck-choice h3 { font-size: 16px; line-height: 1.35; margin: 8px 22px 4px 0; }
+  .deck-choice p { max-height: 47px; overflow-y: auto; margin-bottom: 8px; }
+  .deck-choice__select { min-height: 30px; padding: 5px 8px; }
+  .deck > .deck-arrows {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    justify-content: flex-end;
+    gap: 4px;
+    margin: 0;
+  }
+  .deck > .deck-arrows button { width: 25px; height: 25px; font-size: 19px; background: #10211ed9; }
+  .deck > .deck-arrows span { display: none; }
+  .stage-panel .text-field textarea { min-height: 72px; }
+  .immersive-action-dock .stage-footer {
+    position: sticky;
+    z-index: 5;
+    bottom: 0;
+    margin: 4px -1px -1px;
+    padding: 9px 1px 3px;
+    background: linear-gradient(180deg, #18251ee8, #15231ffa 28%);
+    box-shadow: 0 -9px 18px #0a1718a6;
+  }
+  .stage-footer button { min-height: 39px; }
+  .stage-scenario p { max-height: 66px; }
+}
+@media (prefers-reduced-motion: reduce) { .stage-card-content, .deck-choice { animation: none; } }
+
+/* A small tarot spread sits on the table: the center face is the current
+   decision, while the two card backs turn the deck without listing choices. */
+.tarot-spread {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 278px;
+  perspective: 900px;
+  isolation: isolate;
+}
+.tarot-spread .deck-choice {
+  z-index: 2;
+  width: min(228px, 68%);
+  min-height: 262px;
+  padding: 15px 15px 13px;
+  border: 1px solid var(--tarot-accent, #dbbc81);
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 50% 31%, color-mix(in srgb, var(--tarot-accent, #dbbc81) 15%, transparent), transparent 42%),
+    linear-gradient(150deg, #34423c, #172522 56%, #111b1d);
+  box-shadow: 0 18px 27px #000a, 0 0 0 2px #17241f, inset 0 0 0 5px #16231ead, inset 0 1px #fff5;
+  text-align: center;
+  cursor: pointer;
+  transform: rotateX(3deg);
+  animation: tarot-face-in .25s ease-out both;
+}
+.tarot-spread .deck-choice::before {
+  inset: 7px;
+  width: auto;
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--tarot-accent, #dbbc81) 50%, transparent);
+  border-radius: 4px;
+}
+.tarot-spread .deck-choice::after {
+  content: "✧";
+  position: absolute;
+  top: 4px;
+  left: 11px;
+  color: var(--tarot-accent, #dbbc81);
+  font: 16px/1 Georgia, serif;
+  opacity: .8;
+}
+.tarot-spread .deck-choice.is-selected {
+  box-shadow: 0 18px 27px #000a, 0 0 19px color-mix(in srgb, var(--tarot-accent, #dbbc81) 36%, transparent), inset 0 0 0 5px #16231ead;
+}
+.tarot-spread .deck-choice__label {
+  align-self: center;
+  max-width: 75%;
+  color: var(--tarot-accent, #dbbc81);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+.tarot-spread .deck-choice__number { top: 14px; right: 14px; color: var(--tarot-accent, #dbbc81); font-size: 16px; }
+.tarot-sigil {
+  display: block;
+  flex: none;
+  width: 91px;
+  height: 91px;
+  margin: 10px auto 2px;
+  color: var(--tarot-accent, #dbbc81);
+  opacity: .95;
+  filter: drop-shadow(0 0 13px color-mix(in srgb, var(--tarot-accent, #dbbc81) 35%, transparent));
+}
+.tarot-spread .deck-choice h3 {
+  margin: 4px 0 5px;
+  color: #fff0d5;
+  font-size: 17px;
+  line-height: 1.35;
+}
+.tarot-spread .deck-choice p {
+  max-height: 49px;
+  margin: 0 0 8px;
+  overflow-y: auto;
+  font-size: 9px;
+  line-height: 1.4;
+}
+.tarot-spread .deck-choice__select {
+  justify-content: center;
+  min-height: 32px;
+  margin-top: auto;
+  border-color: color-mix(in srgb, var(--tarot-accent, #dbbc81) 65%, transparent);
+  font-size: 9px;
+}
+.tarot-echo {
+  position: absolute;
+  z-index: 1;
+  top: 21px;
+  display: grid;
+  place-items: center;
+  width: 28%;
+  height: 224px;
+  padding: 7px;
+  border: 1px solid #c8ab76b5;
+  border-radius: 7px;
+  background: repeating-linear-gradient(145deg, #723e3b 0 6px, #693734 6px 11px);
+  color: #eacb91;
+  box-shadow: 0 12px 21px #0009, inset 0 0 0 5px #49282a, inset 0 0 0 6px #e4bd7970;
+  cursor: pointer;
+  transition: transform .2s ease, filter .2s ease;
+}
+.tarot-echo::after { content: ""; position: absolute; inset: 11px; border: 1px solid #e5bd7b8f; border-radius: 2px; pointer-events: none; }
+.tarot-echo .tarot-sigil { width: 69px; height: 69px; margin: 0; filter: none; }
+.tarot-echo--previous { left: 2px; transform: rotate(-10deg) translateY(11px); }
+.tarot-echo--next { right: 2px; transform: rotate(10deg) translateY(11px); }
+.tarot-echo--previous:hover { transform: rotate(-13deg) translate(-4px, 7px); filter: brightness(1.12); }
+.tarot-echo--next:hover { transform: rotate(13deg) translate(4px, 7px); filter: brightness(1.12); }
+.deck > .deck-arrows { position: static; justify-content: center; gap: 12px; margin: 3px 0 5px; }
+.deck > .deck-arrows span { display: inline; min-width: 36px; text-align: center; }
+.tarot-count { margin: 1px 0 5px; color: #d7c49e; font-size: 9px; text-align: center; letter-spacing: .03em; }
+@keyframes tarot-face-in { from { opacity: .5; transform: translateY(11px) rotateY(-15deg) scale(.97); } to { opacity: 1; transform: rotateX(3deg); } }
+
+@media (max-width: 520px) {
+  .tarot-spread { min-height: 194px; }
+  .tarot-spread .deck-choice { width: min(176px, 60%); min-height: 185px; padding: 8px 9px 7px; }
+  .tarot-spread .deck-choice__label { font-size: 7px; }
+  .tarot-spread .deck-choice__number { top: 10px; right: 12px; font-size: 13px; }
+  .tarot-sigil { width: 48px; height: 48px; margin: 5px auto 1px; }
+  .tarot-spread .deck-choice h3 { margin: 3px 0; font-size: 14px; }
+  .tarot-spread .deck-choice p { max-height: 31px; margin-bottom: 4px; font-size: 8px; }
+  .tarot-spread .deck-choice__select { min-height: 26px; padding: 3px; font-size: 8px; }
+  .tarot-echo { top: 14px; width: 28%; height: 162px; }
+  .tarot-echo .tarot-sigil { width: 45px; height: 45px; }
+  .tarot-count { margin: 0 0 2px; font-size: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tarot-spread .deck-choice { animation: none; }
+  .tarot-echo { transition: none; }
+}
+
+/* Preferred-role ranking: two visible slots so nobody stops after one pick. */
+.rank-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: min(520px, 100%);
+  margin: 6px auto 4px;
+}
+.rank-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 30px 6px 8px;
+  border: 1px dashed #d8c29366;
+  border-radius: 6px;
+  background: #0b1311b3;
+  color: #9fa597;
+  text-align: left;
+  transition: border-color .25s, background .25s, color .25s;
+}
+.rank-slot__rank {
+  flex: none;
+  padding: 3px 7px;
+  border: 1px solid #d8c29366;
+  border-radius: 999px;
+  color: #cdb994;
+  font-size: 10px;
+  font-weight: 800;
+}
+.rank-slot strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.rank-slot.is-next { border-color: #f0c987; color: #f5e3c0; animation: rank-slot-pulse 1.6s ease-in-out infinite; }
+.rank-slot.is-next .rank-slot__rank { border-color: #f0c987; color: #ffe1a6; }
+.rank-slot.is-filled { border-style: solid; border-color: #e6be80; background: linear-gradient(120deg, #4a3d28d9, #1b2721e6); color: #fff1d6; }
+.rank-slot.is-filled .rank-slot__rank { border-color: #e6be80; background: #e6be80; color: #17201c; }
+.rank-slot button {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 50%;
+  background: #00000055;
+  color: #f1e3c4;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rank-slot button:hover { background: #8c3b2f99; }
+@keyframes rank-slot-pulse { 0%, 100% { box-shadow: 0 0 0 0 #f0c98700; } 50% { box-shadow: 0 0 0 3px #f0c98738; } }
+
+.deck-choice__rank {
+  position: absolute;
+  z-index: 2;
+  top: 10px;
+  right: 10px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: linear-gradient(115deg, #c29b63, #ffe1a6);
+  box-shadow: 0 4px 12px #000a;
+  color: #17201c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+
+.stage-footer .stage-forward.is-blocked:disabled {
+  opacity: 1;
+  border-style: dashed;
+  background: #1a241fcc;
+  color: #f0c987;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .rank-slots { gap: 6px; }
+  .rank-slot { min-height: 34px; padding: 4px 26px 4px 6px; gap: 6px; }
+  .rank-slot strong { font-size: 11px; }
+  .rank-slot__rank { padding: 2px 6px; font-size: 9px; }
+  .deck-choice__rank { top: 7px; right: 7px; padding: 2px 7px; font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) { .rank-slot.is-next { animation: none; } }

@@ -1,0 +1,328 @@
+/* Choices appear on the table as a full-screen game beat, without a drawer. */
+.immersive-sound-preview { display: block; margin: 10px auto 0; cursor: pointer; }
+.immersive-sound-preview:hover { color: #fff0ca; }
+.immersive-augment-shade {
+  position: absolute;
+  z-index: 7;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 62% 48% at 50% 52%, #070d1396, transparent 78%),
+    linear-gradient(180deg, transparent 10%, #06101163 35%, #050b11d7 100%);
+  animation: augment-shade-in .42s ease-out both;
+}
+
+.immersive-action-dock.immersive-augment-stage,
+.immersive-action-dock.immersive-augment-stage.is-open {
+  position: absolute;
+  z-index: 9;
+  inset: clamp(145px, 20vh, 210px) 0 16px;
+  display: flex;
+  flex-direction: column;
+  width: min(980px, calc(100% - 48px));
+  height: auto;
+  max-height: none;
+  margin: 0 auto;
+  overflow: visible;
+  transform: none;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  animation: none;
+}
+.immersive-augment-stage::before { display: none; }
+.immersive-action-dock.immersive-augment-stage .immersive-action-dock__content,
+.immersive-action-dock.immersive-augment-stage.is-open .immersive-action-dock__content {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+  padding: 0 10px 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  border: 0;
+  scrollbar-width: thin;
+  scrollbar-color: #c9a67265 transparent;
+}
+.immersive-augment-stage .action-panel.stage-panel,
+.immersive-augment-stage .waiting-panel {
+  width: 100%;
+  margin: 0 auto;
+  padding: 2px 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  text-align: center;
+}
+.immersive-augment-stage .action-panel.stage-panel > .eyebrow {
+  display: block;
+  color: #edc78a;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .22em;
+  text-shadow: 0 3px 12px #000;
+}
+.immersive-augment-stage .action-panel.stage-panel > h2 {
+  margin: 6px 0 13px;
+  color: #fff4d9;
+  font: 600 clamp(24px, 3.1vw, 37px)/1.32 "Noto Serif KR", serif;
+  letter-spacing: -.055em;
+  text-shadow: 0 4px 22px #000, 0 1px 4px #000;
+}
+.immersive-augment-stage .stage-flow { margin-top: 4px; }
+.immersive-augment-stage .stage-progress {
+  max-width: 680px;
+  margin: 0 auto;
+  border-color: #e4c28d50;
+  background: #111b1cbd;
+  box-shadow: 0 8px 22px #0007;
+}
+.immersive-augment-stage .stage-card-content {
+  min-height: 0;
+  padding: 12px 0 13px;
+}
+.immersive-augment-stage .stage-card-content:not(:has(.deck)) {
+  max-width: 620px;
+  margin: 18px auto 14px;
+  padding: 21px;
+  border: 1px solid #cfb47e6b;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #1c2b27ef, #101c1ce8);
+  box-shadow: 0 20px 46px #0009, inset 0 0 0 4px #e6ce8e0a;
+}
+.immersive-augment-stage .stage-intro { margin: 0 auto 9px; }
+.immersive-augment-stage .stage-intro p {
+  margin-top: 4px;
+  color: #e7e3d4;
+  font-size: 12px;
+  text-shadow: 0 2px 8px #000;
+}
+.immersive-augment-stage .stage-footer {
+  position: relative;
+  width: min(510px, 100%);
+  margin: 10px auto 0;
+  padding: 13px 0 0;
+  background: none;
+  box-shadow: none;
+}
+.immersive-augment-stage .stage-footer button { min-height: 46px; font-size: 12px; }
+.immersive-augment-stage .stage-selection-summary { font-size: 11px; }
+.immersive-augment-stage .stage-panel .text-field,
+.immersive-augment-stage .stage-scenario,
+.immersive-augment-stage .stage-incoming,
+.immersive-augment-stage .stage-spotlight,
+.immersive-augment-stage .stage-role-reveal,
+.immersive-augment-stage .privacy-inline,
+.immersive-augment-stage .stage-action-button,
+.immersive-augment-stage .auto-notice { max-width: 620px; margin-left: auto; margin-right: auto; }
+.immersive-augment-stage .stage-panel:not(:has(.stage-flow)),
+.immersive-augment-stage .waiting-panel {
+  max-width: 670px;
+  padding: 23px 28px 26px;
+  border: 1px solid #d6bd8c75;
+  border-radius: 8px;
+  background: linear-gradient(150deg, #24352eea, #111e1ae9);
+  box-shadow: 0 24px 60px #000a;
+}
+.immersive-augment-stage .stage-panel:not(:has(.stage-flow)) > h2 { margin-bottom: 18px; }
+.immersive-room--card-open .immersive-look-hint { opacity: 0; }
+
+/* Keep the in-world player nameplates actionable while phase cards cover the table.
+   Only the transparent label layer rises above the card stage; the WebGL scene stays behind it. */
+.immersive-room--card-open .immersive-scene { isolation: auto; }
+.immersive-room--card-open .immersive-scene__labels { z-index: 11; }
+@media (min-width: 761px) {
+  .immersive-room--card-open .immersive-scene__name { margin-top: 45px; }
+}
+
+/* The three face-up choices land in sequence like an augment selection. */
+.immersive-augment-stage .tarot-spread {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: clamp(8px, 1.4vw, 19px);
+  width: min(900px, 100%);
+  min-height: 300px;
+  margin: 13px auto 2px;
+  perspective: 1100px;
+  isolation: isolate;
+}
+.immersive-augment-stage .tarot-spread--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 600px; }
+.immersive-augment-stage .tarot-spread--1 { grid-template-columns: minmax(0, 1fr); max-width: 300px; }
+.immersive-augment-stage .tarot-spread > .deck-choice,
+.immersive-augment-stage .tarot-spread > .tarot-echo {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 300px;
+  height: auto;
+  padding: 18px 16px 14px;
+  transform: none;
+  border: 1px solid var(--tarot-accent, #dbbc81);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 50% 24%, color-mix(in srgb, var(--tarot-accent, #dbbc81) 22%, transparent), transparent 46%),
+    linear-gradient(155deg, #34443c 0%, #172522 54%, #101b1c 100%);
+  color: #f8e9cb;
+  box-shadow: 0 22px 37px #000c, inset 0 0 0 5px #101b1b9c, inset 0 1px #fff4;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  animation: augment-card-drop .55s cubic-bezier(.18, .81, .2, 1.05) both;
+  transition: border-color .2s, box-shadow .2s, filter .2s;
+}
+.immersive-augment-stage .tarot-spread > .tarot-echo--previous { animation-delay: .03s; }
+.immersive-augment-stage .tarot-spread > .deck-choice { animation-delay: .20s; }
+.immersive-augment-stage .tarot-spread > .tarot-echo--next { animation-delay: .37s; }
+.immersive-augment-stage .tarot-spread > .deck-choice::before,
+.immersive-augment-stage .tarot-spread > .tarot-echo::after {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  width: auto;
+  height: auto;
+  border: 1px solid color-mix(in srgb, var(--tarot-accent, #dbbc81) 57%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.immersive-augment-stage .tarot-spread > .deck-choice::after { display: none; }
+.immersive-augment-stage .tarot-spread > :is(.deck-choice, .tarot-echo).is-selected {
+  border-color: #ffdf9f;
+  box-shadow: 0 23px 43px #000e, 0 0 0 3px #f6d69680, 0 0 36px #e6bb7396, inset 0 0 0 5px #101b1b9c;
+}
+.immersive-augment-stage .tarot-spread > :is(.deck-choice, .tarot-echo):hover { filter: brightness(1.15); }
+.immersive-augment-stage .tarot-echo__number,
+.immersive-augment-stage .tarot-spread .deck-choice__number {
+  position: absolute;
+  top: 15px;
+  right: 16px;
+  color: var(--tarot-accent, #dbbc81);
+  font: 500 18px/1 "Noto Serif KR", serif;
+}
+.immersive-augment-stage .tarot-spread .deck-choice__label {
+  align-self: center;
+  max-width: 78%;
+  min-height: 26px;
+  line-height: 1.45;
+}
+.immersive-augment-stage .tarot-spread .tarot-sigil {
+  width: clamp(65px, 8vw, 98px);
+  height: clamp(65px, 8vw, 98px);
+  margin: 18px auto 6px;
+  color: var(--tarot-accent, #dbbc81);
+}
+.immersive-augment-stage .tarot-spread .tarot-echo .tarot-sigil { margin-top: 35px; }
+.immersive-augment-stage .tarot-spread :is(.deck-choice h3, .tarot-echo strong) {
+  display: block;
+  width: 100%;
+  margin: 8px 0 10px;
+  color: #fff4dc;
+  font: 600 clamp(17px, 1.6vw, 22px)/1.38 "Noto Serif KR", serif;
+  letter-spacing: -.045em;
+  overflow-wrap: anywhere;
+}
+.immersive-augment-stage .tarot-spread .deck-choice p {
+  max-height: 86px;
+  margin-bottom: 13px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.immersive-augment-stage .tarot-echo small,
+.immersive-augment-stage .tarot-spread .deck-choice__select {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 34px;
+  margin-top: auto;
+  padding: 7px;
+  border: 1px solid #dec49399;
+  border-radius: 4px;
+  background: #c7aa7454;
+  color: #ffebc6;
+  font: 700 10px/1.4 "Noto Sans KR", sans-serif;
+}
+.immersive-augment-stage .tarot-spread .deck-choice__select[aria-pressed="true"],
+.immersive-augment-stage .tarot-echo.is-selected small { background: #e0bd7d; color: #17251f; }
+.immersive-augment-stage .deck > .tarot-nav { margin: 9px auto 2px; }
+.immersive-augment-stage .deck > .tarot-nav button { width: 34px; height: 32px; }
+
+@keyframes augment-shade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes augment-card-drop {
+  0% { opacity: 0; transform: translateY(-82px) rotateX(21deg) scale(.84); filter: brightness(1.9); }
+  68% { opacity: 1; transform: translateY(8px) rotateX(-4deg) scale(1.025); filter: brightness(1.16); }
+  100% { opacity: 1; transform: translateY(0) rotateX(0) scale(1); filter: brightness(1); }
+}
+
+@media (max-width: 760px) {
+  .immersive-room--card-open .immersive-scene__name { margin-top: -22px; }
+  .immersive-action-dock.immersive-augment-stage,
+  .immersive-action-dock.immersive-augment-stage.is-open {
+    inset: 130px 0 max(5px, env(safe-area-inset-bottom));
+    width: calc(100% - 12px);
+    max-height: none;
+    transform: none;
+  }
+  .immersive-augment-stage .action-panel.stage-panel > h2 { margin-bottom: 8px; font-size: clamp(20px, 5.1vw, 26px); }
+  .immersive-augment-stage .stage-card-content { padding: 8px 0; }
+  .immersive-augment-stage .stage-intro p { font-size: 10px; }
+  .immersive-augment-stage .stage-panel .text-field { text-align: left; }
+  .immersive-augment-stage .stage-footer { margin-top: 5px; padding-top: 7px; }
+  .immersive-augment-stage .stage-footer button { min-height: 39px; }
+  .immersive-augment-stage .tarot-spread { gap: 5px; min-height: 235px; margin-top: 57px; }
+  .immersive-augment-stage .tarot-spread > .deck-choice,
+  .immersive-augment-stage .tarot-spread > .tarot-echo { min-height: 235px; padding: 9px 6px 8px; }
+  .immersive-augment-stage .tarot-spread > :is(.deck-choice, .tarot-echo)::before,
+  .immersive-augment-stage .tarot-spread > .tarot-echo::after { inset: 4px; }
+  .immersive-augment-stage .tarot-echo__number,
+  .immersive-augment-stage .tarot-spread .deck-choice__number { top: 9px; right: 8px; font-size: 12px; }
+  .immersive-augment-stage .tarot-spread .deck-choice__label {
+    align-self: stretch;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: none;
+    min-height: 29px;
+    padding-right: 19px;
+    padding-left: 3px;
+    font-size: 7px;
+    letter-spacing: 0;
+    line-height: 1.35;
+    text-align: left;
+    word-break: keep-all;
+  }
+  .immersive-augment-stage .tarot-spread .tarot-sigil { width: 49px; height: 49px; margin: 23px auto 2px; }
+  .immersive-augment-stage .tarot-spread .tarot-echo .tarot-sigil { margin-top: 32px; }
+  .immersive-augment-stage .tarot-spread :is(.deck-choice h3, .tarot-echo strong) { margin: 6px 0; font-size: 12px; line-height: 1.35; }
+  .immersive-augment-stage .tarot-spread .deck-choice p { max-height: 54px; margin-bottom: 6px; font-size: 8px; line-height: 1.35; }
+  .immersive-augment-stage .tarot-echo small,
+  .immersive-augment-stage .tarot-spread .deck-choice__select { min-height: 27px; padding: 3px; font-size: 8px; }
+  .immersive-augment-stage .deck > .tarot-nav { position: static; justify-content: center; margin-top: 6px; }
+  .immersive-augment-stage .deck > .tarot-nav span { display: inline; }
+  .immersive-augment-stage .deck > .tarot-nav button { width: 29px; height: 28px; }
+  .immersive-augment-stage .stage-panel:not(:has(.stage-flow)),
+  .immersive-augment-stage .waiting-panel { width: calc(100% - 18px); padding: 19px 16px; }
+}
+
+@media (max-width: 390px) {
+  .immersive-action-dock.immersive-augment-stage,
+  .immersive-action-dock.immersive-augment-stage.is-open { inset-block-start: 122px; }
+  .immersive-augment-stage .tarot-spread > .deck-choice,
+  .immersive-augment-stage .tarot-spread > .tarot-echo { padding-inline: 5px; }
+}
+@media (max-height: 640px) {
+  .immersive-action-dock.immersive-augment-stage,
+  .immersive-action-dock.immersive-augment-stage.is-open { inset-block-start: 105px; }
+  .immersive-augment-stage .tarot-spread > .deck-choice,
+  .immersive-augment-stage .tarot-spread > .tarot-echo { min-height: 212px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .immersive-augment-shade,
+  .immersive-augment-stage .tarot-spread > :is(.deck-choice, .tarot-echo) { animation: none; }
+}

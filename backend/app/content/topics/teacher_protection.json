@@ -1,0 +1,267 @@
+{
+  "topicId": "teacher_protection",
+  "title": "교육청에 가상의 교권보호국을 신설해야 할까?",
+  "shortTitle": "교권보호국 신설",
+  "background": "토론을 위한 가상 정책 제안입니다. 한 교육청이 교사의 교육활동 침해 신고, 학생의 소명, 학부모의 민원을 전담하는 ‘교권보호국’ 신설을 검토합니다. 보호 조치와 조사 권한을 어디까지 맡길지, 서로 다른 권리가 충돌할 때 어떤 절차를 둘지 결정해야 합니다.",
+  "question": "교사 보호와 학생·학부모의 권리를 함께 보장하려면, 새로운 전담 조직이 필요할까요?",
+  "tags": [
+    "교육",
+    "권리",
+    "정책"
+  ],
+  "isHypothetical": true,
+  "status": "editorial_reviewed",
+  "active": true,
+  "version": 1,
+  "sourceStatus": "discussion_only",
+  "sources": [],
+  "roles": [
+    {
+      "id": "teacher_protection_teacher",
+      "name": "현장교사",
+      "goal": "교사가 위협을 견디며 혼자 대응하지 않아도 수업을 이어갈 수 있게 한다.",
+      "priority": "신속한 보호와 수업의 지속",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "teacher_protection_teacher_card_1",
+          "title": "도움을 요청하는 순간",
+          "text": "신고 뒤에도 교사가 혼자 당사자를 응대해야 한다면 보호는 늦을 수 있습니다. 조사 결론 전에도 가능한 임시 지원의 범위를 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_teacher_card_2",
+          "title": "보호와 면책의 경계",
+          "text": "교사 보호가 모든 지도 방식의 정당화를 뜻하지는 않습니다. 지원을 받으면서도 자신의 행동을 설명할 책임은 어떻게 유지할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_teacher_card_3",
+          "title": "교실에 남은 학생들",
+          "text": "갈등 당사자 외 학생들의 수업도 고려해야 합니다. 대체 수업이나 업무 지원 중 무엇을 먼저 제공할지 이유를 붙여 말하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "teacher_protection_student_advocate",
+      "name": "학생인권 변호인",
+      "goal": "학생이 불이익을 두려워하지 않고 자기 경험을 말하며 절차에 참여하게 한다.",
+      "priority": "소명권과 권한의 통제",
+      "stance": "oppose",
+      "cards": [
+        {
+          "id": "teacher_protection_student_advocate_card_1",
+          "title": "누가 먼저 들리는가",
+          "text": "학생의 설명을 듣기 전에 ‘침해자’로 분류하지 않도록 어떤 절차가 필요할까요? 보호 조치와 최종 판단을 구분해 보세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_student_advocate_card_2",
+          "title": "지원과 조사의 거리",
+          "text": "교사를 지원하는 조직이 사실 조사까지 맡으면 공정성을 의심받을 수 있습니다. 담당 분리나 외부 재검토 장치를 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_student_advocate_card_3",
+          "title": "기록에 반박할 기회",
+          "text": "학생이 자신의 사건 기록을 이해하고 오류에 이의를 제기할 길이 필요합니다. 미성년자도 이용하기 쉬운 소명 방식을 말하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "teacher_protection_parent",
+      "name": "학부모 대표",
+      "goal": "정당한 질문과 민원이 위협 행위와 구분되어 안전하게 전달되도록 한다.",
+      "priority": "접근 가능한 민원과 상호 존중",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "teacher_protection_parent_card_1",
+          "title": "민원을 막지 않는 창구",
+          "text": "반복 연락을 줄이는 일과 문제 제기를 가로막는 일은 다릅니다. 정해진 상담 시간과 답변 기한으로 둘을 구분할 수 있을까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_parent_card_2",
+          "title": "판단 기준을 함께 보기",
+          "text": "불편한 의견과 위협적인 행동을 누가 어떤 기준으로 나눌까요? 처리 기준과 이의 제기 경로를 먼저 공개하는 방안을 검토하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_parent_card_3",
+          "title": "응답 없는 기다림",
+          "text": "민원이 접수됐다는 안내만으로는 갈등이 풀리지 않을 수 있습니다. 처리 상황을 알 권리와 교사의 업무 부담을 함께 고려하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "teacher_protection_administrator",
+      "name": "교육청 담당자",
+      "goal": "한정된 예산 안에서 실제로 작동하며 책임 소재가 분명한 제도를 설계한다.",
+      "priority": "명확한 권한과 책임 있는 예산",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "teacher_protection_administrator_card_1",
+          "title": "조직보다 먼저 업무",
+          "text": "신설 기구가 맡을 일과 기존 부서가 계속 맡을 일을 나누어 보세요. 같은 사건을 여러 곳에 설명해야 하는 중복을 어떻게 줄일까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_administrator_card_2",
+          "title": "무엇으로 평가할까",
+          "text": "신고 건수 감소만으로 성공을 판단하면 신고가 어려워진 상황을 놓칠 수 있습니다. 접근성·처리 시간·절차 만족도 중 무엇을 볼까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_administrator_card_3",
+          "title": "시범 운영의 조건",
+          "text": "일부 학교에서 먼저 운영한다면 종료·확대 기준을 미리 정해야 합니다. 성과가 부족할 때 예산을 되돌리는 기준도 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "teacher_protection_school_leader",
+      "name": "학교 관리자",
+      "goal": "사건 처리 중에도 학교가 안전하게 운영되고 역할 분담이 분명하게 유지되도록 한다.",
+      "priority": "현장 대응과 운영의 연속성",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "teacher_protection_school_leader_card_1",
+          "title": "오늘의 수업은 누가",
+          "text": "조사가 길어져도 교실은 운영되어야 합니다. 임시 분리, 대체 인력, 학생 학습 지원을 한 묶음으로 제안할 수 있을까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_school_leader_card_2",
+          "title": "넘기면 끝일까",
+          "text": "전담 기구에 사건을 넘긴 뒤 학교가 손을 놓아도 될까요? 현장 확인과 일상 회복에 대한 학교의 책임을 구체화하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_school_leader_card_3",
+          "title": "작은 갈등의 출구",
+          "text": "모든 이견을 공식 사건으로 만들면 관계 회복이 어려울 수 있습니다. 학교 안에서 풀 일과 즉시 외부에 요청할 일의 기준을 정하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "teacher_protection_mediator",
+      "name": "갈등조정 전문가",
+      "goal": "안전을 먼저 확보하되 당사자가 원할 때 관계를 회복할 수 있는 선택지를 만든다.",
+      "priority": "자발적 중재와 재발 방지",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "teacher_protection_mediator_card_1",
+          "title": "중재는 선택이어야",
+          "text": "불리한 위치의 당사자에게 화해를 강요하지 않아야 합니다. 중재를 거절해도 보호와 정식 절차를 이용할 수 있게 설계하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_mediator_card_2",
+          "title": "안전이 먼저인 경우",
+          "text": "모든 갈등이 대화만으로 해결되지는 않습니다. 위협이 계속될 때 중재를 멈추고 보호 절차로 옮기는 조건을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "teacher_protection_mediator_card_3",
+          "title": "사건 다음 날",
+          "text": "합의서 작성 뒤에도 같은 교실에서 생활해야 할 수 있습니다. 재발 확인, 상담, 일정 기간 점검 중 무엇이 필요할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    }
+  ],
+  "scenario": {
+    "id": "teacher_protection_scenario_1",
+    "title": "보호 요청과 소명 요구가 동시에 도착했다",
+    "description": "가상 사건입니다. 한 교사가 반복되는 고성 민원으로 당장 응대 중단과 지원을 요청했습니다. 학생과 보호자는 수업 중 부당한 대우가 있었다며 먼저 설명할 기회를 요구합니다. 사실관계는 아직 확인되지 않았고, 임시 담당 인력은 한 팀뿐입니다.",
+    "options": [
+      {
+        "id": "teacher_protection_option_1",
+        "text": "교사 보호 인력을 먼저 배치하고 학생·보호자의 소명 일정을 동시에 확정한다."
+      },
+      {
+        "id": "teacher_protection_option_2",
+        "text": "지원 담당과 조사 담당을 분리한 임시 공동팀을 구성한다."
+      },
+      {
+        "id": "teacher_protection_option_3",
+        "text": "독립된 외부 검토 창구에 사건을 맡기고 학교는 수업 유지 지원을 한다."
+      },
+      {
+        "id": "teacher_protection_option_4",
+        "text": "안전을 확보한 뒤 양측이 동의하는 경우에만 중재를 먼저 제안한다."
+      }
+    ]
+  },
+  "questions": [
+    "교사를 즉시 보호하면서도 학생을 가해자로 미리 단정하지 않을 방법은 무엇인가요?",
+    "정당한 민원과 위협 행동을 구분하는 기준을 누가 검토해야 하나요?",
+    "신설 조직이 편향됐다는 이의가 제기되면 어디에 재검토를 요청하나요?",
+    "예산이 한정된다면 조사 인력과 현장 지원 중 무엇에 먼저 배분하나요?",
+    "중재를 원하지 않는 당사자에게 어떤 대안을 보장하나요?",
+    "제도가 효과가 있는지 확인할 기준과 중단할 기준을 하나씩 말해 주세요."
+  ]
+}

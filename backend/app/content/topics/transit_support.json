@@ -1,0 +1,267 @@
+{
+  "topicId": "transit_support",
+  "title": "청년 대중교통 요금 지원을 확대해야 할까?",
+  "shortTitle": "청년 교통비 지원",
+  "background": "토론을 위한 가상 지역 정책입니다. 한 지자체가 청년의 대중교통 요금 지원을 늘리려 합니다. 모든 청년에게 같은 한도를 적용할지, 이동 필요나 경제적 여건을 반영할지, 대중교통 자체가 부족한 지역은 어떻게 지원할지 논의합니다.",
+  "question": "청년의 이동을 지원하는 한정된 예산을 누구에게 어떤 방식으로 배분해야 할까요?",
+  "tags": [
+    "지역사회",
+    "이동권",
+    "예산"
+  ],
+  "isHypothetical": true,
+  "status": "editorial_reviewed",
+  "active": true,
+  "version": 1,
+  "sourceStatus": "discussion_only",
+  "sources": [],
+  "roles": [
+    {
+      "id": "transit_support_student",
+      "name": "통학하는 대학생",
+      "goal": "반복되는 통학 비용이 학업과 학교 활동 참여를 제약하지 않게 한다.",
+      "priority": "예측 가능한 이동 지원",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "transit_support_student_card_1",
+          "title": "매일의 왕복",
+          "text": "통학은 한 번의 특별한 이동보다 반복 비용이 중요할 수 있습니다. 이용 횟수와 거리를 지원에 반영할지 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_student_card_2",
+          "title": "수업 밖의 참여",
+          "text": "지원 대상을 정규 수업 이동으로만 제한하면 동아리·도서관 이용은 어떻게 될까요? 이동 목적을 어디까지 확인할지 생각하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_student_card_3",
+          "title": "먼저 내야 하는 돈",
+          "text": "사후 환급은 신청 전에 요금을 낼 수 있어야 이용할 수 있습니다. 즉시 할인과 환급의 장단점을 이 역할에서 비교하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "transit_support_job_seeker",
+      "name": "취업 준비생",
+      "goal": "소득이 불안정해도 면접·훈련·구직 활동에 필요한 이동을 지속할 수 있게 한다.",
+      "priority": "필요할 때 끊기지 않는 접근",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "transit_support_job_seeker_card_1",
+          "title": "일정이 불규칙한 이동",
+          "text": "정기 통학과 달리 구직 이동은 횟수와 경로가 바뀔 수 있습니다. 정기권과 이용액 지원 중 어떤 방식이 적합할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_job_seeker_card_2",
+          "title": "증명하기 어려운 활동",
+          "text": "면접 확인서처럼 증빙을 많이 요구하면 신청이 부담스러울 수 있습니다. 부정 이용 대응과 간단한 신청 사이의 기준을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_job_seeker_card_3",
+          "title": "경계에 선 신청자",
+          "text": "단기 근로 중인 사람이나 졸업을 미룬 사람을 어떻게 다룰까요? 신분보다 이동 필요를 기준으로 삼을 수 있는지 논의하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "transit_support_budget",
+      "name": "지자체 예산 담당자",
+      "goal": "다른 사업과의 균형을 지키며 예산 한도 안에서 예측 가능한 지원을 설계한다.",
+      "priority": "재정 지속성과 설명 가능한 기준",
+      "stance": "oppose",
+      "cards": [
+        {
+          "id": "transit_support_budget_card_1",
+          "title": "지원이 늘어나는 만큼",
+          "text": "교통비 지원을 늘릴 때 조정할 다른 지출이나 재원이 필요합니다. 확대 목표와 함께 감당할 수 있는 한도를 제시하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_budget_card_2",
+          "title": "신청이 예상보다 많다면",
+          "text": "예산 소진 시 선착순으로 끊으면 신청 시점에 따라 차이가 생깁니다. 일괄 조정, 우선순위, 추가 재원 중 기준을 정하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_budget_card_3",
+          "title": "나이만으로 충분할까",
+          "text": "나이는 간단하지만 같은 나이의 여건이 모두 같지는 않습니다. 신청 부담을 크게 늘리지 않고 필요를 반영할 방법을 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "transit_support_operator",
+      "name": "교통 운영기관 담당자",
+      "goal": "요금 지원이 실제 이용으로 이어지고 운행·정산 체계가 감당할 수 있게 한다.",
+      "priority": "서비스의 지속성과 실행 가능성",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "transit_support_operator_card_1",
+          "title": "탈 수 있는 차가 먼저",
+          "text": "요금이 낮아져도 필요한 시간에 노선이 없으면 이동하기 어렵습니다. 요금 지원과 배차 개선의 우선순위를 어떻게 정할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_operator_card_2",
+          "title": "지원금의 정산",
+          "text": "할인 방식이라면 운영기관이 비용을 언제 어떻게 보전받을지 정해야 합니다. 이용자 편의와 안정적인 정산을 함께 설계하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_operator_card_3",
+          "title": "경계를 넘는 통행",
+          "text": "한 사람의 이동이 여러 지자체나 교통수단에 걸칠 수 있습니다. 환승과 지역 간 정산 기준이 없는 지원의 한계를 짚어 보세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "transit_support_regional_youth",
+      "name": "비수도권 청년",
+      "goal": "대중교통 접근성이 낮은 지역의 청년도 이동 지원에서 배제되지 않게 한다.",
+      "priority": "지역 간 형평성과 실질적 이용",
+      "stance": "neutral",
+      "cards": [
+        {
+          "id": "transit_support_regional_youth_card_1",
+          "title": "쓸 노선이 없다면",
+          "text": "교통비 환급만 받는 제도는 버스가 드문 곳에서 도움이 제한될 수 있습니다. 서비스 공급과 비용 지원을 함께 제안하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_regional_youth_card_2",
+          "title": "같은 금액, 다른 기회",
+          "text": "같은 지원금이라도 이동 거리와 환승 여건에 따라 가능한 활동이 달라질 수 있습니다. 똑같이 지급하는 것과 공평한 지원을 구분하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_regional_youth_card_3",
+          "title": "생활권과 주소지",
+          "text": "사는 곳과 공부하거나 일자리를 찾는 곳이 다를 수 있습니다. 주소지 중심 신청이 놓치는 이동을 어떻게 포함할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    },
+    {
+      "id": "transit_support_civic",
+      "name": "이동권 시민단체 활동가",
+      "goal": "지원이 필요한 사람에게 닿으면서 신청 과정의 배제와 낙인을 줄인다.",
+      "priority": "접근성·형평성·쉬운 신청",
+      "stance": "support",
+      "cards": [
+        {
+          "id": "transit_support_civic_card_1",
+          "title": "신청할 수 있어야 지원",
+          "text": "복잡한 온라인 인증이나 서류 제출이 이용 장벽이 될 수 있습니다. 대면 신청과 안내 지원을 포함할지 논의하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_civic_card_2",
+          "title": "청년 밖의 어려움",
+          "text": "청년 지원의 목적을 분명히 하면서 비슷한 어려움을 겪는 다른 연령도 고려해야 합니다. 대상 선정 이유를 어떻게 설명할까요?",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        },
+        {
+          "id": "transit_support_civic_card_3",
+          "title": "개인 이동 기록의 경계",
+          "text": "지원 확인을 위해 모든 이동 경로를 계속 저장할 필요가 있을까요? 정산에 필요한 정보와 불필요한 사생활 정보를 구분하세요.",
+          "type": "perspective",
+          "label": "토론용 관점 카드",
+          "sources": [],
+          "sourceStatus": "discussion_only"
+        }
+      ]
+    }
+  ],
+  "scenario": {
+    "id": "transit_support_scenario_1",
+    "title": "신청은 늘고, 쓸 수 없는 지원도 생겼다",
+    "description": "가상 사건입니다. 시범 지원 신청이 편성 예산을 넘어섰습니다. 동시에 외곽 지역 청년들은 이용할 노선이 적어 환급 한도를 쓰기 어렵다고 말합니다. 이번 기간에는 전체 예산을 바로 늘릴 수 없습니다.",
+    "options": [
+      {
+        "id": "transit_support_option_1",
+        "text": "모든 신청자의 지원 한도를 같은 비율로 조정하고 다음 예산 기준을 공개한다."
+      },
+      {
+        "id": "transit_support_option_2",
+        "text": "경제적 여건과 이동 필요를 반영해 우선 지원하되 신청·이의 제기를 간단히 한다."
+      },
+      {
+        "id": "transit_support_option_3",
+        "text": "지원 일부를 외곽 노선·연계 교통 개선에 배분하고 나머지는 요금을 지원한다."
+      },
+      {
+        "id": "transit_support_option_4",
+        "text": "이동 유형별로 정기권·이용액 지원을 나누고 일정 기간 뒤 배분을 다시 검토한다."
+      }
+    ]
+  },
+  "questions": [
+    "지원 확대의 목표는 비용 절감, 활동 참여, 이동 기회 중 무엇인가요?",
+    "신청자가 예상을 넘으면 어떤 기준으로 배분해야 공정할까요?",
+    "노선이 없는 지역에도 같은 형태의 지원을 제공하는 것이 충분한가요?",
+    "지원 대상을 증명하는 부담을 낮추면서 제도를 운영할 방법은 무엇인가요?",
+    "주소지와 실제 생활권이 다른 청년은 어떻게 포함하나요?",
+    "지원 확대를 지속하거나 조정할 때 무엇을 확인해야 하나요?"
+  ]
+}
