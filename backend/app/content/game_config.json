@@ -1,0 +1,15 @@
+{
+  "minStudents": 6,
+  "maxStudents": 8,
+  "switcherCounts": [1, 2],
+  "defaultSwitcherCount": 1,
+  "phaseSeconds": {
+    "role": 45,
+    "statement": 150,
+    "event": 300,
+    "rebuttal": 240,
+    "vote": 90
+  },
+  "phaseSecondsRange": { "min": 20, "max": 900 },
+  "textLimits": { "statement": 200, "message": 200, "nickname": 12 }
+}

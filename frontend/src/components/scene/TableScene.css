@@ -1,0 +1,276 @@
+.immersive-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #111c25;
+}
+
+.immersive-scene__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+.immersive-scene__vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 95px 18px #0811166b,
+    inset 0 -96px 105px -92px #080e12aa;
+  background: linear-gradient(180deg, #09131916 0%, transparent 25%, transparent 73%, #100e0a35 100%);
+}
+
+.immersive-scene__labels {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.immersive-scene__name {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 12px;
+  border: 1px solid #cfb78b66;
+  border-radius: 6px;
+  background: #14201ee8;
+  box-shadow: 0 7px 20px #0007, inset 0 1px #ffffff18;
+  color: #f2e9d4;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  backdrop-filter: blur(10px);
+  transition: color 160ms, border-color 160ms, background 160ms, opacity 100ms;
+}
+
+.immersive-scene__name:hover,
+.immersive-scene__name--active,
+.immersive-scene__name:focus-visible {
+  color: #ffe0aa;
+  border-color: #efbb72;
+  background: #3c3024ed;
+  outline: none;
+}
+
+.immersive-scene__name-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--avatar-color, #a56b53);
+  box-shadow: 0 0 0 2px #ffffff25, 0 0 9px var(--avatar-color, #a56b53);
+}
+
+.immersive-scene__controls {
+  position: absolute;
+  z-index: 3;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.immersive-scene__hint {
+  color: #d8d5c7a8;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1px 5px #000;
+}
+
+.immersive-scene__reset {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border: 1px solid #d8c9a55c;
+  border-radius: 50%;
+  background: #16211de0;
+  color: #e0d2b9;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.immersive-scene__reset:hover,
+.immersive-scene__reset:focus-visible {
+  color: #ffdb9f;
+  border-color: #ffdb9f;
+  outline: none;
+}
+
+.immersive-scene__reset svg {
+  width: 19px;
+  height: 19px;
+}
+
+.immersive-scene__fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: radial-gradient(ellipse at 50% 75%, #5e4934 0%, #28372f 40%, #111c25 85%);
+  color: #edd3a3;
+  font-family: Georgia, serif;
+  font-size: clamp(20px, 4vw, 48px);
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.immersive-scene__fallback p {
+  margin: 0;
+  color: #f0e7d2;
+  font: 14px/1.5 sans-serif;
+  letter-spacing: 0;
+}
+
+@media (max-width: 620px) {
+  .immersive-scene__name {
+    padding: 6px 9px;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .immersive-scene__controls {
+    left: 13px;
+    right: 13px;
+    bottom: 12px;
+  }
+
+  .immersive-scene__hint {
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .immersive-scene__name {
+    transition: none;
+  }
+}
+
+/* Name plates float over each head; a speech bubble rises above when someone just spoke. */
+.table-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  max-width: 220px;
+  pointer-events: auto;
+  transition: opacity 120ms;
+}
+
+.table-label .immersive-scene__name {
+  position: static;
+  font-size: 13px;
+  padding: 6px 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  white-space: normal;
+  max-width: 220px;
+}
+
+.table-nick { font-weight: 800; }
+
+.table-tag {
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: #e6b85c26;
+  color: #f0cf8a;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.table-status {
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.table-status.done { background: #7fc79c2e; color: #a6e3bd; }
+.table-status.waiting { background: #ffffff14; color: #c9cfca; }
+.table-status.alert { background: #e7735f40; color: #ffc2b6; }
+
+.table-bubble {
+  position: relative;
+  margin: 0;
+  max-width: 220px;
+  padding: 8px 11px;
+  border-radius: 14px;
+  background: #fbf5e8;
+  color: #23201a;
+  font-size: 13px;
+  line-height: 1.4;
+  box-shadow: 0 8px 22px #0008;
+  pointer-events: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  animation: bubble-in 260ms ease-out;
+}
+.table-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.table-bubble.kind-question { box-shadow: 0 0 0 2px #e6b85c, 0 8px 22px #0008; }
+.table-bubble.kind-rebuttal { box-shadow: 0 0 0 2px #e7735f, 0 8px 22px #0008; }
+.table-bubble.kind-answer { box-shadow: 0 0 0 2px #7fc79c, 0 8px 22px #0008; }
+
+@keyframes bubble-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (max-width: 620px) {
+  .table-label, .table-label .immersive-scene__name, .table-bubble { max-width: 150px; }
+  .table-label .immersive-scene__name { font-size: 12px; padding: 5px 8px; }
+  .table-bubble { font-size: 12px; -webkit-line-clamp: 2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-bubble { animation: none; }
+}
+
+.table-label.is-active { z-index: 2; }
+
+/* Phones: name only, status as a coloured dot, so plates stay short and tappable. */
+.is-narrow .table-tag { display: none; }
+.is-narrow .table-status {
+  width: 9px;
+  height: 9px;
+  padding: 0;
+  font-size: 0;
+  border-radius: 50%;
+}
+.is-narrow .table-status.done { background: #7fc79c; }
+.is-narrow .table-status.waiting { background: #6f7a74; }
+.is-narrow .table-status.alert { background: #e7735f; }
+.is-narrow .table-bubble { max-width: 130px; }

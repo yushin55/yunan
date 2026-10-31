@@ -2,30 +2,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
-    function member(roomId) {
+    function roomPath(roomId) { return /databases/$(database)/documents/rooms/$(roomId); }
+    // The anonymous account that created the room is its teacher.
+    function isTeacher(roomId) {
+      return signedIn() && get(roomPath(roomId)).data.hostUid == request.auth.uid;
+    }
+    function isStudent(roomId) {
       return signedIn() && exists(/databases/$(database)/documents/rooms/$(roomId)/participants/$(request.auth.uid));
     }
+    function member(roomId) { return isStudent(roomId) || isTeacher(roomId); }
+
     match /rooms/{roomId} {
-      allow get: if member(roomId);
+      // Topic, phase, timer, settings and (after its phase) the event card.
+      allow get: if signedIn() && (resource.data.hostUid == request.auth.uid || isStudent(roomId));
       allow list, write: if false;
+      // Nicknames, seats, readiness flags and roles once they are public.
       match /participants/{uid} {
         allow read: if member(roomId);
         allow write: if false;
       }
+      // Published statements, moderated chat and, after voting, the reveal.
       match /publicRounds/{roundId} {
         allow read: if member(roomId);
         allow write: if false;
       }
+      // Role preferences, assigned role, switcher status, own vote and moderation notices:
+      // the student alone. The teacher cannot read these either.
       match /privatePlayers/{uid} {
-        allow get: if member(roomId) && request.auth.uid == uid;
+        allow get: if isStudent(roomId) && request.auth.uid == uid;
         allow list, write: if false;
       }
-      match /results/{uid} {
-        allow get: if member(roomId) && request.auth.uid == uid;
+      // Moderation queue and teacher guide: the teacher alone.
+      match /host/{document} {
+        allow get: if isTeacher(roomId);
         allow list, write: if false;
       }
-      // The aggregate includes pending submissions, guesses, ratings and reports.
-      // It is accessible only through the Admin SDK server.
+      // The full aggregate, including votes before the reveal. Server (Admin SDK) only.
       match /internal/{document} { allow read, write: if false; }
       match /{document=**} { allow read, write: if false; }
     }

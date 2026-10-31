@@ -1,0 +1,64 @@
+/* ── Full-screen pre-game flow: briefing → rules → roles ───────────────────────────── */
+body.flow-open { overflow: hidden; }
+.flow-overlay { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-rows: auto 1fr auto; background: radial-gradient(120% 80% at 50% 0%, #1d2e28 0%, #0a100e 65%); }
+.flow-top { display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-bottom: 1px solid var(--line); background: rgba(10, 16, 14, 0.9); }
+.flow-top .lobby-steps { flex: 1; margin: 0; max-width: 720px; margin-inline: auto; }
+.flow-body { overflow-y: auto; padding: 18px 18px 28px; display: grid; align-content: start; gap: 14px; width: 100%; max-width: 1280px; margin: 0 auto; }
+.flow-heading { text-align: center; }
+.flow-heading h2 { font-family: var(--serif); font-size: clamp(1.25rem, 3vw, 2rem); margin: 2px 0 0; }
+.flow-heading .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+.flow-action { display: flex; justify-content: center; padding: 12px 18px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: rgba(10, 16, 14, 0.94); }
+.flow-action .button { width: min(560px, 100%); }
+/* The videos fill as much of the screen as the height allows. */
+.flow-body .news { width: min(100%, calc((100dvh - 250px) * 16 / 9)); margin: 0 auto; }
+.flow-body .rules-text { width: min(100%, 860px); margin: 0 auto; padding: 10px 14px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.flow-body .rules-text summary { cursor: pointer; font-weight: 700; }
+@media (max-width: 560px) {
+  .flow-top { padding: 8px 12px; gap: 8px; }
+  .flow-top .brand-mark { display: none; }
+  .flow-top .lobby-steps li { padding: 6px 8px; font-size: 0.78rem; }
+  .flow-body { padding: 12px 12px 20px; }
+  .flow-body .news { width: 100%; }
+}
+@media (max-width: 380px) {
+  .flow-top .step-label { display: none; }
+}
+
+/* Role picking on a big stage: model on the left, slots and details on the right. */
+.flow-body .wardrobe { width: 100%; }
+.flow-body .dress-stage { height: clamp(280px, 52vh, 560px); }
+@media (min-width: 960px) {
+  .flow-body .wardrobe { grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr); grid-template-rows: auto auto 1fr auto auto; grid-template-areas: "intro intro" "stage slots" "stage info" "rack rack" "submit submit"; align-items: start; column-gap: 18px; }
+  .flow-body .wardrobe > p { grid-area: intro; text-align: center; }
+  .flow-body .wardrobe-slots { grid-area: slots; }
+  .flow-body .dress-room { grid-area: stage; }
+  .flow-body .dress-info { grid-area: info; }
+  .flow-body .wardrobe-rack { grid-area: rack; justify-content: center; }
+  .flow-body .wardrobe > .button { grid-area: submit; width: min(560px, 100%); justify-self: center; }
+  .flow-body .dress-stage { height: clamp(360px, 60vh, 620px); }
+}
+
+/* ── Topic picture cards ───────────────────────────── */
+.topic-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin: 16px 0; }
+.topic-card { position: relative; display: grid; grid-template-rows: auto 1fr; padding: 0; overflow: hidden; text-align: left; border-radius: 16px; border: 2px solid var(--line); background: var(--panel); cursor: pointer; transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s; }
+.topic-card:hover:not(:disabled) { transform: translateY(-3px); border-color: var(--muted); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35); }
+.topic-card.selected { border-color: var(--gold); box-shadow: 0 0 0 4px rgba(230, 184, 92, 0.25), 0 14px 30px rgba(0, 0, 0, 0.35); }
+.topic-card-art { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: #0b1210; }
+.topic-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 55%, rgba(10, 16, 14, 0.75)); }
+.topic-card-no { position: absolute; z-index: 1; top: 10px; left: 10px; padding: 2px 10px; border-radius: 99px; background: rgba(0, 0, 0, 0.6); color: var(--gold); font-family: var(--serif); font-weight: 800; }
+.topic-card-check { position: absolute; z-index: 1; top: 10px; right: 10px; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--gold); color: var(--gold-ink); }
+.topic-card-body { display: grid; align-content: start; gap: 6px; padding: 12px 14px 14px; }
+.topic-card-tag { justify-self: start; padding: 1px 8px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-size: 0.78rem; font-weight: 800; }
+.topic-card-body strong { font-size: 1.05rem; line-height: 1.35; }
+.topic-card-roles { display: flex; gap: 5px; align-items: flex-start; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+.topic-card-roles svg { flex: none; margin-top: 2px; }
+.random-art { display: grid; place-items: center; background: repeating-linear-gradient(45deg, #1a2a24 0 18px, #16241f 18px 36px); }
+.random-art .dice { width: 84px; height: 84px; border-radius: 22px; display: grid; place-items: center; background: var(--gold); color: var(--gold-ink); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4); }
+.topic-card.random:hover .dice { animation: dice 0.6s ease-in-out; }
+@keyframes dice { 50% { transform: rotate(18deg) scale(1.06); } }
+.setup-actions { display: flex; flex-wrap: wrap; gap: 10px; position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, var(--bg) 35%); }
+.nickname-form { display: grid; gap: 6px; }
+.nickname-form .button { margin-top: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .topic-card { transition: none; }
+}

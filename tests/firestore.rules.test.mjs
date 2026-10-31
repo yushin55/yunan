@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import {
@@ -13,30 +12,27 @@ import {
   doc,
   getDoc,
   getDocs,
-  query,
   setDoc,
   setLogLevel,
   updateDoc,
-  where,
   writeBatch,
 } from 'firebase/firestore';
 
-// Isolate security fixtures from the live demo-yunan game and API integration tests.
-// Start local emulators with `npm run emulators`, then run `npm run test:rules`.
+// Isolated from the live demo-yunan game. Start emulators with `npm run emulators`,
+// then run `npm run test:rules`.
 const projectId = 'demo-yunan-rules';
 const emulatorAddress = process.env.FIRESTORE_EMULATOR_HOST || '127.0.0.1:8080';
 const emulatorUrl = new URL(`http://${emulatorAddress}`);
-const roomId = 'rules-active-room';
-const completedRoomId = 'rules-completed-room';
-const foreignRoomId = 'rules-other-room';
-const roomPath = (id = roomId) => `rooms/${id}`;
+const roomId = 'rules-room';
+const otherRoomId = 'rules-other-room';
+const base = `rooms/${roomId}`;
 let environment;
+let teacher;
 let alice;
 let bob;
 let outsider;
 let anonymous;
 
-// Expected denials are test results, not useful SDK warning messages.
 setLogLevel('silent');
 
 before(async () => {
@@ -49,204 +45,94 @@ before(async () => {
     },
   });
   await environment.clearFirestore();
+  teacher = environment.authenticatedContext('teacher').firestore();
   alice = environment.authenticatedContext('alice').firestore();
   bob = environment.authenticatedContext('bob').firestore();
   outsider = environment.authenticatedContext('outsider').firestore();
   anonymous = environment.unauthenticatedContext().firestore();
 
-  await environment.withSecurityRulesDisabled(async context => {
+  await environment.withSecurityRulesDisabled(async (context) => {
     const db = context.firestore();
     const batch = writeBatch(db);
-    for (const id of [roomId, completedRoomId]) {
-      const base = roomPath(id);
-      batch.set(doc(db, base), {
-        hostUid: 'alice',
-        phase: id === completedRoomId ? 'results' : 'claim',
-        phaseVersion: 4,
-        topicId: 'teacher_protection',
-        topicVersion: 1,
-        participantCount: 2,
-      });
+    for (const id of [roomId, otherRoomId]) {
+      const root = `rooms/${id}`;
+      batch.set(doc(db, root), { hostUid: id === roomId ? 'teacher' : 'other-teacher', phase: 'event', phaseVersion: 4, topicId: 'school_cctv' });
       for (const uid of ['alice', 'bob']) {
-        batch.set(doc(db, `${base}/participants/${uid}`), {
-          uid,
-          nickname: uid,
-          ready: true,
-          roleId: `teacher_protection_${uid === 'alice' ? 'teacher' : 'parent'}`,
-        });
-        batch.set(doc(db, `${base}/privatePlayers/${uid}`), {
-          initial: { position: 'oppose', reason: `${uid}-private-initial-reason` },
-          preferences: ['teacher_protection_parent', 'teacher_protection_teacher'],
-          switched: uid === 'bob',
-          cards: [{ id: `private-card-for-${uid}` }],
-          reflection: { opinion: `${uid}-private-final-opinion`, share: false },
-        });
-        batch.set(doc(db, `${base}/results/${uid}`), {
-          total: 70,
-          initial: `${uid}-private-initial-reason`,
-          reflection: `${uid}-private-final-opinion`,
+        if (id === otherRoomId && uid === 'alice') continue;
+        batch.set(doc(db, `${root}/participants/${uid}`), { uid, nickname: uid, seat: 0, prefsDone: true, roleId: 'cctv_student_rep' });
+        batch.set(doc(db, `${root}/privatePlayers/${uid}`), {
+          preferences: { first: 'cctv_student_rep', second: 'cctv_parent_rep' },
+          roleId: 'cctv_student_rep',
+          isSwitcher: uid === 'bob',
+          notices: [],
         });
       }
-      batch.set(doc(db, `${base}/publicRounds/claim`), {
-        items: [{ uid: 'alice', text: 'A published game-role statement.' }],
-      });
-      batch.set(doc(db, `${base}/internal/state`), {
-        submissions: { bob: { text: 'Unpublished statement.' } },
-        guesses: { alice: { targetUid: 'bob', reason: 'Private guess.' } },
-        ratings: { bob: { targetUid: 'alice', accuracy: 5 } },
-        reports: { alice: { detail: 'Private report.' } },
-      });
-      // Deny-by-default must also protect future/legacy private collections.
-      for (const name of ['submissions', 'guesses', 'ratings', 'reports']) {
-        batch.set(doc(db, `${base}/${name}/alice`), { ownerUid: 'alice', secret: true });
-      }
+      batch.set(doc(db, `${root}/publicRounds/chat`), { items: [] });
+      batch.set(doc(db, `${root}/host/state`), { moderation: [], teacherGuide: { summary: 'guide' } });
+      batch.set(doc(db, `${root}/internal/state`), { votes: { alice: ['bob'] } });
     }
-    batch.set(doc(db, `${roomPath(completedRoomId)}/publicRounds/reveal`), {
-      items: [{ uid: 'bob', switched: true, roleId: 'teacher_protection_parent' }],
-    });
-    batch.set(doc(db, roomPath(foreignRoomId)), { hostUid: 'outsider', phase: 'lobby' });
-    batch.set(doc(db, `${roomPath(foreignRoomId)}/participants/outsider`), {
-      uid: 'outsider', nickname: 'Other room member',
-    });
-    batch.set(doc(db, 'roomCodes/hashed-code'), { roomId });
-    batch.set(doc(db, 'topics/teacher_protection'), { active: true, version: 1 });
     await batch.commit();
   });
-}, { timeout: 30000 });
+});
 
 after(async () => {
-  if (environment) {
-    await environment.clearFirestore();
-    await environment.cleanup();
-  }
+  await environment?.cleanup();
 });
 
-describe('Room membership and public game subscriptions', () => {
-  test('an unauthenticated browser and a signed-in nonmember cannot open a room', async () => {
-    await assertFails(getDoc(doc(anonymous, roomPath())));
-    await assertFails(getDoc(doc(outsider, roomPath())));
-    await assertFails(getDocs(collection(outsider, `${roomPath()}/participants`)));
-    await assertFails(getDocs(collection(outsider, `${roomPath()}/publicRounds`)));
+describe('room membership', () => {
+  test('students and the teacher read the room, participants and public rounds', async () => {
+    for (const db of [teacher, alice, bob]) {
+      await assertSucceeds(getDoc(doc(db, base)));
+      await assertSucceeds(getDocs(collection(db, `${base}/participants`)));
+      await assertSucceeds(getDoc(doc(db, `${base}/publicRounds/chat`)));
+    }
   });
 
-  test('room members can read the room and subscribe to its public collections', async () => {
-    const room = await assertSucceeds(getDoc(doc(alice, roomPath())));
-    assert.equal(room.data().phase, 'claim');
-    const players = await assertSucceeds(getDocs(collection(bob, `${roomPath()}/participants`)));
-    assert.equal(players.size, 2);
-    const rounds = await assertSucceeds(getDocs(collection(bob, `${roomPath()}/publicRounds`)));
-    assert.equal(rounds.docs[0].data().items[0].uid, 'alice');
-  });
-
-  test('membership in one room grants no access to another room', async () => {
-    await assertFails(getDoc(doc(alice, roomPath(foreignRoomId))));
-    await assertFails(getDoc(doc(alice, `${roomPath(foreignRoomId)}/participants/outsider`)));
-    await assertSucceeds(getDoc(doc(outsider, roomPath(foreignRoomId))));
-  });
-
-  test('a member cannot enumerate rooms or resolve the private invitation-code index', async () => {
+  test('outsiders, anonymous users and other rooms are denied', async () => {
+    for (const db of [outsider, anonymous]) {
+      await assertFails(getDoc(doc(db, base)));
+      await assertFails(getDocs(collection(db, `${base}/participants`)));
+      await assertFails(getDoc(doc(db, `${base}/publicRounds/chat`)));
+    }
+    await assertFails(getDoc(doc(alice, `rooms/${otherRoomId}`)));
+    await assertFails(getDoc(doc(teacher, `rooms/${otherRoomId}/participants/bob`)));
     await assertFails(getDocs(collection(alice, 'rooms')));
-    await assertFails(getDoc(doc(alice, 'roomCodes/hashed-code')));
-    await assertFails(getDocs(collection(alice, 'roomCodes')));
   });
 });
 
-describe('Private opinions, pending submissions, and personal results', () => {
-  test('a player can retrieve only their own private player document', async () => {
-    const own = await assertSucceeds(getDoc(doc(alice, `${roomPath()}/privatePlayers/alice`)));
-    assert.equal(own.data().initial.reason, 'alice-private-initial-reason');
-    await assertFails(getDoc(doc(alice, `${roomPath()}/privatePlayers/bob`)));
-    await assertFails(getDoc(doc(bob, `${roomPath()}/privatePlayers/alice`)));
-    await assertFails(getDoc(doc(outsider, `${roomPath()}/privatePlayers/alice`)));
-  });
-
-  test('private collections cannot be enumerated, even with a query for the caller', async () => {
-    await assertFails(getDocs(collection(alice, `${roomPath()}/privatePlayers`)));
-    await assertFails(getDocs(query(
-      collection(alice, `${roomPath()}/privatePlayers`),
-      where('__name__', '==', 'alice'),
-    )));
-    await assertFails(getDocs(collectionGroup(alice, 'privatePlayers')));
-    await assertFails(getDocs(collection(alice, `${roomPath()}/results`)));
-  });
-
-  test('even the host cannot read server state containing pending claims, guesses, and reports', async () => {
-    for (const db of [alice, bob, outsider]) {
-      await assertFails(getDoc(doc(db, `${roomPath()}/internal/state`)));
-    }
-    await assertFails(getDocs(collection(alice, `${roomPath()}/internal`)));
-  });
-
-  test('private submission, guess, rating, and report paths remain inaccessible to every client', async () => {
-    for (const name of ['submissions', 'guesses', 'ratings', 'reports']) {
-      await assertFails(getDoc(doc(alice, `${roomPath()}/${name}/alice`)));
-      await assertFails(getDoc(doc(bob, `${roomPath()}/${name}/alice`)));
-      await assertFails(getDocs(collection(alice, `${roomPath()}/${name}`)));
-    }
-  });
-
-  test('the result screen exposes a personal result only to its owner', async () => {
-    const base = roomPath(completedRoomId);
-    const result = await assertSucceeds(getDoc(doc(alice, `${base}/results/alice`)));
-    assert.equal(result.data().total, 70);
-    await assertFails(getDoc(doc(alice, `${base}/results/bob`)));
-    await assertFails(getDoc(doc(outsider, `${base}/results/alice`)));
-  });
-
-  test('a role-switch reveal never makes another player\'s actual opinions readable', async () => {
-    const base = roomPath(completedRoomId);
-    const reveal = await assertSucceeds(getDoc(doc(alice, `${base}/publicRounds/reveal`)));
-    assert.equal(reveal.data().items[0].switched, true);
+describe('private data', () => {
+  test('a student reads only their own preferences and switcher status', async () => {
+    await assertSucceeds(getDoc(doc(alice, `${base}/privatePlayers/alice`)));
     await assertFails(getDoc(doc(alice, `${base}/privatePlayers/bob`)));
-    await assertFails(getDoc(doc(bob, `${base}/privatePlayers/alice`)));
-    await assertFails(getDoc(doc(alice, `${base}/internal/state`)));
+    await assertFails(getDocs(collection(alice, `${base}/privatePlayers`)));
+    await assertFails(getDocs(collectionGroup(alice, 'privatePlayers')));
+  });
+
+  test('the teacher cannot read any student preference or switcher status', async () => {
+    await assertFails(getDoc(doc(teacher, `${base}/privatePlayers/alice`)));
+    await assertFails(getDoc(doc(teacher, `${base}/privatePlayers/bob`)));
+    await assertFails(getDocs(collection(teacher, `${base}/privatePlayers`)));
+  });
+
+  test('only the teacher reads the moderation queue', async () => {
+    await assertSucceeds(getDoc(doc(teacher, `${base}/host/state`)));
+    for (const db of [alice, bob, outsider]) await assertFails(getDoc(doc(db, `${base}/host/state`)));
+  });
+
+  test('nobody reads the server aggregate with votes', async () => {
+    for (const db of [teacher, alice, bob]) await assertFails(getDoc(doc(db, `${base}/internal/state`)));
   });
 });
 
-describe('Only the authenticated backend can mutate game state', () => {
-  test('host and participant cannot advance phases, select topics, change roles, or award points', async () => {
-    await assertFails(updateDoc(doc(alice, roomPath()), { phase: 'results', phaseVersion: 999 }));
-    await assertFails(updateDoc(doc(alice, roomPath()), { topicId: 'ai_assignment' }));
-    await assertFails(updateDoc(doc(alice, `${roomPath()}/participants/alice`), {
-      roleId: 'teacher_protection_student_advocate', ready: true,
-    }));
-    await assertFails(updateDoc(doc(alice, `${roomPath()}/privatePlayers/alice`), { switched: false }));
-    await assertFails(updateDoc(doc(alice, `${roomPath()}/results/alice`), { total: 100 }));
-    await assertFails(updateDoc(doc(bob, roomPath()), { hostUid: 'bob' }));
-  });
-
-  test('an outsider cannot forge membership or create a room directly', async () => {
-    await assertFails(setDoc(doc(outsider, `${roomPath()}/participants/outsider`), {
-      uid: 'outsider', nickname: 'Forged member', ready: true,
-    }));
-    await assertFails(getDoc(doc(outsider, roomPath())));
-    await assertFails(setDoc(doc(outsider, 'rooms/forged-room'), {
-      hostUid: 'outsider', phase: 'lobby',
-    }));
-  });
-
-  test('a client cannot submit, publish, or overwrite server content through Firestore', async () => {
-    for (const path of [
-      `${roomPath()}/internal/state`,
-      `${roomPath()}/submissions/alice`,
-      `${roomPath()}/guesses/alice`,
-      `${roomPath()}/ratings/alice`,
-      `${roomPath()}/reports/alice`,
-      `${roomPath()}/publicRounds/claim`,
-      `${roomPath()}/privatePlayers/alice`,
-      `${roomPath()}/results/alice`,
-      'topics/teacher_protection',
-      'roomCodes/hashed-code',
-    ]) {
-      await assertFails(setDoc(doc(alice, path), { forged: true }));
+describe('writes', () => {
+  test('every client write is denied; the server is the only writer', async () => {
+    for (const db of [teacher, alice]) {
+      await assertFails(updateDoc(doc(db, base), { phase: 'reveal' }));
+      await assertFails(setDoc(doc(db, `${base}/participants/alice`), { roleId: 'cctv_parent_rep' }));
+      await assertFails(updateDoc(doc(db, `${base}/privatePlayers/alice`), { isSwitcher: false }));
+      await assertFails(setDoc(doc(db, `${base}/publicRounds/chat`), { items: [{ text: 'unmoderated' }] }));
+      await assertFails(deleteDoc(doc(db, `${base}/host/state`)));
+      await assertFails(setDoc(doc(db, 'rooms/new-room'), { hostUid: 'alice' }));
     }
-  });
-
-  test('a host cannot delete a room, another participant, or their own private history', async () => {
-    await assertFails(deleteDoc(doc(alice, roomPath())));
-    await assertFails(deleteDoc(doc(alice, `${roomPath()}/participants/bob`)));
-    await assertFails(deleteDoc(doc(alice, `${roomPath()}/privatePlayers/alice`)));
-    const room = await assertSucceeds(getDoc(doc(bob, roomPath())));
-    assert.equal(room.data().phase, 'claim');
   });
 });

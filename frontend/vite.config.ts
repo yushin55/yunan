@@ -7,7 +7,6 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          three: ["three"],
           firebase: ["firebase/app", "firebase/auth", "firebase/firestore"],
         },
       },

@@ -19,15 +19,15 @@ def code_hash(code: str) -> str:
 
 
 def projections(state: dict) -> dict[str, dict]:
-    docs = {"": state["room"], "internal/state": state}
+    """Client-readable documents. Firestore rules decide who may read each path:
+    room/participants/publicRounds → room members and the teacher; privatePlayers/{uid} → that
+    student only; host/state → the teacher only; internal/state → nobody but the server."""
+    docs = {"": state["room"], "internal/state": state, "host/state": state["host"]}
     for uid, participant in state["participants"].items():
         docs[f"participants/{uid}"] = participant
-        private = {k: v for k, v in state["privatePlayers"][uid].items() if k not in ("rateWindow", "rateCount", "reportCount")}
-        docs[f"privatePlayers/{uid}"] = private
-    for name, rows in state["rounds"].items():
-        docs[f"publicRounds/{name}"] = {"items": rows}
-    for uid, result in state.get("results", {}).items():
-        docs[f"results/{uid}"] = result
+        docs[f"privatePlayers/{uid}"] = state["privatePlayers"][uid]
+    for name, value in state["rounds"].items():
+        docs[f"publicRounds/{name}"] = value if isinstance(value, dict) else {"items": value}
     return docs
 
 
@@ -78,7 +78,7 @@ class FirestoreRoomRepository:
         def operation(transaction):
             # Read without a pessimistic lock, then atomically guard the entire
             # write set with the aggregate's update timestamp. This avoids lock
-            # upgrades when four players submit while room listeners refresh.
+            # upgrades when many students submit while room listeners refresh.
             doc = state_ref.get()
             if not doc.exists:
                 raise HTTPException(404, "방을 찾을 수 없어요.")
@@ -112,13 +112,17 @@ class FirestoreRoomRepository:
     def _write(self, transaction, state, before=None, update_time=None):
         root = f"rooms/{state['room']['roomId']}"
         previous = projections(before) if before else {}
-        for suffix, document in projections(state).items():
+        current = projections(state)
+        for suffix, document in current.items():
             if suffix not in previous or previous[suffix] != document:
                 ref = self.db.document(root + (f"/{suffix}" if suffix else ""))
                 if suffix == "internal/state" and update_time is not None:
                     transaction.update(ref, document, option=self.db.write_option(last_update_time=update_time))
                 else:
                     transaction.set(ref, document)
+        for suffix in previous.keys() - current.keys():
+            # A student removed in the lobby loses their participant and private documents.
+            transaction.delete(self.db.document(f"{root}/{suffix}"))
 
 
 class MemoryRoomRepository:

@@ -1,1 +1,1 @@
-"""Yunan multiplayer game server."""
+"""Bridge (WHOSE SIDE?) classroom role-deduction debate game server."""

@@ -1,206 +1,196 @@
-export type Phase =
-  | "lobby"
-  | "topic"
-  | "initial"
-  | "role"
-  | "claim"
-  | "claim_review"
-  | "scenario"
-  | "scenario_review"
-  | "question"
-  | "guess"
-  | "reveal"
-  | "reflection"
-  | "results";
-export type Position =
-  | "support"
-  | "conditional_support"
-  | "neutral"
-  | "conditional_oppose"
-  | "oppose";
-export interface Card {
-  id: string;
-  title: string;
-  text: string;
-  label: string;
-  type: string;
-}
+export type Phase = "lobby" | "role" | "statement" | "event" | "rebuttal" | "vote" | "reveal" | "ended";
+export type TimedPhase = "role" | "statement" | "event" | "rebuttal" | "vote";
+export type MessageKind = "response" | "question" | "answer" | "rebuttal";
+export type Viewer = "host" | "student";
+
 export interface Role {
   id: string;
   name: string;
+  intro: string;
   goal: string;
-  priority: string;
-  stance: string;
-  cards: Card[];
+  concerns: string[];
 }
+
+export interface BriefingSource {
+  id: string;
+  publisher: string;
+  title: string;
+  date: string;
+  url: string;
+}
+
+/** A short pre-game summary of real, cited reporting about the topic. */
+export interface Briefing {
+  asOf: string;
+  note: string;
+  scenes: { title: string; lines: string[]; sourceIds?: string[] }[];
+  sources: BriefingSource[];
+}
+
 export interface Topic {
   topicId: string;
   title: string;
   shortTitle: string;
-  background: string;
-  question: string;
-  tags: string[];
-  isHypothetical: boolean;
+  situation: string;
   version: number;
+  isHypothetical: boolean;
   roles: Role[];
-  scenario: {
-    id: string;
-    title: string;
-    description: string;
-    options: { id: string; text: string }[];
-  };
-  questions: string[];
+  questionPrompts: string[];
+  briefing: Briefing;
 }
+
+export interface EventCard {
+  id: string;
+  title: string;
+  description: string;
+}
+
+export interface GameSettings {
+  switcherCount: 1 | 2;
+  phaseSeconds: Record<TimedPhase, number>;
+}
+
+export interface Room {
+  roomId: string;
+  code: string;
+  hostUid: string;
+  phase: Phase;
+  phaseVersion: number;
+  phaseEndsAt: number | null;
+  paused: boolean;
+  pausedRemainingMs: number | null;
+  participantCount: number;
+  minStudents: number;
+  maxStudents: number;
+  topicId: string;
+  topic: Topic;
+  event: EventCard | null;
+  settings: GameSettings;
+  createdAt: number;
+  endedAt: number | null;
+}
+
 export interface Participant {
   uid: string;
   nickname: string;
-  ready: boolean;
-  roleId?: string;
+  seat: number;
+  joinedAt: number;
+  connectedAt: number;
+  prefsDone: boolean;
   submitted: string[];
-  connectedAt?: number;
+  roleId?: string;
 }
-export interface Submission {
+
+export interface StatementRow {
   uid: string;
-  timedOut?: boolean;
   text?: string;
-  optionId?: string;
-  reason?: string;
-  cardId?: string;
-  cardConnection?: string;
-  questionId?: string;
-  targetUid?: string;
-  answer?: string;
+  at?: number;
+  timedOut?: boolean;
+  late?: boolean;
+  viaTeacher?: boolean;
 }
-export type ReactionKind = "agree" | "convincing" | "rebut" | "curious";
-export interface Reaction {
+
+export interface ChatMessage {
+  id: string;
   uid: string;
-  targetUid: string;
-  round: "claim" | "scenario";
-  kind: ReactionKind;
+  phase: "event" | "rebuttal";
+  kind: MessageKind;
+  text: string;
+  targetUid: string | null;
+  at: number;
+  viaTeacher?: boolean;
+}
+
+export interface Reveal {
+  switcherCount: number;
+  switchers: { uid: string; roleId: string }[];
+  tally: { uid: string; votes: number }[];
+  topVoted: string[];
+  tiedUids: string[];
+  tie: boolean;
+  outcome: "found" | "partial" | "missed" | "tie" | "no_votes";
+  ballots: { uid: string; voted: boolean; targets: string[]; correct: number }[];
+}
+
+export interface Rounds {
+  statements: StatementRow[];
+  chat: ChatMessage[];
+  reveal?: Reveal;
+}
+
+export type NoticeStatus = "needs_edit" | "pending_review" | "returned" | "approved" | "withdrawn";
+
+export interface Notice {
+  id: string;
+  kind: MessageKind | "statement";
+  phase: Phase;
+  status: NoticeStatus;
+  hint: string | null;
+  excerpt: string | null;
+  text: string;
+  targetUid: string | null;
   at: number;
 }
-export interface Reflection {
-  position: Position;
-  understood: string;
-  disagree: string;
-  opinion: string;
-  share: boolean;
-}
-export interface Breakdown {
-  label: string;
-  points: number;
-  max: number;
-  reason?: string;
-}
-export interface PlayerResult {
+
+/** Visible only to the student it belongs to (Firestore privatePlayers/{uid}). */
+export interface Me {
   uid: string;
-  nickname?: string;
-  total: number;
-  breakdown: Breakdown[] | Record<string, unknown>;
-  guessCorrect?: boolean;
-  initialPosition?: { position: Position; reason: string };
-  reflection?: Reflection;
+  preferences: { first: string; second: string } | null;
+  roleId: string | null;
+  isSwitcher: boolean | null;
+  preferenceRank: 1 | 2 | null;
+  vote: string[] | null;
+  notices: Notice[];
 }
+
+export interface ModerationEntry {
+  id: string;
+  uid: string;
+  nickname: string;
+  kind: MessageKind | "statement";
+  phase: Phase;
+  text: string;
+  targetUid: string | null;
+  status: "flagged" | "pending_review" | "approved" | "returned" | "withdrawn";
+  category: "profanity" | "personal_attack" | "mockery" | null;
+  excerpt: string | null;
+  source: "rules" | "ai" | "none";
+  at: number;
+}
+
+/** Visible only to the teacher (Firestore host/state). */
+export interface HostState {
+  uid: string;
+  teacherGuide: { summary: string; tips: string[]; caution?: string };
+  moderation: ModerationEntry[];
+}
+
 export interface Snapshot {
-  serverNow?: number;
-  room: {
-    roomId: string;
-    code: string;
-    hostUid: string;
-    phase: Phase;
-    phaseVersion: number;
-    phaseEndsAt: number | null;
-    topicId?: string;
-    topicVersion?: number;
-    topic?: Topic;
-    participantCount: number;
-    createdAt?: number;
-    revision?: number;
-    updatedAt?: number;
-  };
+  viewer: Viewer;
+  room: Room;
   participants: Participant[];
-  me: {
-    uid: string;
-    ratedTargets?: string[];
-    initialPosition?: {
-      position: Position;
-      reason: string;
-      preferences: string[];
-    };
-    preferences?: string[];
-    roleId?: string;
-    isSwitcher?: boolean;
-    cards?: Card[];
-    reflection?: Reflection;
-    guess?: { targetUid: string; reason: string; clue: string };
-  };
-  rounds: {
-    claim?: Submission[];
-    scenario?: Submission[];
-    question?: Submission[];
-    reactions?: Reaction[];
-    reveal?: { uid: string; roleId: string; isSwitcher: boolean }[];
-    sharedReflections?: {
-      uid: string;
-      opinion?: string;
-      reflection?: Reflection;
-    }[];
-  };
-  results?: { players: PlayerResult[]; me: PlayerResult };
+  rounds: Rounds;
+  me?: Me;
+  host?: HostState;
+  serverNow?: number;
 }
-export const PHASES: Phase[] = [
-  "lobby",
-  "topic",
-  "initial",
-  "role",
-  "claim",
-  "claim_review",
-  "scenario",
-  "scenario_review",
-  "question",
-  "guess",
-  "reveal",
-  "reflection",
-  "results",
-];
-export const PHASE_LABELS: Record<Phase, string> = {
-  lobby: "라운지",
-  topic: "오늘의 주제",
-  initial: "나의 관점",
-  role: "비밀 역할",
-  claim: "입장 선언",
-  claim_review: "입장 공개",
-  scenario: "사건 대응",
-  scenario_review: "대응 공개",
-  question: "교차 질문",
-  guess: "전환자 추리",
-  reveal: "정체 공개",
-  reflection: "진짜 목소리",
-  results: "게임 결과",
-};
-export const POSITIONS: { value: Position; label: string }[] = [
-  { value: "support", label: "찬성" },
-  { value: "conditional_support", label: "조건부 찬성" },
-  { value: "neutral", label: "판단 유보" },
-  { value: "conditional_oppose", label: "조건부 반대" },
-  { value: "oppose", label: "반대" },
-];
-export const PLAYER_COLORS = [
-  "#dba767",
-  "#8aa998",
-  "#8e9ebc",
-  "#ce9389",
-  "#b0a1c5",
-  "#c4bb7b",
-];
-/** After each public round, everyone looks over the other turns and reacts. */
-export const REVIEW_PHASES: Partial<Record<Phase, "claim" | "scenario">> = {
-  claim_review: "claim",
-  scenario_review: "scenario",
-};
-export const REACTIONS: { kind: ReactionKind; icon: string; label: string }[] = [
-  { kind: "agree", icon: "👍", label: "공감돼요" },
-  { kind: "convincing", icon: "💡", label: "설득력 있어요" },
-  { kind: "rebut", icon: "✋", label: "반박하고 싶어요" },
-  { kind: "curious", icon: "❓", label: "더 듣고 싶어요" },
-];
+
+export interface ModerationResult {
+  status: "published" | "needs_edit" | "pending_review";
+  messageId: string;
+  hint?: string | null;
+  excerpt?: string | null;
+}
+
+export interface TopicCatalog {
+  topics: Topic[];
+  config: {
+    minStudents: number;
+    maxStudents: number;
+    switcherCounts: number[];
+    defaultSwitcherCount: number;
+    phaseSeconds: Record<TimedPhase, number>;
+    phaseSecondsRange: { min: number; max: number };
+    textLimits: { statement: number; message: number; nickname: number };
+  };
+}

@@ -1,9 +1,11 @@
 """Real Auth tokens + real Firestore transactions; run with RUN_EMULATOR_TESTS=1.
 
-The clock is injected solely to avoid waiting ten minutes in tests. Authentication,
-API validation, role assignment, persistence and transactions are unmodified.
+One teacher and six students play a whole game through the HTTP API. Concurrent
+submissions race on the same aggregate. Only the moderation mode is fixed to rules so
+the test never calls an external AI service.
 """
 import os
+import random
 from concurrent.futures import ThreadPoolExecutor
 
 import httpx
@@ -15,82 +17,73 @@ from app.core.firebase import firestore_client
 from app.main import app
 from app.repositories.rooms import FirestoreRoomRepository
 from app.services.game import GameService
-from app.services.phase_engine import now_ms
+from app.services.moderation import Moderator
 
 pytestmark = [pytest.mark.emulator, pytest.mark.skipif(os.getenv("RUN_EMULATOR_TESTS") != "1", reason="Firebase emulators are opt-in")]
 
 
-def test_four_authenticated_accounts_complete_game_in_firestore():
-    clock = [now_ms()]
-    repository = FirestoreRoomRepository(firestore_client())
-    service = GameService(repository, lambda: clock[0])
+def sign_up():
+    auth = httpx.post("http://" + os.environ["FIREBASE_AUTH_EMULATOR_HOST"] + "/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key", json={"returnSecureToken": True})
+    assert auth.status_code == 200, auth.text
+    return auth.json()["idToken"], auth.json()["localId"]
+
+
+def test_teacher_and_six_students_complete_a_game_in_firestore():
+    db = firestore_client()
+    service = GameService(FirestoreRoomRepository(db), moderator=Moderator(mode="rules"), rng=random.SystemRandom())
     app.dependency_overrides[game_service] = lambda: service
-    tokens = []
-    uids = []
-    for _ in range(4):
-        auth = httpx.post("http://" + os.environ["FIREBASE_AUTH_EMULATOR_HOST"] + "/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-key", json={"returnSecureToken": True})
-        assert auth.status_code == 200, auth.text
-        tokens.append(auth.json()["idToken"])
-        uids.append(auth.json()["localId"])
+    teacher_token, teacher_uid = sign_up()
+    students = [sign_up() for _ in range(6)]
     try:
         with TestClient(app) as api:
-            def post(index, action, payload):
-                result = api.post(action, json=payload, headers={"Authorization": "Bearer " + tokens[index]})
-                assert result.status_code == 200, (action, result.text)
+            def post(token, path, payload, status=200):
+                result = api.post(path, json=payload, headers={"Authorization": "Bearer " + token})
+                assert result.status_code == status, (path, result.text)
                 return result.json()
 
-            created = post(0, "/api/rooms", {"nickname": "통합테스트0"})
-            rid = created["room"]["roomId"]
+            def everyone(path, payload):
+                with ThreadPoolExecutor(max_workers=6) as executor:
+                    return list(executor.map(lambda i: post(students[i][0], path, payload(i)), range(6)))
+
+            created = post(teacher_token, "/api/rooms", {"topicId": "school_cctv"})
+            rid, code = created["room"]["roomId"], created["room"]["code"]
             base = f"/api/rooms/{rid}/"
+            assert created["viewer"] == "host"
+            for i, (token, _) in enumerate(students):
+                post(token, "/api/rooms/join", {"nickname": f"통합{i}", "code": code})
+            roles = [r["id"] for r in created["room"]["topic"]["roles"]]
+            everyone(base + "preferences", lambda i: {"first": roles[0] if i < 3 else roles[i - 2], "second": roles[4]})
+            post(students[0][0], base + "start", {}, status=403)
+            started = post(teacher_token, base + "start", {})
+            assert started["room"]["phase"] == "role"
 
-            def concurrent(action, payload):
-                # Every real participant may press submit at the same instant.
-                with ThreadPoolExecutor(max_workers=4) as executor:
-                    list(executor.map(lambda i: post(i, base + action, payload(i)), range(4)))
-                return service.read(rid, uids[0])
+            # Firestore projections: no secrets in shared documents.
+            room_ref = db.document(f"rooms/{rid}")
+            for snap in room_ref.collection("participants").stream():
+                assert "preferences" not in snap.to_dict() and "isSwitcher" not in snap.to_dict()
+            assert "preferences" not in str(room_ref.collection("host").document("state").get().to_dict())
 
-            for i in range(1, 4):
-                post(i, "/api/rooms/join", {"nickname": f"통합테스트{i}", "code": created["room"]["code"]})
-                post(i, base + "ready", {"ready": True})
-            current = post(0, base + "start", {})
-            topic = current["room"]["topic"]
-            assert "topic" not in created["room"]
-            clock[0] = current["room"]["phaseEndsAt"] + 1
-            # Race four independent authenticated requests against one expired version.
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                synced = list(executor.map(lambda i: post(i, base + "sync", {"phaseVersion": 1}), range(4)))
-            assert {r["room"]["phaseVersion"] for r in synced} == {2}
-            assert {r["room"]["revision"] for r in synced} == {current["room"]["revision"] + 1}
-            stale = post(0, base + "sync", {"phaseVersion": 1})
-            assert stale["room"]["revision"] == synced[0]["room"]["revision"]
-            assert repository.db.document(f"rooms/{rid}").get().to_dict()["phaseVersion"] == 2
-            preferences = [r["id"] for r in topic["roles"][:2]]
-            current = concurrent("initial-position", lambda i: {"position": "support", "reason": f"비공개 생각 {i}", "preferences": preferences})
-            clock[0] = current["room"]["phaseEndsAt"] + 1
-            post(0, base + "sync", {"phaseVersion": current["room"]["phaseVersion"]})
-            cards = []
-            for i in range(4):
-                mine = api.get(base + "me", headers={"Authorization": "Bearer " + tokens[i]}).json()
-                assert mine["room"]["topicId"] == topic["topicId"]
-                assert f"비공개 생각 {(i+1)%4}" not in str(mine)
-                cards.append(mine["me"]["cards"][0]["id"])
-            concurrent("claim", lambda i: {"text": "제 역할에서는 공정한 절차가 중요합니다.", "cardId": cards[i], "cardConnection": "개인의 설명을 들을 기회를 보장하는 방안과 연결됩니다."})
-            concurrent("review-done", lambda i: {})
-            concurrent("scenario", lambda i: {"optionId": topic["scenario"]["options"][0]["id"], "reason": "현장 적용 가능성을 고려했어요."})
-            concurrent("review-done", lambda i: {})
-            concurrent("question", lambda i: {"targetUid": uids[(i+1)%4], "text": "그 기준을 어떻게 적용할 건가요?"})
-            concurrent("answer", lambda i: {"questionId": "q_" + uids[(i-1)%4], "text": "명확한 기준과 재검토 절차를 마련하겠습니다."})
-            current = concurrent("guess", lambda i: {"targetUid": uids[(i+1)%4], "reason": "우선 가치", "clue": "판단 기준에 변화가 있었어요."})
-            assert sum(r["isSwitcher"] for r in current["rounds"]["reveal"]) == 2
-            concurrent("rating", lambda i: {"targetUid": uids[(i+1)%4], "accuracy": 5, "respect": 5, "evidence": 4})
-            current = concurrent("reflection", lambda i: {"position": "support", "understood": "관점마다 우선 가치가 달라요", "disagree": "권한 확대는 여전히 신중해야 해요", "opinion": f"최종 비공개 의견 {i}", "share": i == 1})
-            assert current["room"]["phase"] == "results"
-            assert len(current["results"]["players"]) == 4
-            persisted = GameService(FirestoreRoomRepository(firestore_client())).read(rid, uids[0])
-            assert persisted["room"]["topicId"] == topic["topicId"]
-            assert "최종 비공개 의견 1" in str(persisted)
-            assert "최종 비공개 의견 2" not in str(persisted)
-            assert "비공개 생각 1" not in str(persisted)
-            assert repository.db.document(f"rooms/{rid}").get().to_dict()["phase"] == "results"
+            everyone(base + "confirm-role", lambda i: {})
+            everyone(base + "statement", lambda i: {"text": f"제 역할로서 {i}번 입장을 발표합니다."})
+            view = post(teacher_token, base + "sync", {})
+            assert view["room"]["phase"] == "event" and view["room"]["event"]["title"]
+            assert len(view["rounds"]["statements"]) == 6
+            everyone(base + "messages", lambda i: {"kind": "question", "text": f"{i}번의 질문이에요", "targetUid": students[(i + 1) % 6][1]})
+            flagged = post(students[0][0], base + "messages", {"kind": "answer", "text": "닥쳐"})
+            assert flagged["moderation"]["status"] == "needs_edit"
+            post(teacher_token, base + "next", {})
+            post(teacher_token, base + "next", {})
+            secrets = {uid: service.read(rid, uid)["me"]["isSwitcher"] for _, uid in students}
+            switcher = next(uid for uid, flag in secrets.items() if flag)
+            everyone(base + "vote", lambda i: {"targets": [switcher if students[i][1] != switcher else students[(i + 1) % 6][1]]})
+            final = post(teacher_token, base + "sync", {})
+            assert final["room"]["phase"] == "reveal"
+            assert final["rounds"]["reveal"]["switchers"][0]["uid"] == switcher
+            assert len(final["rounds"]["chat"]) == 6  # The flagged message never became public.
+            post(teacher_token, base + "end", {})
+            assert room_ref.get().to_dict()["phase"] == "ended"
+            # Reconnecting student gets the same role after the game.
+            again = post(students[1][0], "/api/rooms/join", {"nickname": "다시", "code": code})
+            assert again["me"]["roleId"] == service.read(rid, students[1][1])["me"]["roleId"]
     finally:
         app.dependency_overrides.clear()
