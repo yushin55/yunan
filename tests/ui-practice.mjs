@@ -14,15 +14,12 @@ async function brief(page) {
   await expect(page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
   await page.waitForTimeout(1500);
   await page.getByTestId('briefing').screenshot({ path: `artifacts/briefing-${page.viewportSize().width}.png` });
-  for (let i = 0; i < 8 && (await page.getByTestId('briefing-next').count()); i++) await page.getByTestId('briefing-next').click();
-  await page.getByTestId('briefing-done').click();
+  for (let i = 0; i < 8 && !(await page.getByTestId('video-end').count()); i++) await page.getByTestId('briefing-next').click({ force: true });
+  await page.getByTestId('video-next').click(); // The last frame offers replay or the next step.
   // The rules video, stepped through scene by scene, unlocks role picking.
   await page.getByTestId('rules-play').click();
-  for (let i = 0; i < 10 && !(await page.getByTestId('rules-done').isEnabled()); i++) {
-    await page.getByTestId('briefing-next').click({ force: true }).catch(() => {});
-    await page.waitForTimeout(150);
-  }
-  await page.getByTestId('rules-done').click();
+  await page.getByTestId('video-skip').click({ force: true }); // Skipping jumps to the end screen.
+  await page.getByTestId('video-next').click();
 }
 
 // Dressing-room picker: show a role from the rack, put it in the next slot, then confirm.
@@ -57,6 +54,11 @@ async function play(label, options) {
   await page.getByRole('textbox', { name: '닉네임' }).fill('연습생');
   await page.getByTestId('practice-begin').click();
   await expect(page.getByTestId('flow-overlay')).toBeVisible(); // Briefing, rules and roles fill the screen.
+  // Leaving the full-screen steps returns to the lobby, which offers to continue.
+  await page.getByTestId('flow-exit').click();
+  await expect(page.getByTestId('flow-resume')).toBeVisible();
+  await page.getByRole('button', { name: /이어서 하기/ }).click();
+  await expect(page.getByTestId('flow-overlay')).toBeVisible();
 
   await expect(title).toContainText('대기실');
   await expect(page.getByTestId('practice-start')).toBeDisabled();

@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from "lucide-react";
+import { useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, ExternalLink, Maximize2, Pause, Play, RotateCcw, SkipForward, Volume2, VolumeX } from "lucide-react";
 import type { Briefing } from "../../types/game";
 import { Person, playSting } from "./media";
 import TopicArt from "./TopicArt";
@@ -21,7 +21,22 @@ const LABELS: Record<Shot, string> = { anchor: "오늘의 이슈", footage: "이
  * studio, illustrated footage of the issue, reenacted street voices and a closing question.
  * Narration comes from pre-recorded clips; the content only from the topic's cited briefing.
  */
-export default function IssueBriefing({ briefing, topicId, headline, onFinish }: { briefing: Briefing; topicId?: string; headline?: string; onFinish?: () => void }) {
+export default function IssueBriefing({
+  briefing,
+  topicId,
+  headline,
+  onFinish,
+  onNext,
+  nextLabel,
+}: {
+  briefing: Briefing;
+  topicId?: string;
+  headline?: string;
+  onFinish?: () => void;
+  /** Shown on the last frame next to "다시 보기" (e.g. moving on to the rules). */
+  onNext?: () => void;
+  nextLabel?: string;
+}) {
   const frame = useRef<HTMLDivElement>(null);
   const scenes = briefing.scenes;
   const player = useScenePlayer({ audioKey: topicId ?? "", scenes, introSeconds: INTRO_SECONDS, onFinish });
@@ -64,33 +79,20 @@ export default function IssueBriefing({ briefing, topicId, headline, onFinish }:
   if (player.ended)
     return (
       <div className="news ended" data-testid="briefing">
-        <div className="briefing-end">
-          <span className="news-logo small">
-            BRIDGE <b>NEWS</b>
-          </span>
-          <strong>브리핑이 끝났어요. 이제 역할을 고를 차례예요.</strong>
-          <p className="muted small">
-            {briefing.note} (기준: {briefing.asOf})
-          </p>
-          <ul className="briefing-sources">
-            {briefing.sources.map((s) => (
-              <li key={s.id}>
-                <a href={s.url} target="_blank" rel="noreferrer">
-                  {s.publisher} · {s.title} <ExternalLink size={12} aria-hidden />
-                </a>
-                <span className="muted small"> {s.date}</span>
-              </li>
-            ))}
-          </ul>
-          <button
-            className="button ghost small"
-            onClick={() => {
+        <div className="news-frame">
+          <div className="news-voices-bg">
+            <TopicArt topicId={topicId} shot={2} />
+          </div>
+          <EndCard
+            title="브리핑이 끝났어요"
+            onReplay={() => {
               player.restart();
               if (sound) playSting();
             }}
-          >
-            <RotateCcw size={15} /> 다시 보기
-          </button>
+            onNext={onNext}
+            nextLabel={nextLabel}
+            sources={briefing.sources}
+          />
         </div>
       </div>
     );
@@ -195,9 +197,7 @@ export function PlayerControls({
 }) {
   return (
     <div className="news-controls">
-      <div className="news-scrub" aria-hidden>
-        <i style={{ width: `${(elapsed / total) * 100}%` }} />
-      </div>
+      <Scrubber elapsed={elapsed} total={total} onSeek={player.seek} />
       <div className="news-buttons">
         <button className="icon-button" onClick={() => player.goScene(player.scene - 1)} disabled={player.intro || player.scene === 0} aria-label="이전 장면">
           <ChevronLeft size={18} />
@@ -215,10 +215,114 @@ export function PlayerControls({
           {clock(elapsed)} / {clock(total)}
         </span>
         <span className="muted small news-note">{note}</span>
+        <button className="button ghost small news-skip" data-testid="video-skip" onClick={player.skip} title="영상 건너뛰기">
+          <SkipForward size={15} /> 건너뛰기
+        </button>
         <button className="icon-button" onClick={() => void frame.current?.requestFullscreen?.()} aria-label="전체 화면" title="전체 화면">
           <Maximize2 size={17} />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Progress bar you can click or drag to jump to any moment; arrow keys move 5 seconds. */
+function Scrubber({ elapsed, total, onSeek }: { elapsed: number; total: number; onSeek: (seconds: number) => void }) {
+  const bar = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<number | null>(null);
+  // The live drag position, readable by every pointer event regardless of render timing.
+  const dragRef = useRef<number | null>(null);
+  const move = (value: number | null) => {
+    dragRef.current = value;
+    setDrag(value);
+  };
+  const at = (clientX: number) => {
+    const box = bar.current!.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (clientX - box.left) / box.width)) * total;
+  };
+  const shown = drag ?? elapsed;
+  return (
+    <div
+      ref={bar}
+      className={`news-scrub${drag !== null ? " dragging" : ""}`}
+      role="slider"
+      tabIndex={0}
+      aria-label="재생 위치"
+      aria-valuemin={0}
+      aria-valuemax={Math.round(total)}
+      aria-valuenow={Math.round(elapsed)}
+      aria-valuetext={`${clock(elapsed)} / ${clock(total)}`}
+      data-testid="video-scrub"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        move(at(e.clientX));
+      }}
+      onPointerMove={(e) => dragRef.current !== null && move(at(e.clientX))}
+      onPointerUp={(e) => {
+        if (dragRef.current === null) return;
+        const target = at(e.clientX);
+        move(null);
+        onSeek(target);
+      }}
+      onPointerCancel={() => move(null)}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowRight") onSeek(Math.min(total, elapsed + 5));
+        if (e.key === "ArrowLeft") onSeek(Math.max(0, elapsed - 5));
+      }}
+    >
+      <span className="scrub-track">
+        <i style={{ width: `${(shown / total) * 100}%` }} />
+      </span>
+      <span className="scrub-thumb" style={{ left: `${(shown / total) * 100}%` }} />
+      {drag !== null && (
+        <span className="scrub-time" style={{ left: `${(drag / total) * 100}%` }}>
+          {clock(drag)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function EndCard({
+  title,
+  onReplay,
+  onNext,
+  nextLabel = "다음으로",
+  sources,
+}: {
+  title: string;
+  onReplay: () => void;
+  onNext?: () => void;
+  nextLabel?: string;
+  sources?: Briefing["sources"];
+}) {
+  return (
+    <div className="video-end" data-testid="video-end">
+      <strong>{title}</strong>
+      <div className="video-end-buttons">
+        <button className="button ghost large" onClick={onReplay}>
+          <RotateCcw size={18} /> 다시 보기
+        </button>
+        {onNext && (
+          <button className="button primary large" data-testid="video-next" onClick={onNext}>
+            {nextLabel} <ChevronRight size={18} />
+          </button>
+        )}
+      </div>
+      {sources && sources.length > 0 && (
+        <details className="video-end-sources">
+          <summary>출처</summary>
+          <ul>
+            {sources.map((src) => (
+              <li key={src.id}>
+                <a href={src.url} target="_blank" rel="noreferrer">
+                  {src.publisher} · {src.title} <ExternalLink size={11} aria-hidden />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

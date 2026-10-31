@@ -46,6 +46,8 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
   const [playing, setPlaying] = useState(false);
   const [ended, setEnded] = useState(false);
   const [sound, setSound] = useState(true);
+  // Bumped on every seek so playback restarts from the new spot even within the same scene.
+  const [seekCount, setSeekCount] = useState(0);
   const finished = useRef(false);
   // Parents pass a fresh callback each render; keep playback from restarting because of it.
   const onFinishRef = useRef(onFinish);
@@ -96,6 +98,8 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
   useEffect(() => {
     if (!started || intro || ended || !playing) return;
     let timer: ReturnType<typeof setInterval> | undefined;
+    // The short pause before the next scene; cancelled if the viewer seeks or skips meanwhile.
+    let advance: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     const from = resumeAt.current;
     const startClock = () => {
@@ -122,12 +126,13 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
         if (stopped) return;
         stopped = true;
         clearInterval(timer);
-        setTimeout(() => goScene(scene + 1), 500);
+        advance = setTimeout(() => goScene(scene + 1), 500);
       };
       el.play().then(follow, () => !stopped && startClock());
       return () => {
         stopped = true;
         clearInterval(timer);
+        clearTimeout(advance);
         el.pause();
       };
     }
@@ -137,7 +142,7 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
       clearInterval(timer);
     };
     // `sound` only sets the initial mute; the effect below follows later changes.
-  }, [started, intro, ended, playing, scene, clip, length, goScene]);
+  }, [started, intro, ended, playing, scene, clip, length, goScene, seekCount]);
 
   useEffect(() => {
     if (audio.current) audio.current.muted = !sound;
@@ -160,6 +165,26 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
     elapsed,
     totalSeconds,
     goScene,
+    /** Jump to the end screen; counts as watched. */
+    skip: finish,
+    /** Jump to a moment on the overall timeline (seconds from the very start). */
+    seek: (seconds: number) => {
+      audio.current?.pause();
+      let rest = Math.max(0, seconds - introSeconds);
+      let index = 0;
+      while (index < lengths.length - 1 && rest >= lengths[index]) {
+        rest -= lengths[index];
+        index += 1;
+      }
+      rest = Math.min(rest, Math.max(0, lengths[index] - 0.2));
+      resumeAt.current = rest;
+      setIntro(false);
+      setEnded(false);
+      setScene(index);
+      setT(rest);
+      setPlaying(true);
+      setSeekCount((n) => n + 1);
+    },
     start: () => {
       setStarted(true);
       setPlaying(true);

@@ -89,18 +89,20 @@
 .rules-frame { background: #0b1210; }
 .rv-diagram { position: absolute; inset: 0; width: 100%; height: 100%; }
 .rv-pop { animation: rv-pop 520ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both; transform-box: fill-box; transform-origin: center; }
-@keyframes rv-pop { from { opacity: 0; transform: translateY(18px) scale(0.85); } to { opacity: 1; transform: none; } }
+/* Individual translate/scale compose with the SVG position attribute instead of replacing it. */
+@keyframes rv-pop { from { opacity: 0; translate: 0 18px; scale: 0.85; } to { opacity: 1; translate: 0 0; scale: 1; } }
 .rv-flip { animation: rv-flip 600ms ease-out both; transform-box: fill-box; transform-origin: center; }
-@keyframes rv-flip { from { opacity: 0; transform: translateY(-120px) scaleX(0.1); } 60% { opacity: 1; transform: translateY(0) scaleX(0.1); } to { opacity: 1; transform: scaleX(1); } }
+@keyframes rv-flip { from { opacity: 0; translate: 0 -120px; scale: 0.1 1; } 60% { opacity: 1; translate: 0 0; scale: 0.1 1; } to { opacity: 1; translate: 0 0; scale: 1; } }
 .rv-talk { animation: rv-talk 5.5s ease-in-out infinite both; transform-box: fill-box; transform-origin: bottom center; }
-@keyframes rv-talk { 0% { opacity: 0; transform: scale(0.7); } 8%, 30% { opacity: 1; transform: none; } 40%, 100% { opacity: 0.35; transform: none; } }
+@keyframes rv-talk { 0% { opacity: 0; scale: 0.7; } 8%, 30% { opacity: 1; scale: 1; } 40%, 100% { opacity: 0.35; scale: 1; } }
 .rv-arrow { animation: rv-pop 500ms ease-out both, rv-dash 1s linear infinite; }
 @keyframes rv-dash { to { stroke-dashoffset: -32; } }
 .rv-spot { animation: rv-spot 1.6s ease-in-out infinite alternate; }
 @keyframes rv-spot { from { opacity: 0.08; } to { opacity: 0.3; } }
 .rules-host { position: absolute; z-index: 3; left: 2%; bottom: 16%; height: 30%; }
 .rules-host-tag { position: absolute; z-index: 3; left: 3%; bottom: 13%; padding: 1px 8px; border-radius: 99px; background: var(--gold); color: #1b1408; font-weight: 800; font-size: clamp(0.58rem, 1.4cqw, 0.72rem); }
-.rules-lower { left: 18%; }
+/* No ticker in the rules video, so captions sit at the very bottom, under the table. */
+.rules-lower { left: 18%; bottom: 4%; }
 .rules-lower .news-lower-title { background: #2f6b52; }
 @container (max-width: 480px) {
   .rules-host { height: 18%; bottom: 30%; }
@@ -111,3 +113,27 @@
   .rv-pop, .rv-flip, .rv-talk, .rv-arrow, .rv-spot { animation: none; }
 }
 .news-poster > .news-logo { position: absolute; top: 14px; left: 16px; }
+
+/* ── Last frame: replay or move on ───────────────────────────── */
+.news.ended .news-voices-bg { filter: brightness(0.35) blur(3px); }
+.video-end { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 16px; text-align: center; animation: cut-in 400ms ease-out; }
+.video-end > strong { font-family: var(--serif); font-size: clamp(1.1rem, 4cqw, 1.8rem); color: #fff; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7); }
+.video-end-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.video-end-buttons .button.ghost { background: rgba(10, 16, 14, 0.6); color: #fff; border-color: rgba(255, 255, 255, 0.35); }
+.video-end-sources { position: absolute; left: 12px; bottom: 10px; max-width: calc(100% - 24px); text-align: left; font-size: 0.78rem; color: #c9d2de; }
+.video-end-sources summary { cursor: pointer; opacity: 0.75; }
+.video-end-sources ul { list-style: none; padding: 8px 10px; margin: 6px 0 0; display: grid; gap: 4px; border-radius: 8px; background: rgba(5, 9, 16, 0.85); }
+.video-end-sources a { color: var(--blue); }
+.news-skip { flex: none; }
+.news-skip.button.small { min-height: 34px; padding: 4px 10px; }
+@container (max-width: 720px) { .news-skip { margin-left: auto; } }
+
+/* ── Seekable progress bar ───────────────────────────── */
+.news-scrub { position: relative; height: 18px; margin-top: -7px; background: transparent; cursor: pointer; touch-action: none; outline: none; user-select: none; }
+.scrub-track { position: absolute; left: 0; right: 0; top: 7px; height: 4px; background: rgba(255, 255, 255, 0.15); transition: height 0.12s, top 0.12s; }
+.scrub-track i { display: block; height: 100%; background: #e2503c; transition: none; }
+.news-scrub:hover .scrub-track, .news-scrub.dragging .scrub-track, .news-scrub:focus-visible .scrub-track { top: 6px; height: 6px; }
+.scrub-thumb { position: absolute; top: 9px; width: 14px; height: 14px; border-radius: 50%; background: #e2503c; box-shadow: 0 0 0 3px rgba(226, 80, 60, 0.3); transform: translate(-50%, -50%) scale(0); transition: transform 0.12s; pointer-events: none; }
+.news-scrub:hover .scrub-thumb, .news-scrub.dragging .scrub-thumb, .news-scrub:focus-visible .scrub-thumb { transform: translate(-50%, -50%) scale(1); }
+.scrub-time { position: absolute; bottom: 20px; transform: translateX(-50%); padding: 2px 8px; border-radius: 6px; background: rgba(0, 0, 0, 0.8); color: #fff; font-size: 0.78rem; font-variant-numeric: tabular-nums; pointer-events: none; }
+@media (hover: none) { .scrub-thumb { transform: translate(-50%, -50%) scale(1); } }

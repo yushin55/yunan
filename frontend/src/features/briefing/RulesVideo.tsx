@@ -1,7 +1,7 @@
 import { memo, useRef } from "react";
-import { Play, RotateCcw } from "lucide-react";
+import { Play } from "lucide-react";
 import rules from "../../data/rulesVideo.json";
-import { PlayerControls } from "./IssueBriefing";
+import { EndCard, PlayerControls } from "./IssueBriefing";
 import { Person, playSting } from "./media";
 import { clock, useScenePlayer } from "./useScenePlayer";
 
@@ -53,8 +53,8 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 
       {id === "welcome" && (
         <g className="rv-pop">
-          <text x="800" y="700" textAnchor="middle" fill="#e6b85c" fontSize="96" fontWeight="900" letterSpacing="6">WHOSE SIDE?</text>
-          <text x="800" y="770" textAnchor="middle" fill="#f3eee3" fontSize="40" fontWeight="700">역할 추리 토론</text>
+          <text x="800" y="630" textAnchor="middle" fill="#e6b85c" fontSize="96" fontWeight="900" letterSpacing="6">WHOSE SIDE?</text>
+          <text x="800" y="694" textAnchor="middle" fill="#f3eee3" fontSize="40" fontWeight="700">역할 추리 토론</text>
         </g>
       )}
 
@@ -71,14 +71,14 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
         ))}
       {id === "choose" && (
         <g className="rv-pop" style={{ animationDelay: "2.2s" }}>
-          <rect x="560" y="620" width="480" height="96" rx="20" fill="#0b1210" opacity="0.85" />
-          <text x="800" y="682" textAnchor="middle" fill="#f3eee3" fontSize="40" fontWeight="800">🔒 내 선택은 나만 봐요</text>
+          <rect x="560" y="80" width="480" height="96" rx="20" fill="#0b1210" opacity="0.85" />
+          <text x="800" y="142" textAnchor="middle" fill="#f3eee3" fontSize="40" fontWeight="800">🔒 내 선택은 나만 봐요</text>
         </g>
       )}
 
       {id === "assign" &&
         SEATS.map((s, i) => (
-          <g key={i} transform={`translate(${s.x} ${s.y + 230})`}>
+          <g key={i} transform={`translate(${s.x} ${s.y + 170})`}>
             <g className="rv-flip" style={{ animationDelay: `${0.4 + i * 0.4}s` }}>
               <rect x="-48" y="-66" width="96" height="132" rx="12" fill={i === SWITCHER ? "#e2503c" : "#e6b85c"} />
               <text x="0" y="16" textAnchor="middle" fontSize="54" fontWeight="900" fill="#1b1408">{i === SWITCHER ? "🎭" : "?"}</text>
@@ -94,7 +94,7 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 
       {id === "talk" && (
         <g>
-          <g className="rv-pop" transform="translate(800 690)">
+          <g className="rv-pop" transform="translate(800 600)">
             <rect x="-150" y="-80" width="300" height="160" rx="14" fill="#f7f0e1" />
             <rect x="-150" y="-80" width="16" height="160" fill="#e2503c" />
             <text x="10" y="-24" textAnchor="middle" fontSize="34" fontWeight="900" fill="#b23b27">사건 카드</text>
@@ -138,7 +138,7 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 
       {id === "safe" && (
         <g>
-          <g className="rv-pop" transform="translate(470 680)">
+          <g className="rv-pop" transform="translate(470 560)">
             <rect x="-300" y="-70" width="600" height="140" rx="26" fill="#f6efe0" />
             <text x="-260" y="14" fontSize="40" fontWeight="800" fill="#1b2230">너 진짜 ○○하다</text>
             <path d="M-260 34 q20 10 40 0 t40 0 t40 0 t40 0 t40 0 t40 0 t40 0" stroke="#e2503c" strokeWidth="6" fill="none" />
@@ -147,7 +147,7 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
               <text x="0" y="-118" textAnchor="middle" fontSize="32" fontWeight="900" fill="#1b1408">✏️ 표현을 다듬어 주세요 · 나에게만</text>
             </g>
           </g>
-          <g className="rv-pop" style={{ animationDelay: "2.6s" }} transform="translate(1130 680)">
+          <g className="rv-pop" style={{ animationDelay: "2.6s" }} transform="translate(1130 560)">
             <rect x="-300" y="-70" width="600" height="140" rx="26" fill="#93b6ea" />
             <text x="-260" y="14" fontSize="38" fontWeight="800" fill="#0b1430">저는 반대해요, 왜냐하면…</text>
             <circle cx="250" cy="-60" r="40" fill="#7fc79c" />
@@ -160,7 +160,7 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 });
 
 /** The game rules as a short narrated video around the table, like the earlier rule briefing. */
-export default function RulesVideo({ onFinish }: { onFinish?: () => void }) {
+export default function RulesVideo({ onFinish, onNext, nextLabel }: { onFinish?: () => void; onNext?: () => void; nextLabel?: string }) {
   const frame = useRef<HTMLDivElement>(null);
   const player = useScenePlayer({ audioKey: "_rules", scenes: SCENES, onFinish });
   const { scene, line, text, mouth, playing, sound, elapsed, totalSeconds } = player;
@@ -189,16 +189,11 @@ export default function RulesVideo({ onFinish }: { onFinish?: () => void }) {
   if (player.ended)
     return (
       <div className="news rules ended" data-testid="rules-video">
-        <div className="briefing-end">
-          <strong>규칙 영상이 끝났어요.</strong>
-          <ol className="rules-list">
-            {SCENES.slice(1).map((s) => (
-              <li key={s.id}>{s.title.replace(/^\d+\.\s*/, "")}</li>
-            ))}
-          </ol>
-          <button className="button ghost small" onClick={player.restart}>
-            <RotateCcw size={15} /> 다시 보기
-          </button>
+        <div className="news-frame rules-frame">
+          <div className="news-voices-bg">
+            <Diagram id="welcome" />
+          </div>
+          <EndCard title="규칙 영상이 끝났어요" onReplay={player.restart} onNext={onNext} nextLabel={nextLabel} />
         </div>
       </div>
     );

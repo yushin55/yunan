@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Check, Maximize2, Minimize2, Pause, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Maximize2, Minimize2, Pause, Users, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
 import RoleCard from "../components/RoleCard";
@@ -222,6 +222,8 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
   const [rulesRead, setRulesRead] = useState(Boolean(me.preferences));
   const [rulesWatched, setRulesWatched] = useState(false);
   const [rechoosing, setRechoosing] = useState(false);
+  // "나가기" closes the full-screen steps; the lobby then offers to continue where they stopped.
+  const [away, setAway] = useState(false);
   const step = !briefed ? 0 : !rulesRead ? 1 : 2;
   const finishBriefing = () => {
     setBriefed(true);
@@ -242,38 +244,49 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
       </>
     );
 
+  // Until a video ends the bar only explains how to move on; at the end the video itself
+  // offers "다시 보기" or the next step.
+  if (away)
+    return (
+      <>
+        <section className="panel resume-panel" data-testid="flow-resume">
+          <strong>아직 준비가 끝나지 않았어요</strong>
+          <p className="muted">{["이슈 브리핑", "게임 규칙", "역할 고르기"][step]} 단계에서 멈췄어요. 역할을 골라야 게임에 참여할 수 있어요.</p>
+          <button className="button primary full large" onClick={() => setAway(false)}>
+            이어서 하기 <ArrowRight size={18} />
+          </button>
+        </section>
+        <Roster participants={participants} room={room} />
+      </>
+    );
+
   const action =
-    step === 0 ? (
-      <button className="button primary large" data-testid="briefing-done" disabled={!videoDone} onClick={finishBriefing}>
-        {videoDone ? (
-          <>
-            다음: 게임 규칙 <ArrowRight size={18} />
-          </>
-        ) : (
-          "브리핑을 끝까지 보면 다음으로 넘어갈 수 있어요"
-        )}
+    step === 0 && !videoDone ? (
+      <button className="button primary large" data-testid="briefing-done" disabled>
+        브리핑을 끝까지 보면 다음으로 넘어갈 수 있어요
       </button>
-    ) : step === 1 ? (
-      <button className="button primary large" data-testid="rules-done" disabled={!rulesWatched} onClick={() => setRulesRead(true)}>
-        {rulesWatched ? (
-          <>
-            <Check size={17} /> 규칙을 확인했어요 · 역할 고르기
-          </>
-        ) : (
-          "규칙 영상을 끝까지 보면 역할을 고를 수 있어요"
-        )}
+    ) : step === 1 && !rulesWatched ? (
+      <button className="button primary large" data-testid="rules-done" disabled>
+        규칙 영상을 끝까지 보면 역할을 고를 수 있어요
       </button>
     ) : null;
 
   return (
-    <FlowOverlay step={step} action={action}>
+    <FlowOverlay step={step} action={action} onExit={() => setAway(true)}>
       {step === 0 && (
         <>
           <div className="flow-heading">
             <span className="eyebrow">오늘의 주제</span>
             <h2>{room.topic.title}</h2>
           </div>
-          <IssueBriefing briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} onFinish={() => setVideoDone(true)} />
+          <IssueBriefing
+            briefing={room.topic.briefing}
+            topicId={room.topicId}
+            headline={room.topic.shortTitle}
+            onFinish={() => setVideoDone(true)}
+            onNext={finishBriefing}
+            nextLabel="다음: 게임 규칙"
+          />
         </>
       )}
       {step === 1 && (
@@ -284,7 +297,7 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
             </span>
             <h2>테이블에서는 이렇게 진행돼요</h2>
           </div>
-          <RulesVideo onFinish={() => setRulesWatched(true)} />
+          <RulesVideo onFinish={() => setRulesWatched(true)} onNext={() => setRulesRead(true)} nextLabel="역할 고르러 가기" />
           <details className="rules-text">
             <summary>규칙을 글로 보기</summary>
             <ol className="rules-list">
@@ -319,7 +332,7 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
 }
 
 /** The pre-game steps take over the whole screen, with a browser full-screen toggle. */
-function FlowOverlay({ step, action, children }: { step: number; action: React.ReactNode; children: React.ReactNode }) {
+function FlowOverlay({ step, action, onExit, children }: { step: number; action: React.ReactNode; onExit: () => void; children: React.ReactNode }) {
   const [full, setFull] = useState(Boolean(document.fullscreenElement));
   useEffect(() => {
     const change = () => setFull(Boolean(document.fullscreenElement));
@@ -353,6 +366,16 @@ function FlowOverlay({ step, action, children }: { step: number; action: React.R
           title={full ? "전체 화면 나가기" : "전체 화면"}
         >
           {full ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+        </button>
+        <button
+          className="button ghost small flow-exit"
+          data-testid="flow-exit"
+          onClick={() => {
+            if (document.fullscreenElement) void document.exitFullscreen();
+            onExit();
+          }}
+        >
+          <X size={16} /> 나가기
         </button>
       </header>
       <div className="flow-body">{children}</div>

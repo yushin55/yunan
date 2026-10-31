@@ -33,15 +33,15 @@ async function brief(page) {
   await page.getByTestId('briefing-play').click();
   // The anchor segment starts after the opening title card.
   await expect(page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
-  for (let i = 0; i < 8 && (await page.getByTestId('briefing-next').count()); i++) await page.getByTestId('briefing-next').click();
-  await page.getByTestId('briefing-done').click();
+  for (let i = 0; i < 8 && !(await page.getByTestId('video-end').count()); i++) await page.getByTestId('briefing-next').click({ force: true });
+  await page.getByTestId('video-next').click(); // The last frame offers replay or the next step.
   // The rules video, stepped through scene by scene, unlocks role picking.
   await page.getByTestId('rules-play').click();
-  for (let i = 0; i < 10 && !(await page.getByTestId('rules-done').isEnabled()); i++) {
+  for (let i = 0; i < 10 && !(await page.getByTestId('video-end').count()); i++) {
     await page.getByTestId('briefing-next').click({ force: true }).catch(() => {});
     await page.waitForTimeout(150);
   }
-  await page.getByTestId('rules-done').click();
+  await page.getByTestId('video-next').click();
 }
 
 // Dressing-room picker: show a role from the rack, put it in the next slot, then confirm.
