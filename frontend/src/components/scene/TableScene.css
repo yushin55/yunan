@@ -274,3 +274,6 @@
 .is-narrow .table-status.waiting { background: #6f7a74; }
 .is-narrow .table-status.alert { background: #e7735f; }
 .is-narrow .table-bubble { max-width: 130px; }
+
+/* Title screen: the table is scenery only. */
+.immersive-scene.attract .immersive-scene__canvas { pointer-events: none; cursor: default; }

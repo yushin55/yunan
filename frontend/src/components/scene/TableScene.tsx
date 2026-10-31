@@ -26,6 +26,8 @@ interface TableSceneProps {
   cameraMode?: "mission" | "table" | "review";
   reducedMotion?: boolean;
   quality?: "high" | "low";
+  /** Title-screen mode: no name plates or controls; the camera slowly looks around the table. */
+  attract?: boolean;
 }
 
 type LoungePlayer = TablePlayer;
@@ -72,7 +74,10 @@ export default function TableScene({
   cameraMode = "table",
   reducedMotion = false,
   quality = "high",
+  attract = false,
 }: TableSceneProps) {
+  const attractRef = useRef(attract);
+  attractRef.current = attract;
   const hostRef = useRef<HTMLDivElement>(null);
   const labelRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const selectRef = useRef(onPlayerSelect);
@@ -388,7 +393,8 @@ export default function TableScene({
     signCanvas.width = 800;
     signCanvas.height = 320;
     const signPaint = signCanvas.getContext("2d");
-    if (signPaint) {
+    // The title screen carries its own logo; the wall sign would repeat it.
+    if (signPaint && !attractRef.current) {
       signPaint.fillStyle = "#162521";
       signPaint.fillRect(0, 0, 800, 320);
       signPaint.strokeStyle = "#c3a16b";
@@ -653,7 +659,8 @@ export default function TableScene({
       /^#[0-9a-fA-F]{3,8}$/.test(selfColor ?? "") ? selfColor! : "#617885",
     );
     const ownSkin = material("#d7a37e");
-    for (const side of [-1, 1]) {
+    // Nobody sits in the near seat on the title screen.
+    for (const side of attractRef.current ? [] : [-1, 1]) {
       const arm = box(
         world,
         0.34,
@@ -672,6 +679,7 @@ export default function TableScene({
     // A fan of cards faces the camera: you occupy this seat and have a hand to play.
     const cardBack = material("#733f42", 0.6);
     const cardFan = new THREE.Group();
+    cardFan.visible = !attractRef.current;
     world.add(cardFan);
     for (let i = 0; i < 3; i += 1) {
       const card = new THREE.Group();
@@ -867,6 +875,11 @@ export default function TableScene({
           fovTarget = baseFov;
         }
       }
+      if (attractRef.current && !stopMotion) {
+        // Title screen: a slow look from one side of the table to the other.
+        yawTarget = Math.sin(t * 0.13) * 0.42;
+        pitchTarget = -0.05 + Math.sin(t * 0.09) * 0.025;
+      }
       // Camera moves ease more slowly than drag so focus changes read as a deliberate turn.
       const smooth = stopMotion ? 1 : 1 - Math.exp(-delta * (down ? 8 : 4.6));
       yaw += (yawTarget - yaw) * smooth;
@@ -956,14 +969,14 @@ export default function TableScene({
   }, [peopleKey, selfColor, quality, reducedMotion]);
 
   return (
-    <div className="immersive-scene" ref={hostRef}>
+    <div className={`immersive-scene${attract ? " attract" : ""}`} ref={hostRef}>
       <div className="immersive-scene__vignette" aria-hidden="true" />
       {failed ? (
         <div className="immersive-scene__fallback" role="img" aria-label="원탁에 앉아 다른 플레이어와 마주 보는 게임 장면">
-          <span>WHOSE SIDE?</span>
-          <p>이 기기에서는 3D 원탁을 그릴 수 없어요. 아래 진행 화면으로 그대로 참여할 수 있어요.</p>
+          {!attract && <span>WHOSE SIDE?</span>}
+          {!attract && <p>이 기기에서는 3D 원탁을 그릴 수 없어요. 아래 진행 화면으로 그대로 참여할 수 있어요.</p>}
         </div>
-      ) : (
+      ) : attract ? null : (
         <div className="immersive-scene__labels" aria-label="원탁의 참가자">
           {people.map((person) => {
             const active = focusPlayerUid === person.uid || activePlayer === person.uid || hovered === person.uid;
@@ -1000,6 +1013,7 @@ export default function TableScene({
           })}
         </div>
       )}
+      {!attract && (
       <div className="immersive-scene__controls">
         <span className="immersive-scene__hint">드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요</span>
         <button
@@ -1014,6 +1028,7 @@ export default function TableScene({
           </svg>
         </button>
       </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Bot, Flag, Play, RotateCcw, Shuffle, SkipForward } from "lucide-react";
 import { PHASE_LABELS, PHASE_ORDER } from "../features/game/phases";
 import { TOPICS } from "../features/practice/engine";
@@ -56,7 +56,9 @@ export default function PracticePage() {
 /** Pick a topic card, press start, then give a nickname to sit down at the table. */
 function PracticeSetup({ onBegin }: { onBegin: (nickname: string, topicId: string | null) => void }) {
   const [nickname, setNickname] = useState(savedNickname());
-  const [topicId, setTopicId] = useState<string | null>(null);
+  // A topic card on the home page links here with ?topic= to preselect it.
+  const [search] = useSearchParams();
+  const [topicId, setTopicId] = useState<string | null>(() => TOPICS.find((t) => t.topicId === search.get("topic"))?.topicId ?? null);
   const [random, setRandom] = useState(false);
   const [asking, setAsking] = useState(false);
   const chosen = random || Boolean(topicId);
