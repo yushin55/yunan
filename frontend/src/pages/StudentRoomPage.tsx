@@ -42,7 +42,8 @@ function stored(key: string, fallback: boolean) {
   }
 }
 
-export default function StudentRoomPage({ api }: { api: RoomApi }) {
+/** `lobbyAction` is shown under the to-do note in the lobby (practice mode puts its start button there). */
+export default function StudentRoomPage({ api, lobbyAction }: { api: RoomApi; lobbyAction?: React.ReactNode }) {
   const { state, action, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const me = state!.me!;
@@ -113,6 +114,7 @@ export default function StudentRoomPage({ api }: { api: RoomApi }) {
             </p>
           )}
 
+          {phase === "lobby" && lobbyAction}
           {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} onPrefs={(first, second) => void action("preferences", { first, second })} />}
 
           {phase === "role" && myRole && (

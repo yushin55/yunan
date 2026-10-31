@@ -61,12 +61,15 @@ async function play(label, options) {
   await expect(page.getByTestId('flow-overlay')).toBeVisible();
 
   await expect(title).toContainText('대기실');
-  await expect(page.getByTestId('practice-start')).toBeDisabled();
+  await expect(page.getByTestId('practice-start')).toHaveCount(0); // Start appears once roles are picked.
   await expect(page.getByTestId('briefing-done')).toBeDisabled(); // Roles come after the briefing.
   await page.screenshot({ path: `artifacts/practice-${label}-lobby.png` });
   await brief(page);
   await page.screenshot({ path: `artifacts/practice-${label}-wardrobe.png` });
+  await expect(page.getByTestId('wardrobe-submit')).toBeInViewport(); // No scrolling to reach it.
   await pickRoles(page, [0, 1]);
+  await expect(page.getByTestId('practice-start')).toBeInViewport();
+  await page.screenshot({ path: `artifacts/practice-${label}-ready.png` });
   await page.getByTestId('practice-start').click();
 
   await expect(title).toContainText('역할 확인');

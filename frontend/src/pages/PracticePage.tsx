@@ -23,11 +23,6 @@ export default function PracticePage() {
           <Bot size={16} aria-hidden /> <strong>연습 모드</strong> 함께하는 5명은 컴퓨터 연습 상대예요. 선생님 대신 내가 진행해요.
         </span>
         <div className="row">
-          {room.phase === "lobby" && (
-            <button className="button primary small" data-testid="practice-start" disabled={!prefsDone} onClick={() => void api.action("start")} title={prefsDone ? "" : "먼저 선호 역할을 골라 주세요"}>
-              <Play size={15} /> 게임 시작
-            </button>
-          )}
           {room.phase !== "lobby" && room.phase !== "reveal" && room.phase !== "ended" && (
             <button className="button secondary small" data-testid="practice-next" onClick={() => void api.action("next")}>
               <SkipForward size={15} /> 다음 단계: {PHASE_LABELS[next]}
@@ -48,7 +43,21 @@ export default function PracticePage() {
           </button>
         </div>
       </div>
-      <StudentRoomPage api={api} />
+      <StudentRoomPage
+        api={api}
+        lobbyAction={
+          prefsDone && (
+            <section className="panel practice-start-panel">
+              <p>
+                <strong>준비 완료!</strong> 연습 모드에서는 내가 선생님 대신 게임을 시작해요.
+              </p>
+              <button className="button primary full large" data-testid="practice-start" onClick={() => void api.action("start")}>
+                <Play size={18} /> 게임 시작
+              </button>
+            </section>
+          )
+        }
+      />
     </>
   );
 }

@@ -369,3 +369,5 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
   .panel { padding: 14px; }
   .room-code .qr { display: none; }
 }
+.practice-start-panel { display: grid; gap: 10px; border-color: var(--gold); background: var(--gold-soft); }
+.practice-start-panel p { margin: 0; }

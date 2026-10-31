@@ -29,16 +29,19 @@ body.flow-open { overflow: hidden; }
 
 /* Role picking on a big stage: model on the left, slots and details on the right. */
 .flow-body .wardrobe { width: 100%; }
-.flow-body .dress-stage { height: clamp(280px, 52vh, 560px); }
+.flow-body .dress-stage { height: clamp(220px, 40vh, 560px); }
+/* On narrow screens the submit button stays in reach while scrolling. */
+.flow-body .wardrobe > .button { position: sticky; bottom: 0; z-index: 2; box-shadow: 0 -10px 24px rgba(10, 16, 14, 0.9); }
 @media (min-width: 960px) {
-  .flow-body .wardrobe { grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr); grid-template-rows: auto auto 1fr auto auto; grid-template-areas: "intro intro" "stage slots" "stage info" "rack rack" "submit submit"; align-items: start; column-gap: 18px; }
+  /* Everything, the submit button included, fits on one screen without scrolling. */
+  .flow-body .wardrobe { grid-template-columns: minmax(0, 1.25fr) minmax(340px, 1fr); grid-template-rows: auto auto 1fr auto; grid-template-areas: "intro intro" "stage slots" "stage info" "rack submit"; align-items: start; column-gap: 18px; }
   .flow-body .wardrobe > p { grid-area: intro; text-align: center; }
   .flow-body .wardrobe-slots { grid-area: slots; }
   .flow-body .dress-room { grid-area: stage; }
   .flow-body .dress-info { grid-area: info; }
   .flow-body .wardrobe-rack { grid-area: rack; justify-content: center; }
-  .flow-body .wardrobe > .button { grid-area: submit; width: min(560px, 100%); justify-self: center; }
-  .flow-body .dress-stage { height: clamp(360px, 60vh, 620px); }
+  .flow-body .wardrobe > .button { grid-area: submit; align-self: center; }
+  .flow-body .dress-stage { height: clamp(240px, calc(100dvh - 440px), 620px); }
 }
 
 /* ── Topic picture cards ───────────────────────────── */
@@ -74,3 +77,9 @@ body.flow-open { overflow: hidden; }
 @media (max-width: 480px) {
   .flow-top .lobby-steps li:not(.current) .step-label { display: none; }
 }
+@media (max-width: 560px) {
+  /* Done steps shrink to their check mark so the current label stays on one line. */
+  .flow-top .lobby-steps li { flex: 0 0 auto; white-space: nowrap; }
+  .flow-top .lobby-steps li.current { flex: 1 1 auto; min-width: 0; }
+}
+.rack-item span { word-break: keep-all; }
