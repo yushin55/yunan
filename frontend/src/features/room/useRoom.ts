@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import { api, ApiError } from "../../lib/api";
 import { authenticate, db } from "../../lib/firebase";
+import { createMessageRequestId } from "../../lib/messageRequest";
 import type { HostState, Me, ModerationResult, Participant, Room, Rounds, Snapshot, Viewer } from "../../types/game";
 import { rememberRoom } from "./roomStorage";
 
@@ -29,6 +30,7 @@ export function useRoom(roomId: string) {
   const [online, setOnline] = useState(true);
   const [offset, setOffset] = useState(0);
   const latest = useRef(state);
+  const pendingText = useRef<{ fingerprint: string; id: string } | null>(null);
   latest.current = state;
 
   const adopt = useCallback((snapshot: Snapshot) => {
@@ -151,12 +153,20 @@ export function useRoom(roomId: string) {
     async (name: string, body: Record<string, unknown> = {}) => {
       setBusy(true);
       setError("");
+      const textAction = name === "messages" || name === "statement";
+      if (textAction) {
+        const fingerprint = JSON.stringify({ roomId, name, body });
+        if (pendingText.current?.fingerprint !== fingerprint) pendingText.current = { fingerprint, id: createMessageRequestId() };
+        body = { ...body, requestId: pendingText.current!.id };
+      }
       try {
         const next = await api<Snapshot & { moderation?: ModerationResult }>(`/api/rooms/${roomId}/${name}`, body);
         adopt(next);
         setOnline(true);
+        if (textAction) pendingText.current = null;
         return next;
       } catch (e) {
+        if (textAction && e instanceof ApiError && e.status !== 0) pendingText.current = null;
         setError((e as Error).message);
         if (e instanceof ApiError && e.status === 0) setOnline(false);
         return null;

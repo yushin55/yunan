@@ -5,12 +5,15 @@ judges whose argument is right, never classifies a student's views, never rewrit
 message, and never removes anyone from the game. Disagreement is always allowed.
 """
 import re
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import HTTPException
 
 from app.core.config import settings
 from app.services.ai import AIUnavailable, generate_json
+from app.services.korean_text import normalize, stream
 
 HINTS = {
     "profanity": "욕설로 읽힐 수 있는 표현이 있어요. 그 부분을 바꿔서 다시 보내 주세요.",
@@ -21,43 +24,89 @@ HINTS = {
 # The rules only catch clear-cut cases and favour precision (e.g. "음식을 씹다", "폰이 꺼져서",
 # "사물함을 뒤져", "시발점" must pass). Anything subtler is left to the AI check.
 WORD_START = r"(?<![가-힣ㄱ-ㅎA-Za-z])"
-SEP = r"(?:[^\w\s]|[\d_]){0,2}"  # "시1발", "병*신": symbols or digits inside a word, not spaces
-
-
-def _words(*words: str) -> str:
-    return "|".join(SEP.join(re.escape(ch) for ch in word) for word in words)
-
-
-PROFANITY = re.compile(
-    r"ㅅㅂ|ㅆㅂ|ㅂㅅ|ㅄ|ㅈㄴ|ㅈㄹ|ㅅㄲ|ㅆㅍ|좆|"
-    + WORD_START + r"(?:(?:" + _words("시발", "씨발", "씨빨", "시빨", "씨팔", "시팔") + r")(?!점|역)|"
-    + _words("병신", "븅신", "빙신", "개새끼", "개새", "새끼", "십새", "씹새", "존나", "지랄", "염병", "엠창", "느금", "니애미", "니애비") + ")"
-)
 ATTACK = re.compile(
     WORD_START + r"(?:꺼져(?:라|버려)?(?=\s*[!~?.]*\s*$|\s*[!~])|닥쳐(?:라)?(?=[\s!.~?]|$)|입\s*닥|뒤져라|디져라|뒤질래|디질래|죽을래|패\s*버린다|때려\s*버린다)"
 )
-PRONOUN = WORD_START + r"(?:너|니|넌|너는|니는|네가|니가|쟤|걔|쟤는|걔는)(?=\s|$)"
+PRONOUN = WORD_START + r"(?:너|너희|너희들|니|넌|너는|니는|네가|니가|쟤|걔|쟤는|걔는)(?=\s|$)"
 DIRECTED = re.compile(PRONOUN + r".{0,12}?(?:바보|멍청|한심|무식|찐따|등신|머저리|쓰레기|돌대가리|노답|정신병|미친|또라이|수준\s*낮)")
 MOCKERY = re.compile(WORD_START + r"(?:찐따|머저리|돌대가리|또라이|미친놈|미친년|미쳤냐|정신병자|등신|바보\s*같은\s*(?:놈|애|녀석))|ㅋㅋㅋ+\s*(?:수준|어이없|한심)")
 
 
 @dataclass(frozen=True)
 class Verdict:
-    status: str  # "ok" | "flag" | "unavailable"
+    status: str  # ok=ALLOW, flag=BLOCK, review=REVIEW; unavailable=inspection failure
     source: str  # "rules" | "ai" | "none"
     category: str | None = None
     excerpt: str | None = None
 
     @property
     def hint(self) -> str | None:
+        if self.status in ("review", "unavailable"):
+            return "선생님 확인 후 공개할 수 있어요."
         return HINTS.get(self.category) if self.status == "flag" else None
+
+    @property
+    def decision(self) -> str:
+        return {"ok": "ALLOW", "flag": "BLOCK"}.get(self.status, "REVIEW")
+
+
+LEXICON = json.loads((Path(__file__).resolve().parents[1] / "content/yunan_moderation_lexicon.json").read_text(encoding="utf-8"))
+
+
+def _pattern(word):
+    canonical = stream(normalize(word))[0]
+    if not canonical:
+        raise ValueError("Lexicon entry must have Korean detection characters")
+    return re.compile("".join(re.escape(c) + "+" for c in canonical))
+
+
+LEXICAL_RULES = [(word, category, _pattern(word)) for category, words in LEXICON["block"].items() for word in words]
+CONTEXT_RULES = [(word, _pattern(word)) for word in LEXICON["contextual"]]
+INITIAL_RULES = [_pattern(word) for word in LEXICON["initials"]]
+EDUCATIONAL = re.compile(r"(?:이라는|이란|의 뜻|의 의미|욕설.*(?:뜻|의미|설명)|비속어.*(?:설명|연구)|(?:인용|사료).*(?:표현|욕설))")
+TARGETED = re.compile(PRONOUN + r".{0,16}?(?:씨발|시발|바보|멍청|한심|무식|쓰레기|병신|새끼|운지|홍어|충|정신병|수준\s*낮)")
+AGGRESSIVE = re.compile(r"그게\s*말이\s*돼|(?:너|니|쟤|걔|놈|년|것들|집단).{0,12}(?:꺼져|닥쳐|운지|홍어|새끼|죽)|(?:운지|재기)\s*(?:해라|하라|해)|ㅋㅋㅋ+\s*(?:수준|한심)")
+
+
+def _matches(pattern, compact, offsets, display, boundary=True):
+    for match in pattern.finditer(compact):
+        if match.start() and offsets[match.start()] == offsets[match.start() - 1]:
+            continue  # Never reinterpret the tail consonant of an ordinary syllable.
+        start = offsets[match.start()]
+        prefix = display[:start]
+        # Keep syllable boundaries: "자료 보존 나중" must not become "존나".
+        if not boundary or not prefix or not re.search(r"[가-힣ㄱ-ㅣᄀ-ᇿA-Za-z]$", prefix) or re.fullmatch(r"(?:너|니|넌|쟤|걔)", prefix):
+            return True
+    return False
 
 
 def rule_check(text: str) -> Verdict | None:
-    for pattern, category in ((PROFANITY, "profanity"), (ATTACK, "personal_attack"), (DIRECTED, "personal_attack"), (MOCKERY, "mockery")):
-        match = pattern.search(text)
-        if match:
-            return Verdict("flag", "rules", category, match.group(0)[:30])
+    if len(text) > 4096:
+        return Verdict("review", "rules", "length")
+    display = normalize(text)
+    for phrase in LEXICON["safe_phrases"]:
+        display = display.replace(normalize(phrase), " " * len(normalize(phrase)))
+    compact, offsets = stream(display)
+    direct_attack = any(pattern.search(value) for pattern in (TARGETED, AGGRESSIVE, ATTACK, DIRECTED) for value in (display, text))
+    attack = direct_attack or any(MOCKERY.search(value) for value in (display, text))
+    for word, category, pattern in LEXICAL_RULES:
+        if _matches(pattern, compact, offsets, display, boundary=word == "존나" and "존나" not in display):
+            if EDUCATIONAL.search(text) and not direct_attack:
+                return Verdict("review", "rules", category)
+            return Verdict("flag", "rules", category, text[:30])
+    if attack:
+        return Verdict("flag", "rules", "personal_attack", text[:30])
+    for word, pattern in CONTEXT_RULES:
+        if _matches(pattern, compact, offsets, display):
+            if word in ("운지", "재기해") and re.search(r"너|쟤|걔", display) and stream("해라")[0] in compact:
+                return Verdict("flag", "rules", "personal_attack", text[:30])
+            if word in ("니엄마", "니아빠") and re.search(word + r"(?:가|는|랑|와|도)", display):
+                continue
+            if word == "홍어" and re.search(r"요리|음식|먹|생선|발효", display) and not re.search(r"놈|년|새끼|너|니들", display):
+                continue
+            return Verdict("review", "rules", "mockery")
+    if any(_matches(pattern, compact, offsets, display) for pattern in INITIAL_RULES):
+        return Verdict("review", "rules", "profanity")
     return None
 
 
@@ -82,6 +131,13 @@ class Moderator:
         self.ai_call = ai_call
 
     def review(self, text: str) -> Verdict:
+        # Fail closed without logging message contents or exception details.
+        try:
+            return self._review(text)
+        except Exception:
+            return Verdict("unavailable", "none")
+
+    def _review(self, text: str) -> Verdict:
         flagged = rule_check(text)
         if flagged:
             return flagged
@@ -90,6 +146,8 @@ class Moderator:
         for _ in range(2):
             try:
                 result = self.ai_call(PROMPT + repr(text))
+                if not isinstance(result, dict):
+                    continue
             except AIUnavailable:
                 continue
             verdict = result.get("verdict")

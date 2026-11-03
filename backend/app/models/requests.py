@@ -57,12 +57,16 @@ class Preferences(Input):
 
 class Statement(Input):
     text: str = Field(min_length=1, max_length=200)
+    requestId: ShortId | None = None
+    replacesId: ShortId | None = None
 
 
 class Message(Input):
     kind: Literal["response", "question", "answer", "rebuttal"]
     text: str = Field(min_length=1, max_length=200)
     targetUid: ShortId | None = None
+    requestId: ShortId | None = None
+    replacesId: ShortId | None = None
 
 
 class Vote(Input):

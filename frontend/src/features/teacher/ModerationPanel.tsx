@@ -14,7 +14,7 @@ const STATUS: Record<ModerationEntry["status"], string> = {
 
 /**
  * Teacher-only. Collapsed by default so a projected screen does not single anyone out.
- * The teacher decides; nobody is removed or labelled automatically.
+ * Teachers decide REVIEW entries. BLOCK entries require the author to revise.
  */
 export default function ModerationPanel({ host, busy, onReview }: { host: HostState; busy: boolean; onReview: (entryId: string, decision: "approve" | "return") => void }) {
   const [open, setOpen] = useState(false);
@@ -44,10 +44,10 @@ export default function ModerationPanel({ host, busy, onReview }: { host: HostSt
                   <span className="pill">{STATUS[e.status]}</span>
                 </div>
                 <p>{e.text}</p>
-                {(e.status === "pending_review" || e.status === "flagged") && (
+                {e.status === "pending_review" && (
                   <div className="row">
                     <button className="button secondary small" disabled={busy} onClick={() => onReview(e.id, "approve")}>
-                      {e.status === "flagged" ? "문제없음 · 그대로 공개" : "공개하기"}
+                      공개하기
                     </button>
                     {e.status === "pending_review" && (
                       <button className="button ghost small" disabled={busy} onClick={() => onReview(e.id, "return")}>

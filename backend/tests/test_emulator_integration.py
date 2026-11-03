@@ -87,3 +87,54 @@ def test_teacher_and_six_students_complete_a_game_in_firestore():
             assert again["me"]["roleId"] == service.read(rid, students[1][1])["me"]["roleId"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_korean_policy_is_enforced_before_firestore_publication():
+    assert os.environ["FIRESTORE_EMULATOR_HOST"] == "127.0.0.1:8080"
+    assert os.environ["FIREBASE_AUTH_EMULATOR_HOST"] == "127.0.0.1:9099"
+    db = firestore_client()
+    service = GameService(FirestoreRoomRepository(db), moderator=Moderator(mode="rules"))
+    app.dependency_overrides[game_service] = lambda: service
+    teacher, _ = sign_up()
+    students = [sign_up() for _ in range(6)]
+    try:
+        with TestClient(app) as api:
+            def post(token, path, body, expected=200):
+                result = api.post(path, json=body, headers={"Authorization": "Bearer " + token})
+                assert result.status_code == expected  # Never echo credentials on failure.
+                return result.json()
+            created = post(teacher, "/api/rooms", {"topicId": "school_cctv"})
+            rid, code = created["room"]["roomId"], created["room"]["code"]
+            base = f"/api/rooms/{rid}/"
+            roles = [r["id"] for r in created["room"]["topic"]["roles"]]
+            for i, (token, _) in enumerate(students):
+                post(token, "/api/rooms/join", {"nickname": f"필터검사{i}", "code": code})
+                post(token, base + "preferences", {"first": roles[0], "second": roles[1]})
+            post(teacher, base + "start", {})
+            for token, _ in students:
+                post(token, base + "confirm-role", {})
+            for token, _ in students:
+                post(token, base + "statement", {"text": "정책의 장단점을 검토해야 합니다."})
+            assert service.read(rid, students[0][1])["room"]["phase"] == "event"
+            public = db.document(f"rooms/{rid}/publicRounds/chat")
+            for text in ["^^1 발", "^^l 발", "^^I 발", "LH @H 미"]:
+                result = post(students[0][0], base + "messages", {"kind": "response", "text": text})
+                assert result["moderation"]["status"] == "needs_edit"
+            assert public.get().to_dict()["items"] == []
+            flagged = service.read(rid, created["host"]["uid"])["host"]["moderation"][-1]
+            post(teacher, base + "review", {"entryId": flagged["id"], "decision": "approve"}, 409)
+            result = post(students[1][0], base + "messages", {"kind": "response", "text": "ㅅㅂ"})
+            assert result["moderation"]["status"] == "pending_review"
+            assert public.get().to_dict()["items"] == []
+            entry = service.repository.read(rid)["host"]["moderation"][-1]
+            post(students[2][0], base + "review", {"entryId": entry["id"], "decision": "approve"}, 403)
+            post(teacher, base + "review", {"entryId": entry["id"], "decision": "approve"})
+            assert [m["text"] for m in public.get().to_dict()["items"]] == ["ㅅㅂ"]
+            result = post(students[1][0], base + "messages", {"kind": "response", "text": "운지"})
+            assert result["moderation"]["status"] == "pending_review"
+            entry = service.repository.read(rid)["host"]["moderation"][-1]
+            post(teacher, base + "review", {"entryId": entry["id"], "decision": "return"})
+            post(students[0][0], base + "messages", {"kind": "response", "text": "정책에  반대합니다!"})
+            assert [m["text"] for m in public.get().to_dict()["items"]] == ["ㅅㅂ", "정책에  반대합니다!"]
+    finally:
+        app.dependency_overrides.clear()
