@@ -1,10 +1,12 @@
 import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import { validateFirebaseConfig } from "./firebaseConfig";
 const env = import.meta.env;
 export const useEmulators =
   env.VITE_USE_FIREBASE_EMULATORS === "true" ||
   (env.DEV && env.VITE_USE_FIREBASE_EMULATORS !== "false");
+validateFirebaseConfig(env, useEmulators);
 const app = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY || "demo-key",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN || "demo-yunan.firebaseapp.com",

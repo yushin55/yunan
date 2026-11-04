@@ -61,7 +61,9 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
   const secretStillHidden = phase !== "reveal" && phase !== "ended";
 
   const sendMessage = async (kind: MessageKind, text: string, targetUid: string | null) => {
-    const next = await action("messages", { kind, text, ...(targetUid ? { targetUid } : {}) });
+    const notice = currentNotice(me, room, rounds.chat, false);
+    const replacesId = notice && (notice.status === "needs_edit" || notice.status === "returned") && notice.kind === kind ? notice.id : undefined;
+    const next = await action("messages", { kind, text, ...(targetUid ? { targetUid } : {}), ...(replacesId ? { replacesId } : {}) });
     return next?.moderation ?? null;
   };
   const selectAtTable = (uid: string) => {

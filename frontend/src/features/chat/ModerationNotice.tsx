@@ -27,7 +27,7 @@ export default function ModerationNotice({ notice, onEdit }: { notice: Notice | 
         <Hourglass size={18} aria-hidden />
         <div>
           <strong>선생님이 확인한 뒤 공개돼요</strong>
-          <span>지금은 자동 점검을 할 수 없어서 선생님이 먼저 읽어 볼 거예요.</span>
+          <span>표현의 맥락을 확인해야 하거나 자동 점검이 어려워 선생님이 먼저 읽어 볼 거예요.</span>
         </div>
       </div>
     );

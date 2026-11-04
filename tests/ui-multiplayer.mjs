@@ -1,5 +1,5 @@
 import { chromium, devices, expect } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 
 // Requires the frontend, the FastAPI server and the Auth/Firestore emulators.
 // One teacher (desktop) and six students (mobile), each in an isolated browser context.
@@ -8,6 +8,9 @@ const origin = process.env.BRIDGE_UI_URL || 'http://localhost:5173';
 const browser = await chromium.launch({ headless: true });
 const pageErrors = [];
 const startedAt = Date.now();
+expect.configure({ timeout: 15000 });
+const timings = [];
+const blockedTexts = ['^^1 발', '^^l 발', '^^I 발', 'LH @H 미'];
 await mkdir('artifacts', { recursive: true });
 
 function step(label) {
@@ -18,6 +21,17 @@ async function open(name, options) {
   const context = await browser.newContext(options);
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(`${name}: ${error.message}`));
+  page.on('response', async (response) => {
+    if (!response.url().endsWith('/messages')) return;
+    await response.finished().catch(() => {});
+    const request = response.request();
+    const text = request.postDataJSON()?.text;
+    const t = request.timing();
+    if (t.responseEnd >= t.requestStart && t.requestStart >= 0) timings.push({
+      group: blockedTexts.includes(text) ? 'BLOCK' : ['ㅅㅂ', 'ㅂㅅ'].includes(text) ? 'REVIEW' : 'ALLOW',
+      ms: t.responseEnd - t.requestStart,
+    });
+  });
   page.on('console', (msg) => {
     if (msg.type() === 'error' && !/Failed to load resource|permission-denied/.test(msg.text())) pageErrors.push(`${name}: ${msg.text()}`);
   });
@@ -150,6 +164,104 @@ try {
   await shot(students[1], 'student-event-chat');
   await shot(teacher, 'teacher-event');
 
+  step('moderation: BLOCK stays private, REVIEW approval and rejection');
+  const rid = teacher.page.url().match(/room\/([a-f0-9]{32})/)[1];
+  const observer = students[5].page;
+  await observer.evaluate(async (roomId) => {
+    const { db } = await import('/src/lib/firebase.ts');
+    const source = await (await fetch('/src/lib/firebase.ts')).text();
+    const sdkUrl = source.match(/from\s+["']([^"']*firebase_firestore[^"']*)["']/)[1];
+    const { doc, onSnapshot } = await import(sdkUrl);
+    window.__observedChat = [];
+    window.__stopAudit = onSnapshot(doc(db, `rooms/${roomId}/publicRounds/chat`), snap => {
+      window.__observedChat.push((snap.data()?.items ?? []).map(m => m.text));
+    });
+  }, rid);
+  for (const text of blockedTexts) {
+    await s0.getByLabel('질문 입력').fill(text);
+    await s0.getByRole('button', { name: '보내기' }).click();
+    await expect(s0.getByTestId('moderation-notice')).toContainText('표현을 다듬어 주세요');
+    await expect(teacher.page.getByTestId('chat-message')).toHaveCount(3);
+  }
+  await teacher.page.getByTestId('moderation-toggle').click();
+  const blockedRow = teacher.page.getByTestId('moderation-entry').filter({ hasText: 'LH @H 미' });
+  await expect(blockedRow.getByRole('button', { name: /공개/ })).toHaveCount(0);
+  const blockStatus = await teacher.page.evaluate(async (roomId) => {
+    const { api } = await import('/src/lib/api.ts');
+    const state = await api(`/api/rooms/${roomId}/me`);
+    const entry = state.host.moderation.find(e => e.text === 'LH @H 미');
+    try { await api(`/api/rooms/${roomId}/review`, { entryId: entry.id, decision: 'approve' }); return 200; }
+    catch (error) { return error.status; }
+  }, rid);
+  expect(blockStatus).toBe(409);
+  await s0.getByLabel('질문 입력').fill('ㅅㅂ');
+  await s0.getByRole('button', { name: '보내기' }).click();
+  await expect(s0.getByTestId('moderation-notice')).toContainText('선생님이 확인한 뒤');
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(3);
+  const approveRow = teacher.page.getByTestId('moderation-entry').filter({ has: teacher.page.locator('p', { hasText: /^ㅅㅂ$/ }) });
+  await approveRow.getByRole('button', { name: '공개하기', exact: true }).click();
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(4);
+  await s1.getByLabel('답변 입력').fill('ㅂㅅ');
+  await s1.getByRole('button', { name: '보내기' }).click();
+  const rejectRow = teacher.page.getByTestId('moderation-entry').filter({ has: teacher.page.locator('p', { hasText: /^ㅂㅅ$/ }) });
+  await rejectRow.getByRole('button', { name: '다시 쓰도록 돌려보내기' }).click();
+  await expect(s1.getByTestId('moderation-notice')).toContainText('다시 다듬어');
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(4);
+  await expect.poll(() => observer.evaluate(() => window.__observedChat.length)).toBeGreaterThan(0);
+  const leaked = await observer.evaluate((forbidden) => window.__observedChat.some(batch => batch.some(text => forbidden.includes(text))), [...blockedTexts, 'ㅂㅅ']);
+  expect(leaked).toBe(false);
+  await shot(teacher, 'teacher-moderation-phase5');
+
+  step('network: response lost after commit, retry reuses request id and does not duplicate');
+  const retryPage = students[5].page;
+  await retryPage.getByRole('tab', { name: /토론 채팅/ }).click();
+  let lost = false;
+  const sentIds = [];
+  await retryPage.route('**/api/rooms/*/messages', async route => {
+    sentIds.push(route.request().postDataJSON().requestId);
+    if (!lost) { lost = true; await route.fetch(); await route.abort('failed'); }
+    else await route.continue();
+  });
+  await retryPage.getByLabel('사건 대응 입력').fill('응답이 끊겨도 한 번만 공개되는 메시지');
+  await retryPage.getByRole('button', { name: '보내기' }).click();
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(5);
+  await expect(retryPage.locator('.error, [role=alert]').filter({ hasText: /연결하지 못/ }).first()).toBeVisible();
+  await retryPage.getByRole('button', { name: '보내기' }).click();
+  await expect(retryPage.getByLabel('사건 대응 입력')).toHaveValue('');
+  expect(sentIds).toHaveLength(2);
+  expect(sentIds[0]).toBe(sentIds[1]);
+  await retryPage.unroute('**/api/rooms/*/messages');
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(5);
+  const browserDenials = await students[4].page.evaluate(async (roomId) => {
+    const { db } = await import('/src/lib/firebase.ts');
+    const source = await (await fetch('/src/lib/firebase.ts')).text();
+    const sdkUrl = source.match(/from\s+["']([^"']*firebase_firestore[^"']*)["']/)[1];
+    const { doc, getDoc, setDoc } = await import(sdkUrl);
+    const codes = [];
+    for (const operation of [() => getDoc(doc(db, `rooms/${roomId}/host/state`)), () => setDoc(doc(db, `rooms/${roomId}/publicRounds/chat`), { items: [] })]) {
+      try { await operation(); codes.push('unexpected-success'); } catch (error) { codes.push(error.code); }
+    }
+    return codes;
+  }, rid);
+  expect(browserDenials).toEqual(['permission-denied', 'permission-denied']);
+  const otherTeacher = await open('other-room-teacher', { viewport: { width: 1280, height: 900 } });
+  await otherTeacher.page.goto(origin);
+  const outside = await otherTeacher.page.evaluate(async (roomId) => {
+    const { api } = await import('/src/lib/api.ts');
+    await api('/api/rooms', { topicId: 'school_cctv' });
+    const { db } = await import('/src/lib/firebase.ts');
+    const source = await (await fetch('/src/lib/firebase.ts')).text();
+    const sdkUrl = source.match(/from\s+["']([^"']*firebase_firestore[^"']*)["']/)[1];
+    const { doc, getDoc } = await import(sdkUrl);
+    const codes = [];
+    try { await api(`/api/rooms/${roomId}/me`); codes.push(200); } catch (error) { codes.push(error.status); }
+    try { await getDoc(doc(db, `rooms/${roomId}/host/state`)); codes.push('unexpected-success'); } catch (error) { codes.push(error.code); }
+    return codes;
+  }, rid);
+  expect(outside).toEqual([403, 'permission-denied']);
+  await otherTeacher.context.close();
+  for (const who of [teacher, students[0]]) expect(await who.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+
   step('a student reloads and returns to the same phase and role');
   await students[2].page.reload();
   await expect(phaseTitle(students[2])).toContainText('사건·질문');
@@ -165,7 +277,7 @@ try {
   await students[3].page.getByLabel('받는 사람').selectOption({ label: students[2].nickname });
   await students[3].page.getByLabel('반론 입력').fill('선생님이 대신 확인하면 사생활 문제가 생길 수 있어요.');
   await students[3].page.getByRole('button', { name: '보내기' }).click();
-  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(4);
+  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(6);
 
   step('vote for the switcher');
   await teacher.page.getByTestId('next-phase').click();
@@ -192,6 +304,12 @@ try {
   await shot(teacher, 'teacher-ended');
 
   expect(pageErrors).toEqual([]);
+  const stats = {};
+  for (const group of ['ALLOW', 'BLOCK', 'REVIEW']) {
+    const values = timings.filter(t => t.group === group).map(t => t.ms).sort((a, b) => a - b);
+    stats[group] = { count: values.length, mean_ms: values.reduce((a, b) => a + b, 0) / values.length, p95_ms: values[Math.ceil(values.length * 0.95) - 1] };
+  }
+  await writeFile('artifacts/phase5-browser-timings.json', JSON.stringify({ scope: 'Browser requestStart to responseEnd for chat API, includes local network/Admin SDK/Firestore; small UI corpus', stats }, null, 2));
   step('PASS');
 } catch (error) {
   console.error(error);

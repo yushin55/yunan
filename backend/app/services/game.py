@@ -1,4 +1,6 @@
 import copy
+import hashlib
+import json
 import random
 import secrets
 import uuid
@@ -126,6 +128,18 @@ class GameService:
         validate_text_fields(data)
         data = {**data, "text": data["text"].strip()}
         precheck = self.repository.read(room_id)
+        if viewer(precheck, uid) != "student":
+            raise HTTPException(403, "학생 참가자만 발언할 수 있어요.")
+        fingerprint = hashlib.sha256(json.dumps({"kind": kind, "text": data["text"], "targetUid": data.get("targetUid"), "replacesId": data.get("replacesId")}, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+        request_id = data.get("requestId")
+        def receipt(state):
+            saved = state.get("requestReceipts", {}).get(uid, {}).get(request_id) if request_id else None
+            if saved and saved["fingerprint"] != fingerprint:
+                raise HTTPException(409, "같은 요청 번호로 다른 발언을 보낼 수 없어요.")
+            return saved
+        saved = receipt(precheck)
+        if saved:
+            return {**snapshot(precheck, uid), "moderation": saved["outcome"]}
         error = self._text_error(precheck, uid, kind, data)
         if error:
             raise HTTPException(409, error)
@@ -136,6 +150,12 @@ class GameService:
         def update(state):
             outcome.clear()
             deferred_error.clear()
+            if viewer(state, uid) != "student":
+                raise HTTPException(403, "학생 참가자만 발언할 수 있어요.")
+            saved = receipt(state)
+            if saved:
+                outcome.update(saved["outcome"])
+                return
             now = self.clock()
             advance_if_needed(state, now)
             error = self._text_error(state, uid, kind, data)
@@ -143,6 +163,13 @@ class GameService:
                 deferred_error.append(error)
                 return
             check_rate(state["rate"].setdefault(uid, {}), now)
+            replaces = data.get("replacesId")
+            if replaces:
+                previous = next((e for e in state["host"]["moderation"] if e["id"] == replaces), None)
+                if not previous or previous["uid"] != uid or previous["kind"] != kind or previous["phase"] != state["room"]["phase"] or previous["status"] not in ("pending_review", "flagged", "returned"):
+                    raise HTTPException(409, "이미 처리됐거나 수정할 수 없는 발언이에요.")
+                previous["status"] = "withdrawn"
+                self._update_notice(state, previous, "withdrawn")
             state["seq"] += 1
             entry = {
                 "id": f"m{state['seq']}", "uid": uid, "kind": kind, "phase": state["room"]["phase"],
@@ -153,11 +180,16 @@ class GameService:
             if verdict.status == "ok":
                 self._publish(state, entry, now)
                 outcome.update(status="published", messageId=entry["id"])
-                return
-            status = "needs_edit" if verdict.status == "flag" else "pending_review"
-            self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
-            self._notice(state, entry, status, verdict.hint, verdict.excerpt)
-            outcome.update(status=status, messageId=entry["id"], hint=verdict.hint, excerpt=verdict.excerpt, category=verdict.category)
+            else:
+                status = "needs_edit" if verdict.status == "flag" else "pending_review"
+                self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
+                self._notice(state, entry, status, verdict.hint, verdict.excerpt)
+                outcome.update(status=status, messageId=entry["id"], hint=verdict.hint, excerpt=verdict.excerpt, category=verdict.category)
+            if request_id:
+                receipts = state.setdefault("requestReceipts", {}).setdefault(uid, {})
+                receipts[request_id] = {"fingerprint": fingerprint, "outcome": dict(outcome), "sequence": state["seq"]}
+                while len(receipts) > 64:
+                    del receipts[min(receipts, key=lambda key: receipts[key].get("sequence", 0))]
 
         state = self.repository.mutate(room_id, update)
         if deferred_error:
@@ -260,9 +292,13 @@ class GameService:
             raise HTTPException(409, "정체와 투표 결과를 공개한 뒤에 게임을 끝낼 수 있어요.")
 
     def _host_review(self, state, data, now):
+        if state["room"]["phase"] == "ended":
+            raise HTTPException(409, "종료된 방의 발언은 공개할 수 없어요.")
         entry = next((e for e in state["host"]["moderation"] if e["id"] == data["entryId"]), None)
         if not entry or entry["status"] not in ("pending_review", "flagged"):
             raise HTTPException(409, "이미 처리된 메시지예요.")
+        if entry["status"] == "flagged" and data["decision"] == "approve":
+            raise HTTPException(409, "차단된 메시지는 수정해서 다시 보내야 해요.")
         if entry["uid"] not in state["participants"]:
             raise HTTPException(409, "방을 나간 학생의 메시지예요.")
         if data["decision"] == "approve":
@@ -382,9 +418,14 @@ class GameService:
 
     def _log(self, state, entry, status, verdict):
         log = state["host"]["moderation"]
+        if status == "pending_review" and sum(row["status"] == "pending_review" for row in log) >= MAX_LOG:
+            raise HTTPException(429, "선생님 확인을 기다리는 발언이 많아요. 확인이 끝난 뒤 다시 보내 주세요.")
         log.append({**entry, "nickname": state["participants"][entry["uid"]]["nickname"], "status": status,
                     "category": verdict.category, "excerpt": verdict.excerpt, "source": verdict.source})
-        del log[:-MAX_LOG]
+        # Keep unresolved review entries; history limits must never silently lose a pending message.
+        while len(log) > MAX_LOG:
+            index = next(i for i, row in enumerate(log) if row["status"] != "pending_review")
+            del log[index]
 
     def _notice(self, state, entry, status, hint, excerpt):
         notices = state["privatePlayers"][entry["uid"]]["notices"]
