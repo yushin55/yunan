@@ -130,9 +130,10 @@ try {
 
   step('event card, questions and answers');
   for (const who of [teacher, ...students]) await expect(who.page.locator('.event-card')).toBeVisible();
-  await students[3].page.getByRole('tab', { name: '입장 발표' }).click();
+  // The statements open in a sheet next to the conversation.
+  await students[3].page.getByRole('button', { name: /입장 발표 보기/ }).click();
   await expect(students[3].page.getByTestId('statement-row')).toHaveCount(6);
-  for (const student of students) await student.page.getByRole('tab', { name: /토론 채팅/ }).click();
+  await students[3].page.getByRole('button', { name: '닫기' }).click();
   const s0 = students[0].page;
   await s0.getByRole('radio', { name: '질문' }).click();
   await s0.getByLabel('받는 사람').selectOption({ label: students[1].nickname });

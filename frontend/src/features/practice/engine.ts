@@ -1,12 +1,13 @@
 // Offline practice: one player plus five computer partners, kept in this browser only.
 // Mirrors the server's phases and rules; the real game never uses this code.
 import topicData from "../../data/practiceTopics.json";
-import type { ChatMessage, EventCard, MessageKind, ModerationResult, Participant, Phase, Room, Snapshot, StatementRow, Topic } from "../../types/game";
+import type { ChatMessage, EventCard, HostState, MessageKind, ModerationResult, Participant, Phase, Room, Snapshot, StatementRow, Topic } from "../../types/game";
 import { answerLine, rebuttalLine, responseLine, statementLine } from "./lines";
 import { assignRoles, buildReveal, pick, practiceCheck, shuffle, type Assigned } from "./rules";
 
 interface FullTopic extends Topic {
   events: EventCard[];
+  teacherGuide: HostState["teacherGuide"];
 }
 type BotAction = "confirm" | "statement" | "response" | "question" | "answer" | "rebuttal" | "vote";
 
@@ -60,6 +61,25 @@ export function createPractice(nickname: string, topicId: string | null, now = D
 }
 
 const topicOf = (s: PracticeState) => TOPICS.find((t) => t.topicId === s.snapshot.room.topicId)!;
+
+/** Use only the public game state and the teacher's guide in the host preview. */
+export function teacherSnapshot(s: PracticeState): Snapshot {
+  const { room, participants, rounds, me } = s.snapshot;
+  return {
+    viewer: "host", room, participants, rounds,
+    host: {
+      uid: room.hostUid,
+      teacherGuide: topicOf(s).teacherGuide,
+      moderation: (me?.notices ?? []).map((notice) => ({
+        id: notice.id, uid: ME, nickname: participants.find((p) => p.uid === ME)!.nickname,
+        kind: notice.kind, phase: notice.phase, text: notice.text, targetUid: notice.targetUid,
+        status: notice.status === "needs_edit" ? "flagged" : notice.status,
+        category: null, excerpt: notice.excerpt, source: "rules", at: notice.at,
+      })),
+    },
+  };
+}
+
 const roleOf = (s: PracticeState, uid: string) => s.snapshot.room.topic.roles.find((r) => r.id === s.assigned[uid]?.roleId);
 const bots = (s: PracticeState) => s.snapshot.participants.map((p) => p.uid).filter((uid) => uid !== ME);
 const person = (s: PracticeState, uid: string) => s.snapshot.participants.find((p) => p.uid === uid)!;
@@ -71,8 +91,8 @@ function mark(s: PracticeState, uid: string, key: string) {
 
 function startPhase(s: PracticeState, phase: Phase, now: number) {
   const room = s.snapshot.room;
-  const seconds = SECONDS[phase as keyof typeof SECONDS];
-  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + seconds * 1000 : null });
+  const seconds = room.settings.phaseSeconds[phase as keyof typeof SECONDS];
+  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + seconds * 1000 : null, paused: false, pausedRemainingMs: null });
   if (phase === "ended") room.endedAt = now;
   const v = room.phaseVersion;
   const plan = (uid: string, action: BotAction, at: number, targetUid?: string) => s.schedule.push({ uid, action, at: now + at, targetUid, phaseVersion: v });
@@ -112,6 +132,7 @@ function allDone(s: PracticeState) {
 
 function settle(s: PracticeState, now: number) {
   const room = s.snapshot.room;
+  if (room.paused) return;
   if (!["role", "statement", "event", "rebuttal", "vote"].includes(room.phase)) return;
   if ((room.phaseEndsAt && now >= room.phaseEndsAt) || allDone(s)) transition(s, now);
 }
@@ -152,6 +173,7 @@ function runBot(s: PracticeState, job: PracticeState["schedule"][number], now: n
 /** Advance time: run partner actions that are due, then check the phase deadline. */
 export function tick(state: PracticeState, now = Date.now()): PracticeState | null {
   const room = state.snapshot.room;
+  if (room.paused) return null;
   const due = state.schedule.filter((j) => j.at <= now);
   const expired = room.phaseEndsAt !== null && now >= room.phaseEndsAt;
   if (!due.length && !expired) return null;
@@ -190,11 +212,40 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     startPhase(s, "role", now);
     return { state: s };
   }
+  if (name === "pause" || name === "resume" || name === "extend") {
+    if (!["role", "statement", "event", "rebuttal", "vote"].includes(room.phase)) fail("지금은 시간을 조작할 수 없는 단계예요.");
+    if (name === "pause" && !room.paused) {
+      room.pausedRemainingMs = Math.max(0, (room.phaseEndsAt ?? now) - now);
+      room.phaseEndsAt = null;
+      room.paused = true;
+      // Store remaining delays while paused, so partners resume at the same pace.
+      for (const job of s.schedule) job.at -= now;
+    } else if (name === "resume" && room.paused) {
+      room.phaseEndsAt = now + (room.pausedRemainingMs ?? 0);
+      room.pausedRemainingMs = null;
+      room.paused = false;
+      for (const job of s.schedule) job.at += now;
+    } else if (name === "extend") {
+      const seconds = Number(body.seconds);
+      if (!Number.isFinite(seconds) || seconds < 10 || seconds > 300) fail("연장 시간은 10~300초로 정해 주세요.");
+      if (room.paused) room.pausedRemainingMs = (room.pausedRemainingMs ?? 0) + seconds * 1000;
+      else room.phaseEndsAt = (room.phaseEndsAt ?? now) + seconds * 1000;
+    }
+    return { state: s };
+  }
+  if (name === "end") {
+    if (room.phase === "reveal") startPhase(s, "ended", now);
+    return { state: s };
+  }
   if (name === "next") {
+    if (room.paused) {
+      for (const job of s.schedule) job.at += now;
+    }
     if (room.phase === "reveal") startPhase(s, "ended", now);
     else if (room.phase !== "lobby" && room.phase !== "ended") transition(s, now);
     return { state: s };
   }
+  if (room.paused) fail("선생님이 진행을 잠시 멈췄어요.");
   if (name === "confirm-role") {
     if (room.phase === "role") mark(s, ME, "role");
     settle(s, now);

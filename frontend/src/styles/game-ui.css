@@ -219,3 +219,98 @@
 @media (prefers-reduced-motion: reduce) {
   .dress-model, .dress-model.enter-right, .dress-model.enter-left, .role-avatar .avatar-eyes { animation: none; }
 }
+
+/* ── In-game desk: one short instruction, then the work for this phase ───────────────────────────── */
+.todo-callout { margin: 0 0 12px; padding: 9px 14px; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; }
+.todo-callout > span { font-size: 0.78rem; }
+
+/* Practice mode's stand-in teacher buttons inside the game bar. */
+.bar-extra { display: flex; align-items: center; gap: 6px; }
+.practice-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-size: 0.78rem; font-weight: 800; cursor: help; }
+.teacher-practice-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.teacher-room:has(.teacher-practice-controls) .teacher-top { flex-wrap: wrap; }
+.practice-settings-preview { margin: 0; padding: 0; border: 0; min-width: 0; }
+.practice-settings-preview:disabled { opacity: 0.65; }
+@media (max-width: 640px) {
+  /* Phones: the buttons get their own row under the status. */
+  .game-bar-row { flex-wrap: wrap; row-gap: 6px; }
+  .bar-extra { order: 10; flex-basis: 100%; justify-content: flex-end; }
+  .bar-extra .practice-tag { margin-right: auto; }
+}
+
+/* Discussion: event on top, conversation in the middle, composer at the bottom. */
+.chat-stage { display: flex; flex-direction: column; gap: 10px; }
+.chat-stage-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.link-button { display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; border: 0; background: none; color: var(--gold); font-size: 0.85rem; font-weight: 700; cursor: pointer; }
+.link-button:hover { text-decoration: underline; }
+
+.event-card.collapsible { padding: 0; overflow: hidden; }
+.event-card-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 14px; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.event-card-head h3 { flex: 1; margin: 0; font-size: 1.02rem; }
+.event-card-head .card-kind { margin: 0; flex: none; }
+.event-card-head .chev { flex: none; color: #6d6252; transition: transform 0.2s; }
+.event-card.collapsible:not(.folded) .chev { transform: rotate(180deg); }
+.event-card.collapsible p { margin: 0 14px 6px; }
+.event-card.collapsible small { display: block; margin: 0 14px 12px; }
+
+.chat-feed { display: flex; flex-direction: column; gap: 6px; padding: 2px 4px 2px 0; }
+.chat-feed .empty { margin: auto; padding: 24px 0; text-align: center; }
+.chat-message { padding: 8px 12px; border: 0; border-left: 3px solid var(--line); border-radius: 4px 12px 12px 4px; background: var(--bg-2); }
+.chat-message.kind-response { border-left-color: var(--blue); }
+.chat-message.kind-question { border-left-color: var(--gold); }
+.chat-message.kind-answer { border-left-color: var(--green); }
+.chat-message.kind-rebuttal { border-left-color: var(--red); }
+.chat-message.mine { background: rgba(230, 184, 92, 0.08); }
+.chat-message .meta { gap: 6px; font-size: 0.85rem; flex-wrap: nowrap; min-width: 0; }
+.chat-message .meta strong { flex: none; }
+.chat-message .msg-role { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.chat-message .msg-to { flex: none; color: var(--text); opacity: 0.8; }
+.chat-message .kind-tag { flex: none; margin-left: auto; padding: 0; border: 0; font-weight: 800; font-size: 0.75rem; }
+.chat-message p { margin: 3px 0 0; line-height: 1.55; }
+
+.composer { gap: 8px; padding: 10px 0 0; }
+.composer-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.composer-top .kind-tabs { flex: 1 1 auto; }
+.composer-top .kind-tabs button { min-height: 36px; padding: 0 10px; font-size: 0.9rem; }
+.composer-top .target { flex: 0 1 auto; gap: 6px; }
+.composer-top .target span { font-size: 0.8rem; }
+.composer-top .target select { padding: 6px 8px; min-height: 36px; }
+.composer-input { display: flex; gap: 8px; align-items: stretch; }
+.composer-input textarea { flex: 1; min-height: 64px; resize: none; }
+.composer-input .button { flex: none; align-self: stretch; }
+.composer .composer-foot { margin-top: 0; font-size: 0.8rem; }
+.composer .composer-foot .hint { color: var(--muted); }
+/* Only the conversation gives up space; the event card and composer keep their size. */
+.chat-stage > * { flex: none; }
+.composer-top .kind-tabs button { white-space: nowrap; }
+@media (max-width: 640px) {
+  /* Phones: kind, recipient, text and send in two short rows. */
+  .composer .composer-foot .hint, .composer-top .target span { display: none; }
+  .composer-top { flex-wrap: nowrap; gap: 6px; }
+  .composer-top .kind-tabs { gap: 4px; min-width: 0; }
+  .composer-top .kind-tabs button { padding: 0 8px; font-size: 0.82rem; min-height: 34px; }
+  .composer-top .target select { max-width: 104px; font-size: 0.85rem; min-height: 34px; }
+  .composer-input textarea { min-height: 48px; font-size: 0.95rem; }
+  .composer-input .button { padding: 0 12px; }
+  .todo-callout { font-size: 0.88rem; padding: 8px 12px; }
+}
+
+/* Phones and narrow windows: the page scrolls, the composer stays in reach. */
+.chat-feed { max-height: 50vh; overflow-y: auto; }
+@media (max-width: 999px) {
+  .chat-stage .composer { position: sticky; bottom: 0; z-index: 3; margin: 0 -16px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: rgba(14, 21, 19, 0.97); border-top: 1px solid var(--line); }
+}
+
+/* Wide screens: the game fills the window; only the conversation scrolls. */
+@media (min-width: 1000px) {
+  .student-room { height: 100vh; height: 100dvh; display: flex; flex-direction: column; padding-bottom: 0; }
+  .student-room > * { flex: none; }
+  .student-room > .room-layout { flex: 1 1 auto; min-height: 0; width: 100%; }
+  .room-layout.with-table { grid-template-rows: minmax(0, 1fr); }
+  .room-layout.with-table .stage { position: relative; top: auto; height: auto; }
+  .student-room .desk { height: 100%; overflow-y: auto; display: flex; flex-direction: column; padding-bottom: 16px; }
+  .student-room .desk > * { flex: none; }
+  .student-room .desk > .chat-stage { flex: 1 1 auto; min-height: 0; }
+  .chat-stage .chat-feed { flex: 1 1 auto; min-height: 120px; max-height: none; }
+}
+.chat-stage .event-card { margin: 0; }

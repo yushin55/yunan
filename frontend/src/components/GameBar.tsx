@@ -16,6 +16,7 @@ export default function GameBar({
   show3d,
   onToggle3d,
   online,
+  extra,
 }: {
   room: Room;
   offset: number;
@@ -26,6 +27,8 @@ export default function GameBar({
   show3d?: boolean;
   onToggle3d?: () => void;
   online: boolean;
+  /** Extra controls (practice mode's stand-in teacher buttons). */
+  extra?: React.ReactNode;
 }) {
   const timer = usePhaseTimer(room, offset);
   const index = STEPS.indexOf(room.phase === "ended" ? "reveal" : room.phase);
@@ -47,6 +50,7 @@ export default function GameBar({
           </span>
         )}
         <span className="bar-spacer" />
+        {extra && <div className="bar-extra">{extra}</div>}
         {roleLabel ? (
           <button className={`role-chip${switcher ? " switcher" : ""}`} onClick={onRole} aria-label={`내 역할 ${roleLabel} 보기`} data-testid="role-chip">
             <UserRound size={15} aria-hidden />

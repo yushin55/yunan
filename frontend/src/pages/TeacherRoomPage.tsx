@@ -26,11 +26,11 @@ function useServerNow(offset: number) {
   return now;
 }
 
-export default function TeacherRoomPage({ api }: { api: RoomApi }) {
+export default function TeacherRoomPage({ api, practice = false, barControls }: { api: RoomApi; practice?: boolean; barControls?: React.ReactNode }) {
   const { state, action, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const host = state!.host!;
-  const { catalog } = useTopics();
+  const { catalog } = useTopics(!practice);
   const [changingTopic, setChangingTopic] = useState(false);
   const serverNow = useServerNow(offset);
   const phase = room.phase;
@@ -57,11 +57,18 @@ export default function TeacherRoomPage({ api }: { api: RoomApi }) {
         <span className="code-chip">
           방 코드 <strong>{room.code}</strong>
         </span>
+        {barControls && <div className="teacher-practice-controls">{barControls}</div>}
         <span className={`net ${online ? "on" : "off"}`}>{online ? <Wifi size={16} aria-label="연결됨" /> : <WifiOff size={16} aria-label="연결 끊김" />}</span>
       </header>
 
       <div className="teacher-grid">
         <div className="teacher-main">
+          {practice && (
+            <p className="banner" data-testid="teacher-practice-note">
+              연습용 선생님 화면이에요. 학생 화면과 같은 게임을 보며 진행을 조작할 수 있어요. 학생 입장·주제 및 설정 변경·발언 검토는 실제 방에서 사용할 수 있어요.
+              {phase === "lobby" && waiting > 0 && " 학생 화면에서 브리핑을 보고 선호 역할을 고르면 시작할 수 있어요."}
+            </p>
+          )}
           <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} />
           {error && (
             <p className="error-box" role="alert">
@@ -124,7 +131,7 @@ export default function TeacherRoomPage({ api }: { api: RoomApi }) {
               <section className="panel">
                 <div className="panel-head">
                   <h3>주제</h3>
-                  <button className="button ghost small" onClick={() => setChangingTopic((v) => !v)}>
+                  <button className="button ghost small" disabled={practice} onClick={() => setChangingTopic((v) => !v)}>
                     {changingTopic ? "닫기" : "주제 바꾸기"}
                   </button>
                 </div>
@@ -151,14 +158,16 @@ export default function TeacherRoomPage({ api }: { api: RoomApi }) {
               </section>
               <section className="panel">
                 <h3>진행 설정</h3>
-                {catalog && (
-                  <LobbySettings
-                    key={JSON.stringify(room.settings)}
-                    settings={room.settings}
-                    range={catalog.config.phaseSecondsRange}
-                    busy={busy}
-                    onSave={(settings) => void action("settings", settings as unknown as Record<string, unknown>)}
-                  />
+                {(catalog || practice) && (
+                  <fieldset disabled={practice} className="practice-settings-preview">
+                    <LobbySettings
+                      key={JSON.stringify(room.settings)}
+                      settings={room.settings}
+                      range={catalog?.config.phaseSecondsRange ?? { min: 20, max: 900 }}
+                      busy={busy}
+                      onSave={(settings) => void action("settings", settings as unknown as Record<string, unknown>)}
+                    />
+                  </fieldset>
                 )}
               </section>
             </>
@@ -211,7 +220,7 @@ export default function TeacherRoomPage({ api }: { api: RoomApi }) {
           {phase === "lobby" && (
             <section className="panel">
               <h3>학생 입장</h3>
-              <RoomCode code={room.code} large />
+              {practice ? <p className="muted">연습용 방에는 다른 학생이 입장할 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 표시돼요.</p> : <RoomCode code={room.code} large />}
             </section>
           )}
           <section className="panel">
@@ -225,12 +234,12 @@ export default function TeacherRoomPage({ api }: { api: RoomApi }) {
               room={room}
               participants={participants}
               rounds={rounds}
-              serverNow={serverNow}
+              serverNow={practice ? room.createdAt : serverNow}
               busy={busy}
-              onKick={phase === "lobby" ? (uid) => void action("kick", { targetUid: uid }) : undefined}
+              onKick={phase === "lobby" && !practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
             />
           </section>
-          <ModerationPanel host={host} busy={busy} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
+          <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
           <details className="panel guide">
             <summary>
               <BookOpen size={17} aria-hidden /> 진행 안내

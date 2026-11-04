@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ModerationResult, Snapshot } from "../../types/game";
 import type { RoomApi } from "../room/useRoom";
-import { act, createPractice, PracticeError, tick, type PracticeState } from "./engine";
+import { act, createPractice, PracticeError, teacherSnapshot, tick, type PracticeState } from "./engine";
 
 const KEY = "bridge.practice";
 
@@ -64,6 +64,7 @@ export function usePractice() {
   const api: RoomApi = { state: practice?.snapshot ?? null, status: "ready", error, setError, busy: false, online: true, offset: 0, action };
   return {
     api,
+    teacherApi: { ...api, state: practice ? teacherSnapshot(practice) : null } satisfies RoomApi,
     started: Boolean(practice),
     begin: (nickname: string, topicId: string | null) => commit(createPractice(nickname, topicId)),
     reset: () => commit(null),

@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Check, Maximize2, Minimize2, Pause, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Maximize2, Megaphone, Minimize2, Pause, Users, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
 import RoleCard from "../components/RoleCard";
 import Sheet from "../components/Sheet";
-import Tabs from "../components/Tabs";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RulesVideo from "../features/briefing/RulesVideo";
 import ChatFeed, { roleName } from "../features/chat/ChatFeed";
@@ -42,8 +41,11 @@ function stored(key: string, fallback: boolean) {
   }
 }
 
-/** `lobbyAction` is shown under the to-do note in the lobby (practice mode puts its start button there). */
-export default function StudentRoomPage({ api, lobbyAction }: { api: RoomApi; lobbyAction?: React.ReactNode }) {
+/**
+ * `lobbyAction` is shown under the to-do note in the lobby and `barControls` inside the game bar
+ * (practice mode puts its start and next-step buttons there).
+ */
+export default function StudentRoomPage({ api, lobbyAction, barControls }: { api: RoomApi; lobbyAction?: React.ReactNode; barControls?: React.ReactNode }) {
   const { state, action, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const me = state!.me!;
@@ -88,6 +90,7 @@ export default function StudentRoomPage({ api, lobbyAction }: { api: RoomApi; lo
         show3d={show3d}
         onToggle3d={toggle3d}
         online={online}
+        extra={barControls}
       />
       {!online && <p className="banner warn">연결이 끊겼어요. 다시 연결되면 지금 단계와 내 역할로 자동으로 돌아와요.</p>}
 
@@ -386,9 +389,10 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
   );
 }
 
-type ChatTab = "chat" | "event" | "statements";
-
-/** Discussion phases: the event card, the statements and the chat live in tabs, not one long page. */
+/**
+ * Discussion phases on one screen: the event card (foldable) on top, the conversation in the
+ * middle, the composer always at the bottom. The statements open in a sheet when needed.
+ */
 function ChatStage({
   room,
   rounds,
@@ -412,71 +416,42 @@ function ChatStage({
   notice: Notice | null;
   onSend: (kind: MessageKind, text: string, targetUid: string | null) => Promise<ModerationResult | null>;
 }) {
-  const [tab, setTab] = useState<ChatTab>(room.phase === "event" ? "event" : "chat");
-  const [seen, setSeen] = useState(rounds.chat.length);
-  useEffect(() => {
-    if (tab === "chat") setSeen(rounds.chat.length);
-  }, [tab, rounds.chat.length]);
-  // Picking someone at the table means "talk to them".
-  useEffect(() => {
-    if (focus) setTab("chat");
-  }, [focus]);
+  const [statementsOpen, setStatementsOpen] = useState(false);
   const phaseMessages = rounds.chat.filter((m) => m.phase === room.phase).length;
   return (
-    <>
-      <Tabs<ChatTab>
-        label="토론 화면"
-        active={tab}
-        onChange={setTab}
-        items={[
-          { id: "chat", label: "토론 채팅", badge: tab === "chat" ? 0 : rounds.chat.length - seen },
-          { id: "event", label: "사건 카드" },
-          { id: "statements", label: "입장 발표" },
-        ]}
+    <section className="chat-stage">
+      {room.event && <EventCard event={room.event} collapsible defaultOpen={room.phase === "event"} />}
+      <div className="chat-stage-head">
+        <span className="muted small">이번 단계 발언 {phaseMessages}개</span>
+        <button className="link-button" onClick={() => setStatementsOpen(true)}>
+          <Megaphone size={14} aria-hidden /> 입장 발표 보기
+        </button>
+      </div>
+      <ChatFeed
+        messages={rounds.chat}
+        participants={participants}
+        topic={room.topic}
+        myUid={me.uid}
+        emptyText={room.phase === "event" ? "사건 카드를 읽고 먼저 말을 꺼내 보세요." : "다른 역할의 발언에 반론해 보세요."}
       />
-      {tab === "event" && room.event && (
-        <>
-          <EventCard event={room.event} />
-          <button className="button primary full large" onClick={() => setTab("chat")}>
-            토론하러 가기 <ArrowRight size={18} />
-          </button>
-        </>
-      )}
-      {tab === "statements" && (
-        <section className="panel">
+      <Composer
+        phase={room.phase}
+        others={others}
+        prompts={room.topic.questionPrompts}
+        limit={TEXT_LIMIT}
+        busy={busy}
+        disabled={room.paused}
+        notice={notice}
+        target={focus}
+        onTargetChange={onFocus}
+        onSend={onSend}
+      />
+      {statementsOpen && (
+        <Sheet title="입장 발표" onClose={() => setStatementsOpen(false)}>
           <StatementBoard rows={rounds.statements} participants={participants} topic={room.topic} />
-        </section>
+        </Sheet>
       )}
-      {tab === "chat" && (
-        <section className="panel chat-panel">
-          {room.event && (
-            <button className="event-mini" onClick={() => setTab("event")}>
-              <span>사건</span> {room.event.title}
-            </button>
-          )}
-          <ChatFeed
-            messages={rounds.chat}
-            participants={participants}
-            topic={room.topic}
-            myUid={me.uid}
-            emptyText={room.phase === "event" ? "사건 카드를 읽고 먼저 말을 꺼내 보세요." : "다른 역할의 발언에 반론해 보세요."}
-          />
-          <p className="muted small">이번 단계 발언 {phaseMessages}개</p>
-          <Composer
-            phase={room.phase}
-            others={others}
-            prompts={room.topic.questionPrompts}
-            limit={TEXT_LIMIT}
-            busy={busy}
-            disabled={room.paused}
-            notice={notice}
-            target={focus}
-            onTargetChange={onFocus}
-            onSend={onSend}
-          />
-        </section>
-      )}
-    </>
+    </section>
   );
 }
 

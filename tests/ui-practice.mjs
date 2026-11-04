@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 
 // Needs only the web server: the practice mode runs without the API or Firebase.
 const origin = process.env.BRIDGE_UI_URL || 'http://localhost:5173';
+const device = process.env.BRIDGE_UI_DEVICE;
 // SwiftShader gives headless Chromium a software WebGL context for the 3D table.
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle', '--use-angle=swiftshader'] });
 await mkdir('artifacts', { recursive: true });
@@ -69,6 +70,15 @@ async function play(label, options) {
   await expect(page.getByTestId('wardrobe-submit')).toBeInViewport(); // No scrolling to reach it.
   await pickRoles(page, [0, 1]);
   await expect(page.getByTestId('practice-start')).toBeInViewport();
+  await page.getByTestId('practice-view-toggle').click();
+  await expect(page.getByTestId('teacher-practice-note')).toBeVisible();
+  await expect(page.getByTestId('participant-row')).toHaveCount(6);
+  await expect(page.getByTestId('room-code')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '주제 바꾸기' })).toBeDisabled();
+  await expect(page.getByRole('spinbutton').first()).toBeDisabled();
+  await page.screenshot({ path: `artifacts/practice-${label}-teacher-lobby.png` });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.getByTestId('practice-view-toggle').click();
   await page.screenshot({ path: `artifacts/practice-${label}-ready.png` });
   await page.getByTestId('practice-start').click();
 
@@ -78,6 +88,26 @@ async function play(label, options) {
   await expect(page.getByTestId('identity')).toBeVisible();
   await page.waitForTimeout(800);
   await page.screenshot({ path: `artifacts/practice-${label}-role.png` });
+  await page.getByTestId('practice-view-toggle').click();
+  await expect(page.locator('.teacher-room')).toBeVisible();
+  await expect(page.getByTestId('identity')).toHaveCount(0);
+  await expect(page.locator('.role-chip')).toHaveCount(0);
+  await expect(page.getByTestId('participant-row').first()).toContainText('비공개');
+  await page.getByRole('button', { name: '일시정지', exact: true }).click();
+  const paused = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')));
+  await page.waitForTimeout(1200);
+  const stillPaused = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')));
+  expect(stillPaused.snapshot.room.paused).toBe(true);
+  expect(stillPaused.schedule).toEqual(paused.schedule);
+  await page.reload();
+  await expect(page.locator('.teacher-room')).toBeVisible();
+  await page.getByRole('button', { name: '1분 연장', exact: true }).click();
+  const extended = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')));
+  expect(extended.snapshot.room.pausedRemainingMs).toBe(paused.snapshot.room.pausedRemainingMs + 60000);
+  await page.getByRole('button', { name: '재개', exact: true }).click();
+  await expect(page.getByRole('button', { name: '일시정지', exact: true })).toBeVisible();
+  await page.screenshot({ path: `artifacts/practice-${label}-teacher-role.png` });
+  await page.getByTestId('practice-view-toggle').click();
   // Nothing may push the page sideways (the status bar must fit on a phone).
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: '역할을 확인했어요' }).click();
@@ -91,8 +121,16 @@ async function play(label, options) {
   await page.getByRole('button', { name: '발표하기' }).click();
   await expect(title).toContainText('사건·질문', { timeout: 40000 });
   await expect(page.locator('.event-card')).toBeVisible();
+  await page.getByTestId('practice-view-toggle').click();
+  await expect(page.locator('.teacher-room')).toBeVisible();
+  await expect(page.getByTestId('participant-row')).toHaveCount(6);
+  await page.getByTestId('moderation-toggle').click();
+  await expect(page.getByTestId('moderation-entry')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '문제없음 · 그대로 공개' })).toBeDisabled();
+  await page.screenshot({ path: `artifacts/practice-${label}-teacher-event.png` });
+  await page.getByTestId('practice-view-toggle').click();
 
-  // Tapping someone at the table makes them the recipient and opens the chat tab.
+  // Tapping someone at the table makes them the recipient of the next message.
   await plate().getByRole('button').click();
   await page.getByRole('radio', { name: '질문' }).click();
   await expect(page.getByLabel('받는 사람')).not.toHaveValue('');
@@ -121,16 +159,47 @@ async function play(label, options) {
 
   await page.reload();
   await expect(page.getByTestId('reveal')).toBeVisible(); // Saved in this browser.
+  await page.getByTestId('practice-view-toggle').click();
   await page.getByRole('button', { name: '게임 종료' }).click();
+  await expect(page.getByTestId('game-summary')).toBeVisible();
+  await page.getByTestId('practice-view-toggle').click();
   await expect(title).toContainText('게임 종료');
   await context.close();
   if (errors.length) throw new Error(errors.join(' | '));
   console.log(`PASS practice (${label})`);
 }
 
+async function teacherEntry() {
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('request', (r) => {
+    if (/\/api\/|:(8000|8080|9099)\/|identitytoolkit|firestore\.googleapis/.test(r.url())) errors.push(`network: ${r.url()}`);
+  });
+  await page.goto(`${origin}/practice`);
+  await expect(page.getByTestId('practice-teacher-setup')).toBeDisabled();
+  await page.getByRole('radio', { name: /학교 내 CCTV/ }).click();
+  await page.getByTestId('practice-teacher-setup').click();
+  await expect(page.locator('.teacher-room')).toBeVisible();
+  await expect(page.getByTestId('start-game')).toBeDisabled();
+  await expect(page.getByTestId('participant-row')).toHaveCount(6);
+  await expect(page.locator('body')).not.toHaveClass(/flow-open/);
+  await page.locator('.guide summary').click();
+  await expect(page.locator('.guide')).toContainText('질문 예시');
+  await page.reload();
+  await expect(page.locator('.teacher-room')).toBeVisible();
+  await page.getByTestId('practice-view-toggle').click();
+  await expect(page.getByTestId('flow-overlay')).toBeVisible();
+  if (errors.length) throw new Error(errors.join(' | '));
+  await context.close();
+  console.log('PASS practice (teacher entry, offline)');
+}
+
 try {
-  await play('mobile', { ...devices['Pixel 7'] });
-  await play('desktop', { viewport: { width: 1440, height: 900 } });
+  await teacherEntry();
+  if (!device || device === 'mobile') await play('mobile', { ...devices['Pixel 7'] });
+  if (!device || device === 'desktop') await play('desktop', { viewport: { width: 1440, height: 900 } });
 } catch (error) {
   console.error(error);
   process.exitCode = 1;

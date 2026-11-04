@@ -302,9 +302,6 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 /* Practice */
 .practice-link { display: inline-flex; align-items: center; gap: 8px; color: var(--gold); font-weight: 700; text-decoration: none; padding: 6px 0; }
 .practice-link:hover { text-decoration: underline; }
-.practice-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 16px; background: #2a2414; border-bottom: 1px solid var(--gold); color: #f5e6c4; font-size: 0.9rem; }
-.practice-note { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.practice-note strong { color: var(--gold); }
 
 /* Teacher */
 .teacher-top .tag { color: var(--muted); font-size: 0.9rem; }

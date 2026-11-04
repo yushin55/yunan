@@ -43,9 +43,11 @@ export default function Composer({
   const setTarget = onTargetChange ?? setOwnTarget;
   const [showPrompts, setShowPrompts] = useState(false);
   const active = kinds.includes(kind) ? kind : kinds[0];
+  const canSend = !busy && !disabled && Boolean(text.trim());
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const send = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!canSend) return;
     const result = await onSend(active, text.trim(), target || null);
     // Keep the draft when the wording must change, so the student can revise it.
     // The recipient stays selected so a back-and-forth can continue.
@@ -54,44 +56,56 @@ export default function Composer({
 
   return (
     <form className="composer" onSubmit={send}>
-      <div className="kind-tabs" role="radiogroup" aria-label="발언 종류">
-        {kinds.map((k) => (
-          <button key={k} type="button" role="radio" aria-checked={active === k} className={active === k ? "active" : ""} onClick={() => setKind(k)}>
-            {KIND_LABELS[k]}
-          </button>
-        ))}
-      </div>
-      <label className="target">
-        <span>누구에게?</span>
-        <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="받는 사람">
-          <option value="">모두에게</option>
-          {others.map((p) => (
-            <option key={p.uid} value={p.uid}>
-              {p.nickname}
-            </option>
+      <div className="composer-top">
+        <div className="kind-tabs" role="radiogroup" aria-label="발언 종류">
+          {kinds.map((k) => (
+            <button key={k} type="button" role="radio" aria-checked={active === k} className={active === k ? "active" : ""} onClick={() => setKind(k)}>
+              {KIND_LABELS[k]}
+            </button>
           ))}
-        </select>
-      </label>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        maxLength={limit}
-        rows={3}
-        placeholder={PLACEHOLDER[active]}
-        aria-label={`${KIND_LABELS[active]} 입력`}
-        disabled={disabled}
-      />
+        </div>
+        <label className="target">
+          <span>받는 사람</span>
+          <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="받는 사람">
+            <option value="">모두에게</option>
+            {others.map((p) => (
+              <option key={p.uid} value={p.uid}>
+                {p.nickname}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="composer-input">
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sends, Shift+Enter breaks the line (not while a Korean syllable is being composed).
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+          maxLength={limit}
+          rows={2}
+          placeholder={PLACEHOLDER[active]}
+          aria-label={`${KIND_LABELS[active]} 입력`}
+          disabled={disabled}
+        />
+        <button className="button primary" type="submit" disabled={!canSend}>
+          <Send size={16} /> 보내기
+        </button>
+      </div>
       <ModerationNotice notice={notice} onEdit={setText} />
       <div className="composer-foot">
-        <button type="button" className="button ghost small" onClick={() => setShowPrompts((v) => !v)}>
-          <Lightbulb size={15} /> 질문 예시
+        <button type="button" className="link-button" onClick={() => setShowPrompts((v) => !v)} aria-expanded={showPrompts}>
+          <Lightbulb size={14} /> 질문 예시
         </button>
+        <span className="hint">Enter 보내기 · Shift+Enter 줄바꿈</span>
         <span className="count">
           {text.length}/{limit}
         </span>
-        <button className="button primary" type="submit" disabled={busy || disabled || !text.trim()}>
-          <Send size={16} /> 보내기
-        </button>
       </div>
       {showPrompts && (
         <ul className="prompt-list">
