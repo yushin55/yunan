@@ -157,7 +157,7 @@ $env:RUN_EMULATOR_TESTS='1'
 node --test tests/firebase-config.test.mjs tests/message-request.test.mjs tests/firestore.rules.test.mjs tests/emulator-smoke.test.mjs
 ```
 
-실제 모드로 돌아갈 때는 demo 셸을 닫고 새 셸에서 실제 .env를 읽힌다. production에서 Emulator를 켜거나 MODERATION_MODE=rules로 운영 검사를 우회하지 않는다. 운영은 ai 정책·Gemini·비용·호스팅을 별도 검증해야 한다.
+실제 모드로 돌아갈 때는 demo 셸을 닫고 새 셸에서 실제 .env를 읽힌다. production에서 Emulator를 켜거나 MODERATION_MODE=rules로 운영 검사를 우회하지 않는다. 미성년 학생 운영은 `MODERATION_MODE=teacher_review`, `GEMINI_API_KEY=`로 외부 AI 호출을 끈다. 명백한 욕설은 차단되고 나머지 모든 발언은 교사 승인 후 공개된다. 교사가 검토를 진행할 수업 절차와 호스팅을 검증해야 한다. 기존 ai 모드는 제공자의 이용 대상·약관을 별도로 확인한 경우에만 검토한다.
 
 ## 테스트 데이터와 비용
 
@@ -176,7 +176,7 @@ Spark 한도는 프로젝트 전체 팀원이 공유한다. Console → Firestor
 | permission-denied | 해당 방 소속·배포 규칙. 전체 허용 규칙으로 해결하지 않음 |
 | CORS | 실제 프런트 origin과 ALLOWED_ORIGINS 일치 후 서버 재시작 |
 | Emulator 혼합 | demo/실제 project와 두 HOST 및 자격 증명 설정 확인 |
-| production/rules 거부 | 정상 보호 장치. 운영 ai 정책 준비 |
+| production/rules 거부 | 정상 보호 장치. 학생 운영은 teacher_review 사용 |
 | 첫 요청 타임아웃 | 서버/네트워크/호스팅 절전 확인, 새 방/계정을 반복 생성하지 않음 |
 
 공유 전 `git status`, staged diff와 `git check-ignore frontend/.env.local backend/.env`를 확인한다. 실제 .env/ADC/서비스 계정/Gemini/브라우저 토큰은 Git과 팀 채팅에 넣지 않는다.

@@ -14,7 +14,7 @@
 | `VITE_USE_FIREBASE_EMULATORS` | `true` | `false` | `false` |
 | 백엔드 두 Emulator HOST | 둘 다 설정 | 둘 다 제거 | 둘 다 제거 |
 | `ENVIRONMENT` | `development` | `development` | `production` |
-| `MODERATION_MODE` | `rules` | `rules` | `ai` |
+| `MODERATION_MODE` | `rules` | `rules` | 학생용 `teacher_review` |
 | 관리자 자격 증명 | 사용하지 않음 | ADC 파일 경로 또는 Base64 | 호스트 ADC, 비밀 파일 마운트 또는 Base64 Secret |
 
 백엔드는 **backend/.env만 자동 로드**합니다. `.env.production.example`은 공유 가능한 참고 자료이며, `.env.production`이라는 이름만으로는 백엔드에 적용되지 않습니다. 프로세스/클라우드에서 이미 설정한 값이 `.env`보다 우선합니다. 프런트 Vite는 `.env`, `.env.local`, 해당 mode 파일을 읽으며 실행 환경 변수가 우선하고 mode별 파일이 일반 파일보다 우선합니다. 두 종류 설정을 동시에 남기지 말고 한 환경만 선택한 뒤 서버를 재시작하세요.
@@ -38,8 +38,8 @@
 | 백엔드/SDK | `GOOGLE_APPLICATION_CREDENTIALS` | 선택: 저장소 밖/호스트에 마운트된 JSON 파일의 절대 경로 |
 | 백엔드 | `ALLOWED_ORIGINS` | 프런트 origin, 복수는 쉼표 구분. 경로나 마지막 `/` 없이 |
 | 백엔드 | `ENVIRONMENT` | 로컬 시험은 `development`, 운영은 `production` |
-| 백엔드 | `MODERATION_MODE` | 로컬 시험 `rules`, 운영 `ai` |
-| 백엔드 | `GEMINI_API_KEY` | 이번 단계는 빈 값. 운영 ai 모드에서 키 없으면 교사 검토 대기 |
+| 백엔드 | `MODERATION_MODE` | 로컬 시험 `rules`, 학생용 운영 `teacher_review` (모든 비차단 발언 교사 승인 필요) |
+| 백엔드 | `GEMINI_API_KEY` | 학생용 teacher_review 모드는 빈 값, 외부 AI 호출 없음. ai 사용은 제공자 연령·데이터 약관 별도 확인 |
 | 백엔드 | `GEMINI_MODEL` | 기존 기본값 `gemini-3.5-flash-lite`. 이번 단계에서 모델 호출/사용 가능성 검증 안 함 |
 | 백엔드 | `FIRESTORE_EMULATOR_HOST` | 실제 연결에서는 변수 자체를 제거 |
 | 백엔드 | `FIREBASE_AUTH_EMULATOR_HOST` | 실제 연결에서는 변수 자체를 제거 |

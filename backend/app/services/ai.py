@@ -11,6 +11,8 @@ class AIUnavailable(RuntimeError):
 
 
 def generate_json(prompt: str, timeout: float = 6) -> dict:
+    if settings.moderation_mode == "teacher_review":
+        raise AIUnavailable("External AI is disabled in teacher_review mode")
     if not settings.gemini_api_key:
         raise AIUnavailable("GEMINI_API_KEY is not configured")
     payload = {

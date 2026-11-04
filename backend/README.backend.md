@@ -64,7 +64,9 @@ userLimits/{uid}                  방 생성 횟수 제한
 
 ## 중재
 
-`MODERATION_MODE=ai`(기본): 규칙 검사 → Gemini 판정(실패 시 1회 재시도) → 그래도 실패하면 교사 확인 대기. `MODERATION_MODE=rules`: 규칙 검사만 사용하며 `ENVIRONMENT=production`에서는 서버가 시작을 거부합니다. AI에는 검사할 문장 하나만 보내고, 다른 학생 정보·역할·선호는 보내지 않습니다. 안내 문구는 AI가 아닌 서버의 고정 문구이며, AI가 지목한 고칠 부분은 원문에 실제로 있을 때만 보여 줍니다.
+`MODERATION_MODE=teacher_review`: 외부 AI 호출 없이 규칙을 검사하고, 차단되지 않은 모든 발언도 교사 승인 전까지 비공개로 보류합니다. 정상 문장·정치인 이름을 BLOCK하는 것이 아니라 수동 검토하는 운영 모드이며 미성년 학생용 배포에는 이 모드를 사용합니다. 명백한 BLOCK은 교사도 강제 공개할 수 없고 검사 오류도 자동 공개하지 않습니다. `GEMINI_API_KEY`는 비워 둡니다.
+
+`MODERATION_MODE=ai`(기존 기본값): 규칙 검사 → Gemini 판정(실패 시 1회 재시도) → 그래도 실패하면 교사 확인 대기. 사용 대상과 제공자 약관·데이터 처리 조건을 먼저 확인해야 합니다. `MODERATION_MODE=rules`: 규칙 검사만 사용하며 `ENVIRONMENT=production`에서는 계속 서버가 시작을 거부합니다. 안내 문구는 서버의 고정 문구이며 원문을 임의 변경하지 않습니다.
 
 ## 환경 변수
 
@@ -78,6 +80,6 @@ userLimits/{uid}                  방 생성 횟수 제한
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | 프런트엔드 HTTPS 주소 |
 | `GEMINI_API_KEY` | 선택 | AI 중재 키 |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | 선택 |
-| `MODERATION_MODE` | `rules` 또는 `ai` | `ai` |
+| `MODERATION_MODE` | `rules`, `ai`, `teacher_review` | 미성년 학생 운영 `teacher_review` |
 
 Base64는 암호화가 아닙니다. 서비스 계정과 AI 키는 서버 환경변수로만 관리합니다.

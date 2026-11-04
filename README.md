@@ -146,7 +146,7 @@ VS Code에서는 "전체 실행 (에뮬레이터 + 백엔드 + 프론트)" 구�
 
 교사는 **선생님 → 주제 선택 → 게임 방 만들기**, 학생은 QR이나 **학생 → 방 코드**로 들어옵니다. 같은 브라우저 프로필의 탭은 같은 익명 계정이므로, 혼자 시험할 때는 교사 1개 + 학생 6개의 분리된 브라우저 프로필(또는 시크릿 창)을 쓰세요. 교사 계정으로는 학생 입장이 막혀 있습니다.
 
-`GEMINI_API_KEY` 없이 로컬에서 시험하려면 `backend/.env`에 `MODERATION_MODE=rules`를 두세요(규칙 검사만 사용, 운영 환경에서는 서버가 거부). 키가 있으면 기본값 `ai`로 둡니다. `ai` 모드인데 키가 없거나 AI가 응답하지 않으면 메시지는 교사 확인 뒤에만 공개됩니다.
+`GEMINI_API_KEY` 없이 로컬에서 시험하려면 `backend/.env`에 `MODERATION_MODE=rules`를 두세요(규칙 검사만 사용, 운영 환경에서는 서버가 거부). 미성년 학생용 운영은 `MODERATION_MODE=teacher_review`, `GEMINI_API_KEY=`를 사용합니다. 외부 AI를 호출하지 않고 명백한 욕설은 차단하며, 나머지 모든 발언도 교사 승인 후 공개합니다. 기존 `ai` 모드는 제공자 연령·데이터 약관을 확인한 경우에만 검토하며, AI 장애 시에도 자동 공개하지 않습니다.
 
 ## 테스트
 
@@ -200,7 +200,7 @@ npm run build                                              # 타입 검사 + 프
 | `ALLOWED_ORIGINS` | 프런트엔드 주소 (쉼표로 여러 개) |
 | `GEMINI_API_KEY` | AI 중재용 키 |
 | `GEMINI_MODEL` | 선택, 기본 `gemini-3.5-flash-lite` |
-| `MODERATION_MODE` | `ai` (기본값, 운영에서는 `rules` 불가) |
+| `MODERATION_MODE` | 학생용 운영 `teacher_review`; 기존 기본값 `ai`, 운영 `rules` 불가 |
 
 운영에는 `FIRESTORE_EMULATOR_HOST`·`FIREBASE_AUTH_EMULATOR_HOST`를 **넣지 않습니다**(있으면 서버가 시작을 거부).
 

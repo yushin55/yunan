@@ -32,7 +32,7 @@ export default function ModerationPanel({ host, busy, onReview }: { host: HostSt
       </button>
       {open && (
         <div className="moderation-body">
-          <p className="muted small">학생 화면에는 보이지 않아요. 프로젝터로 화면을 띄울 때는 접어 두세요. AI가 연결되지 않으면 메시지는 선생님이 확인한 뒤에만 공개돼요.</p>
+          <p className="muted small">학생 화면에는 보이지 않아요. 프로젝터로 화면을 띄울 때는 접어 두세요. 교사 검토 모드에서는 모든 발언을 선생님이 확인한 뒤에만 공개해요. 차단된 표현은 학생이 수정해야 해요.</p>
           {entries.length === 0 && <p className="muted">아직 점검에 걸린 메시지가 없어요.</p>}
           <ul>
             {entries.map((e) => (

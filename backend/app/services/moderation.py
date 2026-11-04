@@ -124,7 +124,8 @@ PROMPT = (
 
 class Moderator:
     """MODERATION_MODE=ai: rules, then AI (one retry). If AI cannot answer, the teacher decides.
-    MODERATION_MODE=rules: rules only, intended for local development without an AI key."""
+    MODERATION_MODE=rules: rules only, intended for local development without an AI key.
+    MODERATION_MODE=teacher_review: rules, then private teacher review; no external AI."""
 
     def __init__(self, mode: str | None = None, ai_call=generate_json):
         self.mode = mode or settings.moderation_mode
@@ -141,6 +142,8 @@ class Moderator:
         flagged = rule_check(text)
         if flagged:
             return flagged
+        if self.mode == "teacher_review":
+            return Verdict("review", "rules")
         if self.mode == "rules":
             return Verdict("ok", "rules")
         for _ in range(2):

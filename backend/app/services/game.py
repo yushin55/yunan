@@ -418,9 +418,14 @@ class GameService:
 
     def _log(self, state, entry, status, verdict):
         log = state["host"]["moderation"]
+        if status == "pending_review" and sum(row["status"] == "pending_review" for row in log) >= MAX_LOG:
+            raise HTTPException(429, "선생님 확인을 기다리는 발언이 많아요. 확인이 끝난 뒤 다시 보내 주세요.")
         log.append({**entry, "nickname": state["participants"][entry["uid"]]["nickname"], "status": status,
                     "category": verdict.category, "excerpt": verdict.excerpt, "source": verdict.source})
-        del log[:-MAX_LOG]
+        # Keep unresolved review entries; history limits must never silently lose a pending message.
+        while len(log) > MAX_LOG:
+            index = next(i for i, row in enumerate(log) if row["status"] != "pending_review")
+            del log[index]
 
     def _notice(self, state, entry, status, hint, excerpt):
         notices = state["privatePlayers"][entry["uid"]]["notices"]
