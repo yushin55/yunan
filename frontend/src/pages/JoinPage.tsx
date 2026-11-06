@@ -47,7 +47,7 @@ export default function JoinPage() {
           placeholder="ABC123"
         />
         <label className="field-label" htmlFor="nickname">
-          닉네임
+          이름
         </label>
         <input
           id="nickname"
@@ -57,7 +57,7 @@ export default function JoinPage() {
           maxLength={12}
           required
           autoComplete="off"
-          placeholder="게임에서 쓸 이름 (12자 이내)"
+          placeholder="내 이름 (12자 이내)"
         />
         {error && (
           <p className="error-box" role="alert">

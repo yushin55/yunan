@@ -1,6 +1,6 @@
 import { Equal, Search, VenetianMask } from "lucide-react";
 import type { Participant, Reveal, Topic } from "../../types/game";
-import { roleName } from "../chat/ChatFeed";
+import { roleName } from "../roles/roleName";
 
 const OUTCOME: Record<Reveal["outcome"], { title: string; text: string }> = {
   found: { title: "역할 전환자를 찾아냈어요!", text: "가장 많은 표를 받은 사람이 역할 전환자였어요." },

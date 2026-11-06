@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.dependencies import game_service
 from app.api.rooms import RoomId
 from app.core.auth import current_uid
-from app.models.requests import Empty, Extend, Kick, Message, Preferences, Review, Settings, Statement, Sync, Vote
+from app.models.requests import Empty, Extend, Kick, LineDelete, LineAdd, LineEdit, MicOn, Preferences, Review, Settings, Speaker, Speech, Sync, Vote
 from app.services.game import GameService
 
 router = APIRouter(prefix="/api/rooms", tags=["game"])
@@ -23,13 +23,14 @@ def action(name):
 
 
 # Teacher (room creator) controls. The service rejects everyone else with 403.
-for name, schema in [("settings", Settings), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("extend", Extend), ("end", Empty), ("review", Review)]:
+for name, schema in [("settings", Settings), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("skip-phase", Sync), ("speaker", Speaker), ("extend", Extend), ("end", Empty), ("review", Review), ("line-edit", LineEdit), ("line-delete", LineDelete)]:
     register(name, schema, action(name))
 
 # Student actions.
-for name, schema in [("preferences", Preferences), ("confirm-role", Empty), ("vote", Vote)]:
+for name, schema in [("preferences", Preferences), ("confirm-role", Empty), ("end-turn", Sync), ("mic-on", MicOn), ("mic-off", Sync), ("vote", Vote)]:
     register(name, schema, action(name))
 
-# Public text is checked for profanity and personal attacks before anyone else sees it.
-register("statement", Statement, lambda service, room_id, uid, data: service.post_text(room_id, uid, "statement", data))
-register("messages", Message, lambda service, room_id, uid, data: service.post_text(room_id, uid, data["kind"], data))
+# The discussion record. Audio is transcribed and dropped; lines are checked before anyone sees them.
+register("speech", Speech, lambda service, room_id, uid, data: service.speech(room_id, uid, data))
+register("line-add", LineAdd, lambda service, room_id, uid, data: service.add_line(room_id, uid, data))
+register("summary", Empty, lambda service, room_id, uid, data: service.summarize(room_id, uid))

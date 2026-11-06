@@ -74,15 +74,11 @@ export function buildReveal(uids: string[], assigned: Record<string, Assigned>, 
   };
 }
 
-const HINTS = {
-  profanity: "욕설로 읽힐 수 있는 표현이 있어요. 그 부분을 바꿔서 다시 보내 주세요.",
-  personal_attack: "사람을 향한 공격으로 읽힐 수 있어요. 상대가 아니라 주장이나 이유에 대해 말해 보세요.",
-  mockery: "다른 학생을 놀리거나 깎아내리는 표현으로 읽힐 수 있어요. 동의하지 않는 이유를 설명하는 문장으로 바꿔 보세요.",
-};
+type Category = "profanity" | "personal_attack" | "mockery";
 const START = "(?<![가-힣ㄱ-ㅎA-Za-z])";
 const SEP = "[\\d_*.\\-~!@#$%^&()+=]{0,2}";
 const words = (...list: string[]) => list.map((w) => [...w].join(SEP)).join("|");
-const RULES: [RegExp, keyof typeof HINTS][] = [
+const RULES: [RegExp, Category][] = [
   [new RegExp(`ㅅㅂ|ㅆㅂ|ㅂㅅ|ㅄ|ㅈㄴ|ㅈㄹ|ㅅㄲ|좆|${START}(?:(?:${words("시발", "씨발", "씨팔", "시팔")})(?!점|역)|${words("병신", "개새끼", "새끼", "존나", "지랄", "느금", "니애미")})`), "profanity"],
   [new RegExp(`${START}(?:꺼져(?:라)?(?=\\s*[!~?.]*\\s*$|\\s*[!~])|닥쳐(?:라)?(?=[\\s!.~?]|$)|입\\s*닥|뒤져라|죽을래)`), "personal_attack"],
   [new RegExp(`${START}(?:너|니|넌|너는|니는|네가|니가|쟤|걔)(?=\\s|$).{0,12}?(?:바보|멍청|한심|무식|찐따|등신|머저리|쓰레기|돌대가리|노답|미친|또라이|수준\\s*낮)`), "personal_attack"],
@@ -93,7 +89,7 @@ const RULES: [RegExp, keyof typeof HINTS][] = [
 export function practiceCheck(text: string) {
   for (const [pattern, category] of RULES) {
     const match = text.match(pattern);
-    if (match) return { hint: HINTS[category], excerpt: match[0].slice(0, 30) };
+    if (match) return { category, excerpt: match[0].slice(0, 30) };
   }
   return null;
 }

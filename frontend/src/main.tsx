@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "./app/App";
 import "./styles/global.css";
 import "./styles/game-ui.css";
+import "./styles/discussion.css";
 import "./styles/news-footage.css";
 import "./styles/flow.css";
 import "./styles/home.css";

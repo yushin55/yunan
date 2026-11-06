@@ -1,6 +1,6 @@
 import { Check, Vote } from "lucide-react";
 import type { Participant, Topic } from "../../types/game";
-import { roleName } from "../chat/ChatFeed";
+import { roleName } from "../roles/roleName";
 
 export function togglePick(current: string[], uid: string, count: number) {
   if (current.includes(uid)) return current.filter((x) => x !== uid);

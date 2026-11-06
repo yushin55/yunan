@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 ShortId = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")]
 Seconds = Annotated[int, Field(ge=20, le=900)]
+MicSeconds = Annotated[int, Field(ge=10, le=120)]
 
 
 class Input(BaseModel):
@@ -23,6 +24,7 @@ class Settings(Input):
     randomTopic: bool = False
     switcherCount: Literal[1, 2] | None = None
     phaseSeconds: PhaseSeconds | None = None
+    micSeconds: MicSeconds | None = None
 
     @model_validator(mode="after")
     def one_topic_choice(self):
@@ -55,14 +57,37 @@ class Preferences(Input):
         return self
 
 
-class Statement(Input):
-    text: str = Field(min_length=1, max_length=200)
+class MicOn(Input):
+    """Ask for the one microphone in the room. Z speaks for the phase, X answers."""
+    kind: Literal["statement", "question", "rebuttal", "answer"]
 
 
-class Message(Input):
-    kind: Literal["response", "question", "answer", "rebuttal"]
-    text: str = Field(min_length=1, max_length=200)
-    targetUid: ShortId | None = None
+class Speech(Input):
+    """One short stretch of the speaker's audio. It is transcribed and never stored."""
+    audio: str = Field(min_length=1, max_length=2_000_000, pattern=r"^[A-Za-z0-9+/]+={0,2}$")
+    mimeType: Literal["audio/wav"]
+    phaseVersion: int = Field(ge=0)
+    # Clips are sent side by side when the AI is slow; this keeps them in the order they were said.
+    clip: int | None = Field(default=None, ge=0)
+
+
+class LineAdd(Input):
+    text: str = Field(min_length=1, max_length=400)
+    phaseVersion: int | None = Field(default=None, ge=0)
+
+
+class LineEdit(Input):
+    lineId: ShortId
+    text: str = Field(min_length=1, max_length=400)
+
+
+class LineDelete(Input):
+    lineId: ShortId
+
+
+class Speaker(Input):
+    targetUid: ShortId
+    phaseVersion: int | None = Field(default=None, ge=0)
 
 
 class Vote(Input):

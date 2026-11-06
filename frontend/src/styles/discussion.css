@@ -1,0 +1,238 @@
+/* The spoken discussion: the shared screen that runs the turns and shows what was said. */
+
+/* Boxes are for the big areas only; inside them, space and thin lines do the separating.
+   Gold means "now": the current speaker, the current phase and the one main button. */
+
+/* Who has the floor. */
+.speaker-stage { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 18px; align-items: center; margin: 0 0 14px; }
+.speaker-now { min-width: 0; }
+.speaker-now .eyebrow { color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.speaker-now h2 { margin: 2px 0 0; font-family: var(--serif); font-size: clamp(1.9rem, 3.6vw, 3rem); line-height: 1.15; overflow-wrap: anywhere; }
+.speaker-role { margin: 2px 0 0; color: var(--muted); font-weight: 600; font-size: clamp(1rem, 1.5vw, 1.15rem); }
+.speaker-timer { display: inline-flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.speaker-timer strong { font-size: clamp(1.9rem, 3.6vw, 3rem); line-height: 1.1; }
+.speaker-timer.urgent { color: var(--red); }
+.speaker-timer.paused { color: var(--amber); }
+.speaker-queue { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.speaker-queue li > span, .speaker-queue li > button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 3px 12px; border: 1px solid var(--line); border-radius: 99px; color: var(--text); background: transparent; font: inherit; font-size: 0.9rem; }
+.speaker-queue li > button { cursor: pointer; }
+.speaker-queue li > button:hover:not(:disabled) { border-color: var(--muted); }
+.speaker-queue li.done > span, .speaker-queue li.done > button { color: var(--muted); border-color: transparent; }
+.speaker-queue li.current > span { color: var(--gold-ink); border-color: var(--gold); background: var(--gold); font-weight: 800; }
+
+/* The teacher's buttons. */
+.run-row { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-bottom: 14px; }
+.run-row > .controls { margin: 0; align-items: center; }
+
+/* The microphone on a student's device: Z and X, or the same two buttons by finger. */
+.mic-controls { display: grid; gap: 8px; margin-top: 10px; }
+.mic-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.floor-card .mic-buttons .button { margin-top: 0; justify-self: auto; }
+.mic-button { flex: 1 1 140px; min-height: 52px; gap: 10px; font-size: 1.02rem; font-weight: 700; }
+.mic-button kbd { display: inline-grid; place-items: center; min-width: 26px; height: 26px; border: 1px solid currentColor; border-radius: 6px; font: inherit; font-size: 0.86rem; line-height: 1; opacity: 0.8; }
+.mic-button[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; }
+.mic-button[aria-pressed="true"]:hover:not(:disabled) { background: var(--red); border-color: var(--red); }
+/* A phone has no Z key to remind anyone of. */
+@media (hover: none) { .mic-button kbd { display: none; } }
+.mic-state { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-height: 1.5em; font-size: 0.95rem; }
+.mic-state:empty { display: none; }
+.mic-state strong { font-weight: 700; }
+.mic-state [data-testid="mic-remaining"] { font-variant-numeric: tabular-nums; }
+.mic-interim { color: var(--muted); font-style: italic; overflow-wrap: anywhere; }
+.mic-problem { color: var(--amber); font-size: 0.88rem; }
+.mic-notice { margin: 0 0 16px; padding-left: 18px; display: grid; gap: 8px; }
+.floor-card .mic-controls p { margin: 0; }
+.mic-controls .line-input { margin-top: 0; padding-top: 0; border-top: 0; }
+.on-air { width: 10px; height: 10px; border-radius: 50%; background: var(--red); animation: on-air 1.4s ease-in-out infinite; }
+@keyframes on-air { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .on-air { animation: none; } }
+.meter { flex: 1 1 90px; max-width: 160px; height: 6px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width 0.12s linear; }
+
+/* Sorted-out notes: each statement in short, then who asked and answered what. Words on the panel, nothing boxed. */
+.notes { display: grid; gap: 18px; word-break: keep-all; overflow-wrap: anywhere; }
+.notes-part { display: grid; align-content: start; gap: 8px; min-width: 0; }
+.statement-list, .exchange-feed { display: grid; align-content: start; margin: 0; padding: 0; list-style: none; }
+.statement-list { gap: 10px; }
+.statement-list li { display: grid; grid-template-columns: 1.5em minmax(0, 1fr); gap: 2px 8px; }
+.statement-no { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.statement-list li.speaking .statement-no, .statement-list li.speaking .statement-who strong { color: var(--gold); }
+.statement-who { margin: 0; }
+.statement-who span { color: var(--muted); font-size: 0.86rem; }
+.statement-text { margin: 2px 0 0; line-height: 1.6; }
+.statement-list p, .exchange-row p { font-weight: 400; }
+.statement-who strong, .exchange-who strong { font-weight: 700; }
+.exchange-feed { gap: 12px; max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.exchange-row p { margin: 0; line-height: 1.6; }
+.exchange-who { color: var(--gold); font-size: 0.92rem; }
+.exchange-who strong { color: var(--text); font-size: 1rem; }
+.exchange-row.kind-answer { margin-left: 16px; }
+.exchange-empty { margin: 0; }
+.turn-kind { color: var(--gold); font-size: 0.86rem; font-weight: 700; }
+
+/* A small note of my own, always within reach while the desk scrolls. */
+.memo-pad { position: sticky; bottom: 0; z-index: 2; display: grid; gap: 4px; margin-top: auto; padding-block: 8px; background: var(--bg); }
+.memo-pad label { font-size: 0.9rem; font-weight: 700; }
+.memo-pad label .small { font-weight: 400; }
+.memo-pad textarea { width: 100%; resize: vertical; min-height: 54px; max-height: 30vh; padding: 8px 10px; font-size: 0.95rem; line-height: 1.5; }
+
+/* Teacher's screen during the discussion: the header, stage and controls sit on the page itself. */
+.teacher-room.discussing .teacher-main > .banner { margin: 0 0 12px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.88rem; }
+.teacher-room.discussing .phase-header { margin-bottom: 16px; padding: 0; border: 0; background: none; }
+.teacher-room.discussing .phase-title-row .eyebrow { display: none; }
+.teacher-room.discussing .phase-title-row h2 { font-family: inherit; font-size: 1.05rem; font-weight: 700; }
+.teacher-room.discussing .todo:not(.paused-note) { margin: 2px 0 0; padding: 0; background: none; color: var(--muted); font-size: 0.92rem; }
+.teacher-room.discussing .todo:not(.paused-note) strong { display: none; }
+.teacher-room.discussing .run-row { align-items: center; padding: 12px 0; border-block: 1px solid var(--line); }
+.teacher-room.discussing .run-row .button { min-height: 40px; padding: 7px 14px; font-size: 0.94rem; }
+.teacher-room.discussing .run-row .button.secondary { background: transparent; border-color: var(--line); color: var(--text); }
+.teacher-room.discussing .event-card { margin-bottom: 14px; }
+@media (min-width: 1000px) {
+  /* The side panels are folded most of the time; the discussion gets the width. */
+  .teacher-room.discussing .teacher-grid { grid-template-columns: minmax(0, 1fr) 300px; max-width: 1680px; }
+}
+
+/* The event card, once the discussion is on: as readable as the rest, not a bright sheet. */
+.event-card.collapsible { border: 1px solid var(--line); background: var(--panel); color: var(--text); box-shadow: none; }
+.event-card.collapsible .card-kind { color: var(--muted); }
+.event-card.collapsible h3 { font-family: inherit; font-size: 1rem; font-weight: 700; }
+.event-card.collapsible .chev, .event-card.collapsible small { color: var(--muted); }
+
+/* The top bars' buttons step back so the phase and the role stand out. */
+.bar-extra .button.secondary, .teacher-top .button.secondary { background: transparent; border-color: var(--line); color: var(--text); }
+.bar-extra .practice-tag, .teacher-top .practice-tag { background: none; color: var(--muted); }
+.bar-extra .button, .bar-extra .practice-tag { white-space: nowrap; }
+@media (max-width: 560px) {
+  /* A phone has room for the words, not the words and their icons. */
+  .bar-extra { min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .bar-extra .button { flex: none; padding-inline: 9px; font-size: 0.84rem; }
+  .bar-extra .button svg { display: none; }
+}
+
+/* Folding sections say so. */
+details.panel > summary::after { content: "+"; margin-left: auto; color: var(--muted); font-size: 1.15rem; font-weight: 400; line-height: 1; }
+details.panel[open] > summary::after { content: "\2212"; }
+
+/* Record and summary side by side on the shared screen. Plain on purpose: words on the panel,
+   one accent colour, nothing boxed inside a box. */
+.discussion-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-items: start; }
+.discussion-grid > .panel, .discussion-side > .panel { margin: 0; min-width: 0; }
+.discussion-side { display: grid; gap: 14px; min-width: 0; }
+.memo-title { margin: 0; font-size: 1.05rem; }
+/* Korean breaks between words here, never inside one. */
+.transcript, .summary-board { word-break: keep-all; overflow-wrap: anywhere; }
+.transcript, .summary-body { scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+
+/* The record: phase, speaker, what was said. */
+.transcript { container-type: inline-size; display: flex; flex-direction: column; margin-top: 10px; padding-right: 8px; max-height: 50vh; overflow-y: auto; overscroll-behavior: contain; }
+.transcript-columns { flex: none; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.transcript-column { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.transcript-column.vacant { display: none; }
+/* Room for three readable columns: statements on the left, then event, then rebuttal. Each scrolls by itself. */
+@container (min-width: 720px) {
+  .transcript-columns { flex: 0 1 auto; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 24px; }
+  .transcript-column { min-height: 0; padding-right: 6px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .transcript-column.vacant { display: flex; }
+  .transcript-phase { position: sticky; top: 0; z-index: 1; background: var(--panel); }
+  .transcript-column .small { margin: 0; }
+}
+.transcript .empty { margin: auto; padding: 24px 0; text-align: center; }
+.transcript-phase { margin: 0; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 0.92rem; font-weight: 700; }
+.transcript-column:has(.live) .transcript-phase { color: var(--gold); }
+.transcript-turn header { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; margin-bottom: 4px; }
+.transcript-turn.mine header strong, .transcript-turn.live header strong { color: var(--gold); }
+.turn-role { color: var(--muted); font-size: 0.86rem; }
+.turn-live { margin-left: auto; color: var(--gold); font-size: 0.8rem; font-weight: 700; }
+.transcript-line { position: relative; }
+.transcript-line + .transcript-line, .line-edit + .transcript-line, .transcript-line + .line-edit { margin-top: 6px; }
+.transcript-line p { margin: 0; font-weight: 400; line-height: 1.7; }
+/* Correcting is occasional. On touch screens the tools follow the sentence; with a pointer they take
+   no space at all until it is on the line, in the corner where a paragraph's last row is usually short. */
+.line-tools { display: inline-flex; gap: 2px; margin-left: 6px; vertical-align: middle; }
+.line-tools .icon-button { width: 34px; height: 34px; border-color: transparent; }
+@media (hover: hover) {
+  .line-tools { position: absolute; right: 0; bottom: 0; margin: 0; border-radius: 8px; background: var(--panel-2); opacity: 0; }
+  .line-tools .icon-button { width: 26px; height: 26px; border-radius: 7px; }
+  .transcript-line:hover .line-tools, .line-tools:focus-within { opacity: 1; }
+}
+.line-edit { display: flex; align-items: flex-start; gap: 4px; margin-top: 4px; }
+.line-edit textarea { flex: 1; min-width: 0; resize: vertical; }
+.line-input { display: flex; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.line-input input { flex: 1; min-width: 0; padding-block: 8px; }
+
+/* The summary: a label and its points, the same for every section. */
+.summary-empty { margin: 10px 0 0; }
+.summary-body { display: grid; align-content: start; gap: 18px; margin-top: 12px; }
+.summary-body .summary-open, .summary-body .summary-positions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px; }
+.summary-body h4 { margin: 0 0 4px; font-size: 0.92rem; font-weight: 700; }
+.summary-body ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.summary-role li, .summary-group li { position: relative; padding-left: 12px; font-weight: 400; line-height: 1.6; }
+.summary-role li::before, .summary-group li::before { content: ""; position: absolute; left: 0; top: 0.72em; width: 4px; height: 4px; border-radius: 50%; background: var(--muted); }
+.summary-note { margin: 0; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+.summary-note.warn { margin-top: 10px; color: var(--amber); }
+
+/* Read back inside a fold-out: no panel within the panel, and the page does the scrolling. */
+details.panel .summary-board { margin: 0 0 18px; padding: 0; border: 0; background: none; }
+details.panel .transcript { max-height: none; padding-right: 0; overflow: visible; }
+
+/* Classroom display: only the public picture, larger. */
+.teacher-room.present .teacher-grid { grid-template-columns: minmax(0, 1fr); max-width: none; }
+.teacher-room.present .teacher-side { display: none; }
+.teacher-room.present .transcript-line p, .teacher-room.present .summary-body li { font-size: 1.15rem; }
+.teacher-room.present .transcript-turn header strong { font-size: 1.1rem; }
+/* Fill a projector of any size without scrolling the page: --present-used is everything above and
+   around the record, including the event card when there is one. The summary has no input row. */
+.teacher-room.present { --present-used: 550px; }
+.teacher-room.present:has(.event-card.folded) { --present-used: 610px; }
+.teacher-room.present:has(.event-card:not(.folded)) { --present-used: 750px; }
+.teacher-room.present .transcript { max-height: max(180px, calc(100vh - var(--present-used))); }
+.teacher-room.present .discussion-grid .summary-body { max-height: max(240px, calc(100vh - var(--present-used) + 60px)); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
+@media (min-width: 861px) {
+  .teacher-room.present .discussion-grid { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+}
+/* One screen, no scrolling: everything that is not the discussion itself steps aside. */
+.teacher-room.present .teacher-main > .banner, .teacher-room.present .phase-header .todo { display: none; }
+.teacher-room.present .teacher-grid { padding: 10px 18px; }
+.teacher-room.present.discussing .phase-header { margin-bottom: 10px; }
+.teacher-attention { padding: 3px 10px; border-radius: 99px; color: var(--gold-ink); background: var(--amber); font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
+
+/* Student screen during the discussion: one calm panel with whose turn it is and what to do. */
+.floor-card { display: grid; gap: 4px; }
+.floor-card .eyebrow { margin: 0; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.floor-card.mine .eyebrow, .floor-card.mine .floor-name { color: var(--gold); }
+.floor-card .floor-name { margin: 0; font-family: var(--serif); font-size: 1.7rem; line-height: 1.25; overflow-wrap: anywhere; }
+.floor-card p { margin: 0; }
+.floor-card .button { justify-self: start; margin-top: 8px; }
+.role-tips { margin: 6px 0 0; padding-left: 18px; font-weight: 400; }
+.room-layout .todo-callout:not(.paused) { padding: 0; border: 0; background: none; font-weight: 400; }
+.room-layout .todo-callout:not(.paused) > span { color: var(--muted); font-weight: 600; letter-spacing: 0; }
+
+.speaking-main { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.speaking-main > * + * { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.speaking-main > .panel, .speaking-main > .event-card { margin-bottom: 0; padding-inline: 0; padding-bottom: 0; border-inline: 0; border-bottom: 0; border-radius: 0; background: none; }
+.speaking-main > .panel:first-child { padding-top: 0; border-top: 0; }
+.speaking-main > .event-card.collapsible { padding: 16px 0 0; }
+.speaking-main .event-card-head { padding: 0; }
+.speaking-main .event-card.collapsible p { margin: 8px 0 6px; font-weight: 400; }
+.speaking-main .event-card.collapsible small { margin: 0; }
+.speaking-main .role-reminder { margin: 0 0 8px; padding: 0; border: 0; background: none; font-weight: 400; }
+.speaking-main .roster li { padding: 4px 0; background: none; }
+
+.speaking-stage > * { margin-bottom: 12px; }
+
+/* 3D table off on a wide window: what to do on the left, the record beside it. Each column scrolls
+   by itself, so the current turn stays in sight without moving the page. */
+@media (min-width: 1000px) {
+  .room-layout.spread { max-width: 1760px; }
+  .student-room .room-layout.spread .desk { overflow: hidden; }
+  .student-room .desk > .speaking-stage.spread { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: 14px; margin-bottom: 12px; }
+  .speaking-stage.spread > * { margin: 0; min-height: 0; }
+  .speaking-stage.spread .speaking-main { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  /* The notes get the room, questions beside statements; the full record stays folded until someone wants it. */
+  .speaking-stage.spread .speaking-memo { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
+  .speaking-stage.spread .notes { min-height: 0; margin: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; align-content: start; }
+  .speaking-stage.spread .notes.both { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+  .speaking-stage.spread .exchange-feed { max-height: none; overflow: visible; }
+  .speaking-stage.spread .memo-fold { margin: 0; padding-block: 14px; max-height: 42vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+}
+.role-tips { margin: 6px 0 0; padding-left: 18px; }

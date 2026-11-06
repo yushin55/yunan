@@ -3,7 +3,7 @@ import type { Room } from "../types/game";
 import { PHASE_LABELS, PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 
-export default function PhaseHeader({ room, offset, todo }: { room: Room; offset: number; todo: string }) {
+export default function PhaseHeader({ room, offset, todo, hideTimer }: { room: Room; offset: number; todo: string; hideTimer?: boolean }) {
   const timer = usePhaseTimer(room, offset);
   const steps = PHASE_ORDER.filter((p) => p !== "ended");
   const index = steps.indexOf(room.phase === "ended" ? "reveal" : room.phase);
@@ -25,7 +25,7 @@ export default function PhaseHeader({ room, offset, todo }: { room: Room; offset
           </span>
           <h2>{PHASE_LABELS[room.phase]}</h2>
         </div>
-        {timer.label && (
+        {timer.label && !hideTimer && (
           <div className={`timer${urgent ? " urgent" : ""}${timer.paused ? " paused" : ""}`} role="timer" aria-label={`남은 시간 ${timer.label}`}>
             {timer.paused ? <Pause size={18} aria-hidden /> : <Timer size={18} aria-hidden />}
             <strong>{timer.label}</strong>

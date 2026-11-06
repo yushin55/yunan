@@ -57,5 +57,5 @@ def test_phases_end_at_reveal_without_real_opinion_steps():
 
 def test_removed_features_have_no_api():
     paths = " ".join(app.openapi()["paths"])
-    for removed in ("initial-position", "reflection", "rating", "guess", "react", "review-done", "report", "assist", "coach", "tone", "hint", "score", "claim", "scenario"):
+    for removed in ("initial-position", "reflection", "rating", "guess", "react", "review-done", "report", "assist", "coach", "tone", "hint", "score", "claim", "scenario", "statement", "messages"):
         assert removed not in paths, removed

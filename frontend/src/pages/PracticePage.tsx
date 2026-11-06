@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, Bot, Flag, Monitor, Play, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
+import { ArrowRight, Bot, FastForward, Flag, Monitor, Play, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
+import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
 import { TOPICS } from "../features/practice/engine";
 import { usePractice } from "../features/practice/usePractice";
@@ -13,6 +14,8 @@ import TeacherRoomPage from "./TeacherRoomPage";
 /** Try both sides of the same offline game with five computer partners. */
 export default function PracticePage() {
   const { api, teacherApi, started, begin, reset } = usePractice();
+  // There is no teacher to keep the summary fresh while the player is on the student screen.
+  useAutoSummary(api.state?.rounds.transcript ?? [], () => api.quiet("summary"));
   const [teacherView, selectTeacherView] = useState(() => {
     try {
       return sessionStorage.getItem("bridge.practice.view") === "teacher";
@@ -53,7 +56,12 @@ export default function PracticePage() {
       </button>
       {!teacherView && room.phase !== "lobby" && room.phase !== "reveal" && room.phase !== "ended" && (
         <button className="button secondary small" data-testid="practice-next" onClick={() => void api.action("next")}>
-          <SkipForward size={15} /> 다음: {PHASE_SHORT[next]}
+          <SkipForward size={15} /> {room.turn ? "다음 차례" : `다음: ${PHASE_SHORT[next]}`}
+        </button>
+      )}
+      {!teacherView && room.turn && (
+        <button className="button ghost small" data-testid="practice-skip" onClick={() => void api.action("skip-phase")}>
+          <FastForward size={15} /> {PHASE_SHORT[next]}로
         </button>
       )}
       {!teacherView && room.phase === "reveal" && (
@@ -77,6 +85,8 @@ export default function PracticePage() {
     <StudentRoomPage
       api={api}
       barControls={controls}
+      micEngine="browser"
+      allowTyping
       lobbyAction={
         prefsDone && (
           <section className="panel practice-start-panel">
@@ -93,7 +103,7 @@ export default function PracticePage() {
   );
 }
 
-/** Pick a topic card, press start, then give a nickname to sit down at the table. */
+/** Pick a topic card, press start, then give a name to sit down at the table. */
 function PracticeSetup({ onBegin }: { onBegin: (nickname: string, topicId: string | null, teacher?: boolean) => void }) {
   const [nickname, setNickname] = useState(savedNickname());
   // A topic card on the home page links here with ?topic= to preselect it.
@@ -108,7 +118,7 @@ function PracticeSetup({ onBegin }: { onBegin: (nickname: string, topicId: strin
       <span className="eyebrow">혼자 연습하기</span>
       <h1>오늘 이야기할 주제를 골라 주세요</h1>
       <p className="muted">
-        서버나 방 코드 없이 학생 화면과 선생님 화면을 바꿔 가며 한 판을 해 볼 수 있어요. 함께하는 5명은 역할 카드를 바탕으로 말하는 컴퓨터 연습 상대예요. 진행은 이 브라우저에만 저장돼요.
+        서버나 방 코드 없이 학생 화면과 선생님 화면을 바꿔 가며 한 판을 해 볼 수 있어요. 함께하는 5명은 역할 카드를 바탕으로 말하는 컴퓨터 연습 상대이고, 나는 Z와 X 또는 버튼을 눌러 마이크로 말해요. 진행은 이 브라우저에만 저장돼요.
       </p>
       <TopicPicker
         topics={TOPICS}
@@ -141,7 +151,7 @@ function PracticeSetup({ onBegin }: { onBegin: (nickname: string, topicId: strin
         </Link>
       </div>
       {asking && (
-        <Sheet title="게임에서 쓸 닉네임" onClose={() => setAsking(false)}>
+        <Sheet title="이름을 알려 주세요" onClose={() => setAsking(false)}>
           <form
             className="nickname-form"
             onSubmit={(e) => {
@@ -154,9 +164,9 @@ function PracticeSetup({ onBegin }: { onBegin: (nickname: string, topicId: strin
               {random ? <Shuffle size={15} aria-hidden /> : null} {random ? "무작위 주제" : topic?.title}
             </p>
             <label className="field-label" htmlFor="practice-nickname">
-              닉네임
+              이름
             </label>
-            <input id="practice-nickname" autoFocus value={nickname} maxLength={12} onChange={(e) => setNickname(e.target.value)} placeholder="게임에서 쓸 이름 (12자 이내)" />
+            <input id="practice-nickname" autoFocus value={nickname} maxLength={12} onChange={(e) => setNickname(e.target.value)} placeholder="내 이름 (12자 이내)" />
             <button className="button primary full large" type="submit" data-testid="practice-begin" disabled={!nickname.trim()}>
               방에 들어가기 <ArrowRight size={18} />
             </button>

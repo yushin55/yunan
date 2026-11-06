@@ -8,7 +8,8 @@
     "test:rules": "node --test tests/firestore.rules.test.mjs",
     "test:e2e": "node tests/ui-multiplayer.mjs",
     "content:sync": "node scripts/sync-practice-topics.mjs",
-    "test:practice": "node tests/ui-practice.mjs"
+    "test:practice": "node tests/ui-practice.mjs",
+    "test:voice": "node tests/ui-voice.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

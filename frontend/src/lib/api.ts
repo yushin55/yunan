@@ -1,4 +1,3 @@
-import { authenticate, useEmulators } from "./firebase";
 import type { Snapshot } from "../types/game";
 
 const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -20,10 +19,14 @@ function detail(data: unknown): string {
   return "요청을 처리하지 못했어요. 입력과 현재 단계를 확인해 주세요.";
 }
 
-export async function api<T = Snapshot>(path: string, body?: unknown): Promise<T> {
+export async function api<T = Snapshot>(path: string, body?: unknown, timeoutMs = 20000): Promise<T> {
   let token: string;
+  let useEmulators = false;
   try {
-    token = await (await authenticate()).getIdToken();
+    // Loaded only here: the offline practice mode shares this module and must never start Firebase.
+    const firebase = await import("./firebase");
+    useEmulators = firebase.useEmulators;
+    token = await (await firebase.authenticate()).getIdToken();
   } catch {
     throw new ApiError(
       useEmulators
@@ -38,7 +41,7 @@ export async function api<T = Snapshot>(path: string, body?: unknown): Promise<T
       method: body === undefined ? "GET" : "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
     throw new ApiError(`게임 서버(${base})에 연결하지 못했어요. 서버가 실행 중인지, 인터넷 연결을 확인해 주세요.`, 0);

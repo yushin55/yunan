@@ -192,6 +192,7 @@
 }
 
 .table-nick { font-weight: 800; }
+.table-order { margin-right: 5px; color: #f0cf8a; }
 
 .table-tag {
   padding: 1px 7px;
@@ -240,9 +241,6 @@
   background: inherit;
   transform: translateX(-50%) rotate(45deg);
 }
-.table-bubble.kind-question { box-shadow: 0 0 0 2px #e6b85c, 0 8px 22px #0008; }
-.table-bubble.kind-rebuttal { box-shadow: 0 0 0 2px #e7735f, 0 8px 22px #0008; }
-.table-bubble.kind-answer { box-shadow: 0 0 0 2px #7fc79c, 0 8px 22px #0008; }
 
 @keyframes bubble-in {
   from { opacity: 0; transform: translateY(6px) scale(0.96); }
@@ -274,6 +272,9 @@
 .is-narrow .table-status.waiting { background: #6f7a74; }
 .is-narrow .table-status.alert { background: #e7735f; }
 .is-narrow .table-bubble { max-width: 130px; }
+
+/* A card held up to read: the name plates must not sit on top of its words. */
+.immersive-scene.reading .immersive-scene__labels { visibility: hidden; }
 
 /* Title screen: the table is scenery only. */
 .immersive-scene.attract .immersive-scene__canvas { pointer-events: none; cursor: default; }

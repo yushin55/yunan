@@ -10,9 +10,7 @@ export default function EventCard({ event, collapsible = false, defaultOpen = tr
     <article className={`event-card${collapsible ? " collapsible" : ""}${shown ? "" : " folded"}`} aria-label={`사건 카드: ${event.title}`}>
       {collapsible ? (
         <button className="event-card-head" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
-          <span className="card-kind">
-            <Siren size={14} aria-hidden /> 사건
-          </span>
+          <span className="card-kind">사건</span>
           <h3>{event.title}</h3>
           <ChevronDown size={18} className="chev" aria-hidden />
         </button>

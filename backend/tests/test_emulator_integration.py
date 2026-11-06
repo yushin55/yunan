@@ -1,8 +1,8 @@
 """Real Auth tokens + real Firestore transactions; run with RUN_EMULATOR_TESTS=1.
 
 One teacher and six students play a whole game through the HTTP API. Concurrent
-submissions race on the same aggregate. Only the moderation mode is fixed to rules so
-the test never calls an external AI service.
+submissions race on the same aggregate. Moderation is fixed to rules and transcription to a
+stand-in so the test never calls an external AI service.
 """
 import os
 import random
@@ -30,7 +30,7 @@ def sign_up():
 
 def test_teacher_and_six_students_complete_a_game_in_firestore():
     db = firestore_client()
-    service = GameService(FirestoreRoomRepository(db), moderator=Moderator(mode="rules"), rng=random.SystemRandom())
+    service = GameService(FirestoreRoomRepository(db), moderator=Moderator(mode="rules"), rng=random.SystemRandom(), transcriber=lambda audio, mime: "제 역할의 입장을 말합니다.")
     app.dependency_overrides[game_service] = lambda: service
     teacher_token, teacher_uid = sign_up()
     students = [sign_up() for _ in range(6)]
@@ -64,22 +64,38 @@ def test_teacher_and_six_students_complete_a_game_in_firestore():
             assert "preferences" not in str(room_ref.collection("host").document("state").get().to_dict())
 
             everyone(base + "confirm-role", lambda i: {})
-            everyone(base + "statement", lambda i: {"text": f"제 역할로서 {i}번 입장을 발표합니다."})
             view = post(teacher_token, base + "sync", {})
+            assert view["room"]["phase"] == "statement"
+            for i in range(6):
+                version = view["room"]["phaseVersion"]
+                assert view["room"]["turn"]["uid"] == students[i][1]
+                # Everyone presses at once; only the student whose turn it is gets the microphone.
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    answers = list(executor.map(lambda token: api.post(base + "mic-on", json={"kind": "statement"}, headers={"Authorization": "Bearer " + token}).status_code, [students[i][0], students[(i + 1) % 6][0]]))
+                assert answers == [200, 409]
+                post(students[i][0], base + "speech", {"audio": "QUJD", "mimeType": "audio/wav", "phaseVersion": version})
+                # The speaker and the teacher finish the same turn at once; only one step happens.
+                with ThreadPoolExecutor(max_workers=2) as executor:
+                    list(executor.map(lambda token: post(token, base + ("end-turn" if token != teacher_token else "next"), {"phaseVersion": version}), [students[i][0], teacher_token]))
+                view = post(teacher_token, base + "sync", {})
+                assert view["room"]["phaseVersion"] == version + 1
             assert view["room"]["phase"] == "event" and view["room"]["event"]["title"]
-            assert len(view["rounds"]["statements"]) == 6
-            everyone(base + "messages", lambda i: {"kind": "question", "text": f"{i}번의 질문이에요", "targetUid": students[(i + 1) % 6][1]})
-            flagged = post(students[0][0], base + "messages", {"kind": "answer", "text": "닥쳐"})
-            assert flagged["moderation"]["status"] == "needs_edit"
-            post(teacher_token, base + "next", {})
-            post(teacher_token, base + "next", {})
+            # The open floor: two students race for the one microphone inside a real transaction.
+            with ThreadPoolExecutor(max_workers=6) as executor:
+                answers = list(executor.map(lambda token: api.post(base + "mic-on", json={"kind": "question"}, headers={"Authorization": "Bearer " + token}).status_code, [token for token, _ in students]))
+            assert sorted(answers) == [200, 409, 409, 409, 409, 409]
+            flagged = post(teacher_token, base + "line-add", {"text": "닥쳐"})
+            assert flagged["speech"] == "held"
+            assert room_ref.collection("publicRounds").document("transcript").get().to_dict()["items"][0]["uid"] == students[0][1]
+            post(teacher_token, base + "skip-phase", {})
+            post(teacher_token, base + "skip-phase", {})
             secrets = {uid: service.read(rid, uid)["me"]["isSwitcher"] for _, uid in students}
             switcher = next(uid for uid, flag in secrets.items() if flag)
             everyone(base + "vote", lambda i: {"targets": [switcher if students[i][1] != switcher else students[(i + 1) % 6][1]]})
             final = post(teacher_token, base + "sync", {})
             assert final["room"]["phase"] == "reveal"
             assert final["rounds"]["reveal"]["switchers"][0]["uid"] == switcher
-            assert len(final["rounds"]["chat"]) == 6  # The flagged message never became public.
+            assert len(final["rounds"]["transcript"]) == 6  # The flagged line never became public.
             post(teacher_token, base + "end", {})
             assert room_ref.get().to_dict()["phase"] == "ended"
             # Reconnecting student gets the same role after the game.

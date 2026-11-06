@@ -1,6 +1,7 @@
 export type Phase = "lobby" | "role" | "statement" | "event" | "rebuttal" | "vote" | "reveal" | "ended";
 export type TimedPhase = "role" | "statement" | "event" | "rebuttal" | "vote";
-export type MessageKind = "response" | "question" | "answer" | "rebuttal";
+export type SpeakingPhase = "statement" | "event" | "rebuttal";
+export type SpeechKind = "statement" | "question" | "rebuttal" | "answer";
 export type Viewer = "host" | "student";
 
 export interface Role {
@@ -48,6 +49,23 @@ export interface EventCard {
 export interface GameSettings {
   switcherCount: 1 | 2;
   phaseSeconds: Record<TimedPhase, number>;
+  /** How long one person can hold the microphone on the open floor (questions, answers, rebuttals). */
+  micSeconds: number;
+}
+
+/** Whose turn it is during the statements. `phaseEndsAt` is the deadline of this turn. */
+export interface Turn {
+  order: string[];
+  index: number;
+  uid: string;
+}
+
+/** The one microphone in the room. `version` is the phaseVersion what is said gets recorded under. */
+export interface Floor {
+  uid: string;
+  kind: SpeechKind;
+  version: number;
+  endsAt: number;
 }
 
 export interface Room {
@@ -65,6 +83,8 @@ export interface Room {
   topicId: string;
   topic: Topic;
   event: EventCard | null;
+  turn: Turn | null;
+  floor: Floor | null;
   settings: GameSettings;
   createdAt: number;
   endedAt: number | null;
@@ -81,24 +101,32 @@ export interface Participant {
   roleId?: string;
 }
 
-export interface StatementRow {
-  uid: string;
-  text?: string;
-  at?: number;
-  timedOut?: boolean;
-  late?: boolean;
-  viaTeacher?: boolean;
-}
-
-export interface ChatMessage {
+/** A stretch of speech, written down. Each turn can have several. */
+export interface TranscriptLine {
   id: string;
   uid: string;
-  phase: "event" | "rebuttal";
-  kind: MessageKind;
+  phase: SpeakingPhase;
+  kind: SpeechKind;
+  /** The phaseVersion of the turn it was said in. */
+  turn: number;
+  /** Order within the recording; clips can arrive out of order. */
+  clip?: number | null;
   text: string;
-  targetUid: string | null;
+  source: "voice" | "typed";
   at: number;
   viaTeacher?: boolean;
+  editedAt?: number;
+}
+
+export interface DiscussionSummary {
+  positions: { roleId: string; points: string[] }[];
+  clashes: string[];
+  questions: string[];
+  /** One short line per person who gave a statement: what goes on their card. */
+  statements?: { uid: string; text: string }[];
+  source: "ai" | "local";
+  revision: number;
+  at: number;
 }
 
 export interface Reveal {
@@ -113,23 +141,9 @@ export interface Reveal {
 }
 
 export interface Rounds {
-  statements: StatementRow[];
-  chat: ChatMessage[];
+  transcript: TranscriptLine[];
+  summary?: DiscussionSummary;
   reveal?: Reveal;
-}
-
-export type NoticeStatus = "needs_edit" | "pending_review" | "returned" | "approved" | "withdrawn";
-
-export interface Notice {
-  id: string;
-  kind: MessageKind | "statement";
-  phase: Phase;
-  status: NoticeStatus;
-  hint: string | null;
-  excerpt: string | null;
-  text: string;
-  targetUid: string | null;
-  at: number;
 }
 
 /** Visible only to the student it belongs to (Firestore privatePlayers/{uid}). */
@@ -140,22 +154,15 @@ export interface Me {
   isSwitcher: boolean | null;
   preferenceRank: 1 | 2 | null;
   vote: string[] | null;
-  notices: Notice[];
 }
 
-export interface ModerationEntry {
-  id: string;
-  uid: string;
+/** A line held back from the shared record until the teacher decides. */
+export interface ModerationEntry extends TranscriptLine {
   nickname: string;
-  kind: MessageKind | "statement";
-  phase: Phase;
-  text: string;
-  targetUid: string | null;
-  status: "flagged" | "pending_review" | "approved" | "returned" | "withdrawn";
+  status: "flagged" | "pending_review" | "approved" | "returned";
   category: "profanity" | "personal_attack" | "mockery" | null;
   excerpt: string | null;
-  source: "rules" | "ai" | "none";
-  at: number;
+  verdictSource: "rules" | "ai" | "none";
 }
 
 /** Visible only to the teacher (Firestore host/state). */
@@ -175,13 +182,6 @@ export interface Snapshot {
   serverNow?: number;
 }
 
-export interface ModerationResult {
-  status: "published" | "needs_edit" | "pending_review";
-  messageId: string;
-  hint?: string | null;
-  excerpt?: string | null;
-}
-
 export interface TopicCatalog {
   topics: Topic[];
   config: {
@@ -190,7 +190,8 @@ export interface TopicCatalog {
     switcherCounts: number[];
     defaultSwitcherCount: number;
     phaseSeconds: Record<TimedPhase, number>;
+    micSeconds: number;
     phaseSecondsRange: { min: number; max: number };
-    textLimits: { statement: number; message: number; nickname: number };
+    textLimits: { line: number; nickname: number };
   };
 }

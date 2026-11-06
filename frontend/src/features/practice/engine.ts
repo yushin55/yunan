@@ -1,7 +1,7 @@
 // Offline practice: one player plus five computer partners, kept in this browser only.
-// Mirrors the server's phases and rules; the real game never uses this code.
+// Mirrors the server's phases, turns and rules; the real game never uses this code.
 import topicData from "../../data/practiceTopics.json";
-import type { ChatMessage, EventCard, HostState, MessageKind, ModerationResult, Participant, Phase, Room, Snapshot, StatementRow, Topic } from "../../types/game";
+import type { DiscussionSummary, EventCard, HostState, ModerationEntry, Participant, Phase, Room, Snapshot, SpeakingPhase, SpeechKind, Topic, TranscriptLine } from "../../types/game";
 import { answerLine, rebuttalLine, responseLine, statementLine } from "./lines";
 import { assignRoles, buildReveal, pick, practiceCheck, shuffle, type Assigned } from "./rules";
 
@@ -9,25 +9,33 @@ interface FullTopic extends Topic {
   events: EventCard[];
   teacherGuide: HostState["teacherGuide"];
 }
-type BotAction = "confirm" | "statement" | "response" | "question" | "answer" | "rebuttal" | "vote";
+type BotAction = "confirm" | "speak" | "finish" | "vote" | "floor" | "release";
 
 export interface PracticeState {
-  version: 2;
+  version: 4;
   snapshot: Snapshot;
   prefs: Record<string, [string, string]>;
   assigned: Record<string, Assigned>;
   votes: Record<string, string[]>;
-  statements: Record<string, StatementRow>;
+  moderation: ModerationEntry[];
   eventCard: EventCard | null;
   seq: number;
-  schedule: { at: number; uid: string; action: BotAction; targetUid?: string; phaseVersion: number }[];
+  revision: number;
+  schedule: { at: number; uid: string; action: BotAction; kind?: SpeechKind; phaseVersion: number; phase?: Phase; left?: number }[];
+  /** Who spoke under each phaseVersion, so late words still go to the right person. */
+  turnLog: Record<string, { uid: string; phase: SpeakingPhase; kind: SpeechKind }>;
 }
 
 export const TOPICS = topicData as FullTopic[];
 export const ME = "me";
 const BOTS = ["하늘", "도윤", "서연", "지우", "민준"];
 const ORDER: Phase[] = ["lobby", "role", "statement", "event", "rebuttal", "vote", "reveal", "ended"];
-const SECONDS = { role: 30, statement: 90, event: 150, rebuttal: 120, vote: 60 };
+const TIMED = ["role", "statement", "event", "rebuttal", "vote"];
+const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"], rebuttal: ["rebuttal", "answer"] };
+const SECONDS = { role: 30, statement: 30, event: 120, rebuttal: 90, vote: 60 };
+const MIC_SECONDS = 30;
+// Partners leave room to get a word in, then go quiet so the player is never crowded out.
+const BOT_FLOORS = 6;
 const rng = Math.random;
 const between = (min: number, max: number) => Math.round((min + rng() * (max - min)) * 1000);
 
@@ -45,18 +53,18 @@ export function createPractice(nickname: string, topicId: string | null, now = D
   for (const uid of seats) if (uid !== ME) prefs[uid] = shuffle(roleIds, rng).slice(0, 2) as [string, string];
   const room: Room = {
     roomId: "practice", code: "연습", hostUid: "practice-teacher", phase: "lobby", phaseVersion: 0, phaseEndsAt: null, paused: false, pausedRemainingMs: null,
-    participantCount: 6, minStudents: 6, maxStudents: 8, topicId: topic.topicId, topic: publicTopic(topic), event: null,
-    settings: { switcherCount: 1, phaseSeconds: SECONDS }, createdAt: now, endedAt: null,
+    participantCount: 6, minStudents: 6, maxStudents: 8, topicId: topic.topicId, topic: publicTopic(topic), event: null, turn: null, floor: null,
+    settings: { switcherCount: 1, phaseSeconds: SECONDS, micSeconds: MIC_SECONDS }, createdAt: now, endedAt: null,
   };
   return {
-    version: 2,
+    version: 4,
     snapshot: {
       viewer: "student", room,
       participants: seats.map((uid, seat) => participant(uid, name(uid), seat)),
-      rounds: { statements: [], chat: [] },
-      me: { uid: ME, preferences: null, roleId: null, isSwitcher: null, preferenceRank: null, vote: null, notices: [] },
+      rounds: { transcript: [] },
+      me: { uid: ME, preferences: null, roleId: null, isSwitcher: null, preferenceRank: null, vote: null },
     },
-    prefs, assigned: {}, votes: {}, statements: {}, eventCard: null, seq: 0, schedule: [],
+    prefs, assigned: {}, votes: {}, moderation: [], eventCard: null, seq: 0, revision: 0, schedule: [], turnLog: {},
   };
 }
 
@@ -64,20 +72,8 @@ const topicOf = (s: PracticeState) => TOPICS.find((t) => t.topicId === s.snapsho
 
 /** Use only the public game state and the teacher's guide in the host preview. */
 export function teacherSnapshot(s: PracticeState): Snapshot {
-  const { room, participants, rounds, me } = s.snapshot;
-  return {
-    viewer: "host", room, participants, rounds,
-    host: {
-      uid: room.hostUid,
-      teacherGuide: topicOf(s).teacherGuide,
-      moderation: (me?.notices ?? []).map((notice) => ({
-        id: notice.id, uid: ME, nickname: participants.find((p) => p.uid === ME)!.nickname,
-        kind: notice.kind, phase: notice.phase, text: notice.text, targetUid: notice.targetUid,
-        status: notice.status === "needs_edit" ? "flagged" : notice.status,
-        category: null, excerpt: notice.excerpt, source: "rules", at: notice.at,
-      })),
-    },
-  };
+  const { room, participants, rounds } = s.snapshot;
+  return { viewer: "host", room, participants, rounds, host: { uid: room.hostUid, teacherGuide: topicOf(s).teacherGuide, moderation: s.moderation } };
 }
 
 const roleOf = (s: PracticeState, uid: string) => s.snapshot.room.topic.roles.find((r) => r.id === s.assigned[uid]?.roleId);
@@ -89,77 +85,148 @@ function mark(s: PracticeState, uid: string, key: string) {
   if (!p.submitted.includes(key)) p.submitted.push(key);
 }
 
+/** The one microphone. On the open floor each speaker gets their own phaseVersion, as on the server. */
+function takeFloor(s: PracticeState, uid: string, kind: SpeechKind, now: number) {
+  const room = s.snapshot.room;
+  if (!room.turn) {
+    room.phaseVersion += 1;
+    s.turnLog[room.phaseVersion] = { uid, phase: room.phase as SpeakingPhase, kind };
+  }
+  const endsAt = room.turn ? room.phaseEndsAt! : Math.min(now + room.settings.micSeconds * 1000, room.phaseEndsAt ?? Infinity);
+  room.floor = { uid, kind, version: room.phaseVersion, endsAt };
+}
+
+/** Partners talk briefly and hand over; the player keeps the turn until they finish or time runs out. */
+function planTurn(s: PracticeState, now: number) {
+  const room = s.snapshot.room;
+  const uid = room.turn!.uid;
+  s.turnLog[room.phaseVersion] = { uid, phase: "statement", kind: "statement" };
+  if (uid === ME) return;
+  takeFloor(s, uid, "statement", now);
+  s.schedule.push({ uid, action: "speak", kind: "statement", at: now + between(1, 2), phaseVersion: room.phaseVersion });
+  s.schedule.push({ uid, action: "finish", at: now + between(4, 6), phaseVersion: room.phaseVersion });
+}
+
+/** Sometime soon, a partner who has something to say goes for the microphone. */
+function planFloor(s: PracticeState, at: number, left: number) {
+  const room = s.snapshot.room;
+  if (left > 0) s.schedule.push({ uid: "", action: "floor", at, phaseVersion: room.phaseVersion, phase: room.phase, left });
+}
+
 function startPhase(s: PracticeState, phase: Phase, now: number) {
   const room = s.snapshot.room;
   const seconds = room.settings.phaseSeconds[phase as keyof typeof SECONDS];
-  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + seconds * 1000 : null, paused: false, pausedRemainingMs: null });
+  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + seconds * 1000 : null, paused: false, pausedRemainingMs: null, turn: null, floor: null });
   if (phase === "ended") room.endedAt = now;
   const v = room.phaseVersion;
-  const plan = (uid: string, action: BotAction, at: number, targetUid?: string) => s.schedule.push({ uid, action, at: now + at, targetUid, phaseVersion: v });
-  const others = (uid: string) => s.snapshot.participants.map((p) => p.uid).filter((u) => u !== uid);
+  const plan = (uid: string, action: BotAction, at: number) => s.schedule.push({ uid, action, at: now + at, phaseVersion: v });
   for (const uid of bots(s)) {
     if (phase === "role") plan(uid, "confirm", between(2, 6));
-    if (phase === "statement") plan(uid, "statement", between(6, 25));
-    if (phase === "event") plan(uid, "response", between(5, 40));
-    if (phase === "rebuttal") plan(uid, "rebuttal", between(6, 55), pick(others(uid), rng));
     if (phase === "vote") plan(uid, "vote", between(3, 12));
   }
-  if (phase === "event")
-    for (const uid of shuffle(bots(s), rng).slice(0, 3)) plan(uid, "question", between(30, 90), rng() < 0.5 ? ME : pick(others(uid), rng));
+  if (phase === "statement") {
+    const order = s.snapshot.participants.map((p) => p.uid);
+    room.turn = { order, index: 0, uid: order[0] };
+    planTurn(s, now);
+  }
+  if (phase === "event" || phase === "rebuttal") planFloor(s, now + between(3, 5), BOT_FLOORS);
+}
+
+function nextTurn(s: PracticeState, now: number) {
+  const room = s.snapshot.room;
+  const turn = room.turn;
+  if (!turn || turn.index + 1 >= turn.order.length) return false;
+  turn.index += 1;
+  turn.uid = turn.order[turn.index];
+  Object.assign(room, { phaseVersion: room.phaseVersion + 1, phaseEndsAt: now + room.settings.phaseSeconds[room.phase as keyof typeof SECONDS] * 1000, paused: false, pausedRemainingMs: null, floor: null });
+  planTurn(s, now);
+  return true;
+}
+
+function finishPhase(s: PracticeState, now: number) {
+  const room = s.snapshot.room;
+  if (room.phase === "role") for (const p of s.snapshot.participants) p.roleId = s.assigned[p.uid].roleId;
+  if (room.phase === "statement") room.event = s.eventCard;
+  if (room.phase === "vote") s.snapshot.rounds.reveal = buildReveal(s.snapshot.participants.map((p) => p.uid), s.assigned, s.votes, room.settings.switcherCount);
+  startPhase(s, ORDER[ORDER.indexOf(room.phase) + 1], now);
 }
 
 function transition(s: PracticeState, now: number) {
-  const room = s.snapshot.room;
-  if (room.phase === "role") for (const p of s.snapshot.participants) p.roleId = s.assigned[p.uid].roleId;
-  if (room.phase === "statement") {
-    s.snapshot.rounds.statements = s.snapshot.participants.map((p) => s.statements[p.uid] ?? { uid: p.uid, timedOut: true });
-    room.event = s.eventCard;
-  }
-  if (room.phase === "vote") {
-    s.snapshot.rounds.reveal = buildReveal(s.snapshot.participants.map((p) => p.uid), s.assigned, s.votes, room.settings.switcherCount);
-  }
-  startPhase(s, ORDER[ORDER.indexOf(room.phase) + 1], now);
+  if (!nextTurn(s, now)) finishPhase(s, now);
 }
 
 function allDone(s: PracticeState) {
   const phase = s.snapshot.room.phase;
   const ps = s.snapshot.participants;
   if (phase === "role") return ps.every((p) => p.submitted.includes("role"));
-  if (phase === "statement") return ps.every((p) => p.uid in s.statements);
   if (phase === "vote") return ps.every((p) => p.uid in s.votes);
   return false;
 }
 
 function settle(s: PracticeState, now: number) {
   const room = s.snapshot.room;
-  if (room.paused) return;
-  if (!["role", "statement", "event", "rebuttal", "vote"].includes(room.phase)) return;
+  if (room.paused || !TIMED.includes(room.phase)) return;
   if ((room.phaseEndsAt && now >= room.phaseEndsAt) || allDone(s)) transition(s, now);
 }
 
-function post(s: PracticeState, uid: string, kind: MessageKind, text: string, now: number, targetUid?: string) {
+function addLine(s: PracticeState, version: number, text: string, source: TranscriptLine["source"], now: number) {
+  const { uid, phase, kind } = s.turnLog[version];
   s.seq += 1;
-  const message: ChatMessage = { id: `m${s.seq}`, uid, phase: s.snapshot.room.phase as "event" | "rebuttal", kind, text, targetUid: targetUid ?? null, at: now };
-  s.snapshot.rounds.chat.push(message);
-  // Someone asked a partner a question: the partner answers shortly.
-  if (kind === "question" && targetUid && targetUid !== ME)
-    s.schedule.push({ uid: targetUid, action: "answer", at: now + between(5, 10), targetUid: uid, phaseVersion: s.snapshot.room.phaseVersion });
+  const id = `m${s.seq}`;
+  const line: TranscriptLine = { id, uid, phase, kind, turn: version, text, source, at: now };
+  const flagged = uid === ME ? practiceCheck(text) : null;
+  if (flagged) {
+    s.moderation.push({ ...line, nickname: person(s, uid).nickname, status: "flagged", category: flagged.category, excerpt: flagged.excerpt, verdictSource: "rules" });
+    return;
+  }
+  // Words that arrive after the next speaker started still go back to where they were said.
+  const lines = s.snapshot.rounds.transcript;
+  const place = lines.findIndex((l) => l.turn > version);
+  lines.splice(place < 0 ? lines.length : place, 0, line);
+  s.revision += 1;
+}
+
+function botLine(s: PracticeState, job: PracticeState["schedule"][number]) {
+  const { uid, kind } = job;
+  const role = roleOf(s, uid);
+  const switcher = s.assigned[uid]?.isSwitcher ?? false;
+  const room = s.snapshot.room;
+  if (!role) return "";
+  if (kind === "statement") return statementLine(role, switcher, rng);
+  if (kind === "question") return pick(room.topic.questionPrompts, rng);
+  if (kind === "answer") return room.phase === "event" && s.eventCard && rng() < 0.5 ? responseLine(role, s.eventCard, switcher, rng) : answerLine(role, switcher, rng);
+  const target = pick(s.snapshot.participants.map((p) => p.uid).filter((u) => u !== uid), rng);
+  return rebuttalLine(role, person(s, target).nickname, roleOf(s, target), switcher, rng);
+}
+
+/** A partner takes the free microphone: an answer if the last person asked something, otherwise the phase's own kind of speech. */
+function runFloor(s: PracticeState, job: PracticeState["schedule"][number], now: number) {
+  const room = s.snapshot.room;
+  if (room.floor && room.floor.endsAt > now) {
+    planFloor(s, now + 1500, job.left!);
+    return;
+  }
+  const previous = s.turnLog[room.phaseVersion];
+  const answering = previous?.phase === room.phase && previous.kind !== "answer";
+  const kind = answering ? "answer" : MIC_KINDS[room.phase]![0];
+  const uid = pick(bots(s).filter((u) => u !== previous?.uid), rng);
+  takeFloor(s, uid, kind, now);
+  s.schedule.push({ uid, action: "speak", kind, at: now + between(1, 2), phaseVersion: room.phaseVersion });
+  s.schedule.push({ uid, action: "release", at: now + between(4, 6), phaseVersion: room.phaseVersion });
+  planFloor(s, now + between(8, 13), job.left! - 1);
 }
 
 function runBot(s: PracticeState, job: PracticeState["schedule"][number], now: number) {
   const { uid } = job;
-  const role = roleOf(s, uid);
   const switcher = s.assigned[uid]?.isSwitcher ?? false;
   if (job.action === "confirm") mark(s, uid, "role");
-  if (job.action === "statement" && role) {
-    s.statements[uid] = { uid, text: statementLine(role, switcher, rng), at: now };
-    mark(s, uid, "statement");
+  if (job.action === "speak") {
+    const text = botLine(s, job);
+    if (text) addLine(s, job.phaseVersion, text, "voice", now);
   }
-  if (job.action === "response" && role && s.eventCard) post(s, uid, "response", responseLine(role, s.eventCard, switcher, rng), now);
-  if (job.action === "question") post(s, uid, "question", pick(s.snapshot.room.topic.questionPrompts, rng), now, job.targetUid);
-  if (job.action === "answer" && role) post(s, uid, "answer", answerLine(role, switcher, rng), now, job.targetUid);
-  if (job.action === "rebuttal" && role && job.targetUid)
-    post(s, uid, "rebuttal", rebuttalLine(role, person(s, job.targetUid).nickname, roleOf(s, job.targetUid), switcher, rng), now, job.targetUid);
+  if (job.action === "finish") transition(s, now);
+  if (job.action === "release" && s.snapshot.room.floor?.uid === uid) s.snapshot.room.floor = null;
+  if (job.action === "floor") runFloor(s, job, now);
   if (job.action === "vote") {
     const others = s.snapshot.participants.map((p) => p.uid).filter((u) => u !== uid);
     const switchers = others.filter((u) => s.assigned[u].isSwitcher);
@@ -168,6 +235,23 @@ function runBot(s: PracticeState, job: PracticeState["schedule"][number], now: n
     s.votes[uid] = [target];
     mark(s, uid, "vote");
   }
+}
+
+/** A simple stand-in for the AI summary: each role's latest words, without any judgement. */
+function localSummary(s: PracticeState): DiscussionSummary {
+  const lines = s.snapshot.rounds.transcript;
+  const roles = new Map<string, string[]>();
+  const short = (text: string) => (text.length > 60 ? `${text.slice(0, 60)}…` : text);
+  for (const line of lines) {
+    const roleId = person(s, line.uid).roleId;
+    if (roleId) roles.set(roleId, [...(roles.get(roleId) ?? []), short(line.text)].slice(-2));
+  }
+  const questions = lines.filter((l) => l.kind === "question").map((l) => short(l.text));
+  const statements = s.snapshot.participants.flatMap((p) => {
+    const said = lines.filter((l) => l.uid === p.uid && l.kind === "statement").map((l) => l.text);
+    return said.length ? [{ uid: p.uid, text: short(said.join(" ")) }] : [];
+  });
+  return { positions: [...roles].map(([roleId, points]) => ({ roleId, points: [...new Set(points)] })), clashes: [], questions: [...new Set(questions)].slice(-3), statements, source: "local", revision: s.revision, at: Date.now() };
 }
 
 /** Advance time: run partner actions that are due, then check the phase deadline. */
@@ -179,7 +263,12 @@ export function tick(state: PracticeState, now = Date.now()): PracticeState | nu
   if (!due.length && !expired) return null;
   const s = structuredClone(state);
   s.schedule = s.schedule.filter((j) => j.at > now);
-  for (const job of due.sort((a, b) => a.at - b.at)) if (job.phaseVersion === s.snapshot.room.phaseVersion) runBot(s, job, now);
+  for (const job of due.sort((a, b) => a.at - b.at)) {
+    const current = s.snapshot.room;
+    // Words already spoken still get written down; everything else is for the moment it was planned for.
+    const timely = job.action === "speak" ? current.phase === s.turnLog[job.phaseVersion]?.phase : job.action === "floor" ? current.phase === job.phase : current.phaseVersion === job.phaseVersion;
+    if (timely) runBot(s, job, now);
+  }
   settle(s, now);
   return s;
 }
@@ -187,13 +276,18 @@ export function tick(state: PracticeState, now = Date.now()): PracticeState | nu
 export class PracticeError extends Error {}
 
 /** The player's (and the stand-in teacher's) actions. Mirrors the server's checks. */
-export function act(state: PracticeState, name: string, body: Record<string, unknown>, now = Date.now()): { state: PracticeState; moderation?: ModerationResult } {
+export function act(state: PracticeState, name: string, body: Record<string, unknown>, now = Date.now()): { state: PracticeState } {
   const s = structuredClone(state);
   const room = s.snapshot.room;
   const me = s.snapshot.me!;
   const fail = (message: string): never => {
     throw new PracticeError(message);
   };
+  // Scheduled delays are stored relative while paused, so partners resume at the same pace.
+  const unpauseJobs = () => {
+    if (room.paused) for (const job of s.schedule) job.at += now;
+  };
+  const stale = body.phaseVersion !== undefined && body.phaseVersion !== room.phaseVersion;
   settle(s, now);
   if (name === "sync") return { state: s };
   if (name === "preferences") {
@@ -213,12 +307,12 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     return { state: s };
   }
   if (name === "pause" || name === "resume" || name === "extend") {
-    if (!["role", "statement", "event", "rebuttal", "vote"].includes(room.phase)) fail("지금은 시간을 조작할 수 없는 단계예요.");
+    if (!TIMED.includes(room.phase)) fail("지금은 시간을 조작할 수 없는 단계예요.");
     if (name === "pause" && !room.paused) {
       room.pausedRemainingMs = Math.max(0, (room.phaseEndsAt ?? now) - now);
       room.phaseEndsAt = null;
       room.paused = true;
-      // Store remaining delays while paused, so partners resume at the same pace.
+      room.floor = null;
       for (const job of s.schedule) job.at -= now;
     } else if (name === "resume" && room.paused) {
       room.phaseEndsAt = now + (room.pausedRemainingMs ?? 0);
@@ -230,6 +324,7 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
       if (!Number.isFinite(seconds) || seconds < 10 || seconds > 300) fail("연장 시간은 10~300초로 정해 주세요.");
       if (room.paused) room.pausedRemainingMs = (room.pausedRemainingMs ?? 0) + seconds * 1000;
       else room.phaseEndsAt = (room.phaseEndsAt ?? now) + seconds * 1000;
+      if (room.turn && room.floor) room.floor.endsAt = room.phaseEndsAt!;
     }
     return { state: s };
   }
@@ -238,17 +333,71 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     return { state: s };
   }
   if (name === "next") {
-    if (room.paused) {
-      for (const job of s.schedule) job.at += now;
-    }
+    if (stale) return { state: s };
+    unpauseJobs();
     if (room.phase === "reveal") startPhase(s, "ended", now);
     else if (room.phase !== "lobby" && room.phase !== "ended") transition(s, now);
     return { state: s };
   }
+  if (name === "skip-phase") {
+    if (stale) return { state: s };
+    if (!TIMED.includes(room.phase)) fail("지금은 다음 단계로 넘길 수 없어요.");
+    unpauseJobs();
+    finishPhase(s, now);
+    return { state: s };
+  }
+  if (name === "speaker") {
+    const turn = room.turn;
+    const target = String(body.targetUid);
+    if (!turn) return fail("차례대로 말하는 단계에서만 차례를 줄 수 있어요.");
+    if (stale || target === turn.uid) return { state: s };
+    unpauseJobs();
+    turn.order = [...turn.order.slice(0, turn.index + 1), target, ...turn.order.slice(turn.index + 1).filter((u) => u !== target)];
+    nextTurn(s, now);
+    return { state: s };
+  }
+  if (name === "line-add") {
+    const version = body.phaseVersion === undefined ? room.phaseVersion : Number(body.phaseVersion);
+    if (!s.turnLog[version]) fail("지금 말하는 사람이 없어요.");
+    addLine(s, version, String(body.text ?? "").trim(), "typed", now);
+    return { state: s };
+  }
+  if (name === "line-edit" || name === "line-delete") {
+    const lines = s.snapshot.rounds.transcript;
+    const line = lines.find((l) => l.id === body.lineId);
+    if (!line) return fail("이미 지운 발언이에요.");
+    if (name === "line-edit") line.text = String(body.text).trim();
+    else lines.splice(lines.indexOf(line), 1);
+    s.revision += 1;
+    return { state: s };
+  }
+  if (name === "summary") {
+    if (s.snapshot.rounds.transcript.length && s.snapshot.rounds.summary?.revision !== s.revision) s.snapshot.rounds.summary = localSummary(s);
+    return { state: s };
+  }
+  if (name === "mic-off") {
+    if (room.floor?.uid === ME && !stale) room.floor = null;
+    return { state: s };
+  }
   if (room.paused) fail("선생님이 진행을 잠시 멈췄어요.");
+  if (name === "mic-on") {
+    const kind = body.kind as SpeechKind;
+    if (!MIC_KINDS[room.phase]?.includes(kind)) fail("지금은 이 버튼으로 마이크를 켤 수 없어요.");
+    if (room.floor && room.floor.endsAt > now) {
+      if (room.floor.uid === ME && room.floor.kind === kind) return { state: s };
+      fail(`${person(s, room.floor.uid).nickname}님이 말하고 있어요. 끝나면 마이크를 켤 수 있어요.`);
+    }
+    if (room.turn && room.turn.uid !== ME) fail("내 차례가 오면 마이크를 켤 수 있어요.");
+    takeFloor(s, ME, kind, now);
+    return { state: s };
+  }
   if (name === "confirm-role") {
     if (room.phase === "role") mark(s, ME, "role");
     settle(s, now);
+    return { state: s };
+  }
+  if (name === "end-turn") {
+    if (room.turn?.uid === ME && !stale) transition(s, now);
     return { state: s };
   }
   if (name === "vote") {
@@ -260,28 +409,6 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     mark(s, ME, "vote");
     settle(s, now);
     return { state: s };
-  }
-  if (name === "statement" || name === "messages") {
-    const text = String(body.text ?? "").trim();
-    const kind = (name === "statement" ? "statement" : body.kind) as MessageKind | "statement";
-    if (name === "statement" && room.phase !== "statement") fail("입장 발표 시간이 끝났어요.");
-    if (name === "messages" && room.phase !== "event" && room.phase !== "rebuttal") fail("지금은 채팅으로 발언하는 단계가 아니에요.");
-    s.seq += 1;
-    const id = `m${s.seq}`;
-    const flagged = practiceCheck(text);
-    if (flagged) {
-      me.notices.push({ id, kind, phase: room.phase, status: "needs_edit", hint: flagged.hint, excerpt: flagged.excerpt, text, targetUid: (body.targetUid as string) ?? null, at: now });
-      return { state: s, moderation: { status: "needs_edit", messageId: id, hint: flagged.hint, excerpt: flagged.excerpt } };
-    }
-    if (name === "statement") {
-      s.statements[ME] = { uid: ME, text, at: now };
-      mark(s, ME, "statement");
-      settle(s, now);
-    } else {
-      s.seq -= 1; // post() assigns the id
-      post(s, ME, kind as MessageKind, text, now, (body.targetUid as string) || undefined);
-    }
-    return { state: s, moderation: { status: "published", messageId: id } };
   }
   return { state: s };
 }

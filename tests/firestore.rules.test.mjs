@@ -67,7 +67,7 @@ before(async () => {
           notices: [],
         });
       }
-      batch.set(doc(db, `${root}/publicRounds/chat`), { items: [] });
+      batch.set(doc(db, `${root}/publicRounds/transcript`), { items: [] });
       batch.set(doc(db, `${root}/host/state`), { moderation: [], teacherGuide: { summary: 'guide' } });
       batch.set(doc(db, `${root}/internal/state`), { votes: { alice: ['bob'] } });
     }
@@ -84,7 +84,7 @@ describe('room membership', () => {
     for (const db of [teacher, alice, bob]) {
       await assertSucceeds(getDoc(doc(db, base)));
       await assertSucceeds(getDocs(collection(db, `${base}/participants`)));
-      await assertSucceeds(getDoc(doc(db, `${base}/publicRounds/chat`)));
+      await assertSucceeds(getDoc(doc(db, `${base}/publicRounds/transcript`)));
     }
   });
 
@@ -92,7 +92,7 @@ describe('room membership', () => {
     for (const db of [outsider, anonymous]) {
       await assertFails(getDoc(doc(db, base)));
       await assertFails(getDocs(collection(db, `${base}/participants`)));
-      await assertFails(getDoc(doc(db, `${base}/publicRounds/chat`)));
+      await assertFails(getDoc(doc(db, `${base}/publicRounds/transcript`)));
     }
     await assertFails(getDoc(doc(alice, `rooms/${otherRoomId}`)));
     await assertFails(getDoc(doc(teacher, `rooms/${otherRoomId}/participants/bob`)));
@@ -130,7 +130,7 @@ describe('writes', () => {
       await assertFails(updateDoc(doc(db, base), { phase: 'reveal' }));
       await assertFails(setDoc(doc(db, `${base}/participants/alice`), { roleId: 'cctv_parent_rep' }));
       await assertFails(updateDoc(doc(db, `${base}/privatePlayers/alice`), { isSwitcher: false }));
-      await assertFails(setDoc(doc(db, `${base}/publicRounds/chat`), { items: [{ text: 'unmoderated' }] }));
+      await assertFails(setDoc(doc(db, `${base}/publicRounds/transcript`), { items: [{ text: 'unmoderated' }] }));
       await assertFails(deleteDoc(doc(db, `${base}/host/state`)));
       await assertFails(setDoc(doc(db, 'rooms/new-room'), { hostUid: 'alice' }));
     }

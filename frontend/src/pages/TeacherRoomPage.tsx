@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Flag, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
+import { BookOpen, FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
 import EventCard from "../components/EventCard";
 import PhaseHeader from "../components/PhaseHeader";
-import ChatFeed from "../features/chat/ChatFeed";
-import { PHASE_LABELS, PHASE_ORDER, TEACHER_TODO, TIMED } from "../features/game/phases";
-import StatementBoard from "../features/game/StatementBoard";
+import { StatementList } from "../features/discussion/DiscussionNotes";
+import { useFloor } from "../features/discussion/floor";
+import SpeakerStage from "../features/discussion/SpeakerStage";
+import SummaryBoard from "../features/discussion/SummaryBoard";
+import TranscriptFeed, { LineInput } from "../features/discussion/TranscriptFeed";
+import { useAutoSummary } from "../features/discussion/useAutoSummary";
+import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RoomCode from "../features/room/RoomCode";
@@ -27,13 +31,21 @@ function useServerNow(offset: number) {
 }
 
 export default function TeacherRoomPage({ api, practice = false, barControls }: { api: RoomApi; practice?: boolean; barControls?: React.ReactNode }) {
-  const { state, action, busy, error, offset, online } = api;
+  const { state, action, quiet, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const host = state!.host!;
   const { catalog } = useTopics(!practice);
   const [changingTopic, setChangingTopic] = useState(false);
+  const [present, setPresent] = useState(false);
   const serverNow = useServerNow(offset);
   const phase = room.phase;
+  const speaking = SPEAKING.includes(phase);
+  const turn = room.turn;
+  const { floor } = useFloor(room, offset);
+  const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
+  const upcoming = turn && turn.index + 1 < turn.order.length ? participants.find((p) => p.uid === turn.order[turn.index + 1]) : undefined;
+  const toReview = host.moderation.filter((e) => e.status === "flagged" || e.status === "pending_review").length;
+  const summaryStatus = useAutoSummary(rounds.transcript, () => quiet("summary"));
   const next = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1];
   const count = participants.length;
   const waiting = participants.filter((p) => !p.prefsDone).length;
@@ -45,7 +57,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
   const submittedNow = (key: string) => participants.filter((p) => p.submitted.includes(key)).length;
 
   return (
-    <main className="teacher-room">
+    <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}${present ? " present" : ""}`}>
       <header className="teacher-top">
         <span className="brand-mark">
           브릿지<span>.</span>
@@ -57,6 +69,12 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
         <span className="code-chip">
           방 코드 <strong>{room.code}</strong>
         </span>
+        {present && toReview > 0 && <span className="teacher-attention" data-testid="review-badge">확인할 발언 {toReview}</span>}
+        {phase !== "lobby" && (
+          <button className="button ghost small" data-testid="present-toggle" aria-pressed={present} onClick={() => setPresent((v) => !v)}>
+            {present ? <Minimize2 size={15} /> : <Maximize2 size={15} />} {present ? "선생님 패널 보기" : "교실 화면으로 크게"}
+          </button>
+        )}
         {barControls && <div className="teacher-practice-controls">{barControls}</div>}
         <span className={`net ${online ? "on" : "off"}`}>{online ? <Wifi size={16} aria-label="연결됨" /> : <WifiOff size={16} aria-label="연결 끊김" />}</span>
       </header>
@@ -69,13 +87,16 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               {phase === "lobby" && waiting > 0 && " 학생 화면에서 브리핑을 보고 선호 역할을 고르면 시작할 수 있어요."}
             </p>
           )}
-          <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} />
+          <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} hideTimer={Boolean(turn)} />
           {error && (
             <p className="error-box" role="alert">
               {error}
             </p>
           )}
 
+          {speaking && <SpeakerStage room={room} participants={participants} offset={offset} busy={busy} onCall={(uid) => void action("speaker", { targetUid: uid, phaseVersion: room.phaseVersion })} />}
+
+          <div className="run-row">
           {phase === "lobby" ? (
             <div className="controls">
               <button className="button primary large" data-testid="start-game" disabled={busy || blockers.length > 0} onClick={() => void action("start")}>
@@ -107,7 +128,16 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
                     <Plus size={17} /> 1분 연장
                   </button>
                 )}
-                {phase === "reveal" ? (
+                {turn && (
+                  <button className="button ghost" data-testid="next-phase" disabled={busy} onClick={() => void action("skip-phase", { phaseVersion: room.phaseVersion })}>
+                    <FastForward size={17} /> 건너뛰고 {PHASE_LABELS[next]}
+                  </button>
+                )}
+                {turn ? (
+                  <button className="button primary" data-testid="next-turn" disabled={busy} onClick={() => void action("next", { phaseVersion: room.phaseVersion })}>
+                    <SkipForward size={17} /> {upcoming ? `다음 차례: ${upcoming.nickname}` : `다음 단계: ${PHASE_LABELS[next]}`}
+                  </button>
+                ) : phase === "reveal" ? (
                   <button className="button primary" disabled={busy} onClick={() => void action("end")}>
                     <Flag size={17} /> 게임 종료
                   </button>
@@ -119,8 +149,9 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               </div>
             )
           )}
+          </div>
 
-          {participants.length > 0 && (
+          {participants.length > 0 && !speaking && (
             <div className="teacher-table" aria-label="원탁 보기">
               <TableView room={room} participants={participants} rounds={rounds} offset={offset} />
             </div>
@@ -163,6 +194,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
                     <LobbySettings
                       key={JSON.stringify(room.settings)}
                       settings={room.settings}
+                      students={Math.max(count, room.minStudents)}
                       range={catalog?.config.phaseSecondsRange ?? { min: 20, max: 900 }}
                       busy={busy}
                       onSave={(settings) => void action("settings", settings as unknown as Record<string, unknown>)}
@@ -173,10 +205,10 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
             </>
           )}
 
-          {(phase === "role" || phase === "statement" || phase === "vote") && (
+          {(phase === "role" || phase === "vote") && (
             <section className="panel progress-panel">
               <h3>
-                {phase === "role" ? "역할을 확인한 학생" : phase === "statement" ? "입장 발표를 낸 학생" : "투표한 학생"}{" "}
+                {phase === "role" ? "역할을 확인한 학생" : "투표한 학생"}{" "}
                 <strong data-testid="progress-count">
                   {submittedNow(phase)}/{count}
                 </strong>
@@ -185,33 +217,52 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
                 <i style={{ width: `${(submittedNow(phase) / Math.max(1, count)) * 100}%` }} />
               </div>
               <p className="muted small">
-                {phase === "statement"
-                  ? "발표 내용은 모두 내거나 시간이 끝나면 한꺼번에 공개돼요."
-                  : phase === "vote"
-                    ? "누가 누구에게 투표했는지는 결과 공개 때 함께 보여요."
-                    : "역할과 역할 전환 여부는 각 학생 화면에만 보여요. 선생님 화면에도 표시되지 않아요."}
+                {phase === "vote" ? "누가 누구에게 투표했는지는 결과 공개 때 함께 보여요." : "역할과 역할 전환 여부는 각 학생 화면에만 보여요. 선생님 화면에도 표시되지 않아요."}
               </p>
             </section>
           )}
 
-          {(phase === "event" || phase === "rebuttal") && (
-            <>
-              {room.event && <EventCard event={room.event} />}
-              <details className="panel">
-                <summary>입장 발표 ({rounds.statements.filter((r) => !r.timedOut).length}명)</summary>
-                <StatementBoard rows={rounds.statements} participants={participants} topic={room.topic} />
-              </details>
-              <section className="panel chat-panel">
-                <h3>토론 채팅</h3>
-                <ChatFeed messages={rounds.chat} participants={participants} topic={room.topic} emptyText="아직 발언이 없어요." />
+          {room.event && (phase === "event" || phase === "rebuttal") && <EventCard key={phase} event={room.event} collapsible defaultOpen={phase === "event"} />}
+
+          {(speaking || phase === "vote") && (
+            <div className="discussion-grid">
+              <section className="panel" data-testid="transcript-panel">
+                <h3 className="memo-title">발언 기록</h3>
+                <TranscriptFeed
+                  lines={rounds.transcript}
+                  participants={participants}
+                  topic={room.topic}
+                  speakingUid={speaker?.uid}
+                  emptyText="학생이 마이크를 켜고 말하면 여기에 글로 기록돼요."
+                  disabled={busy}
+                  onEdit={(lineId, text) => void action("line-edit", { lineId, text })}
+                  onDelete={(lineId) => void action("line-delete", { lineId })}
+                />
+                {speaking && speaker && <LineInput speaker={speaker.nickname} disabled={busy} onAdd={(text) => void action("line-add", { text, phaseVersion: room.phaseVersion })} />}
               </section>
-            </>
+              <div className="discussion-side">
+                <section className="panel">
+                  <h3 className="memo-title">입장 발표 정리</h3>
+                  <StatementList room={room} participants={participants} rounds={rounds} />
+                </section>
+                <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />
+              </div>
+            </div>
           )}
 
           {(phase === "reveal" || phase === "ended") && rounds.reveal && (
             <section className="panel">
               <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} />
             </section>
+          )}
+          {(phase === "reveal" || phase === "ended") && rounds.transcript.length > 0 && (
+            <>
+              <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />
+              <details className="panel">
+                <summary>전체 발언 기록 다시 보기</summary>
+                <TranscriptFeed lines={rounds.transcript} participants={participants} topic={room.topic} />
+              </details>
+            </>
           )}
           {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
         </div>
@@ -223,13 +274,13 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               {practice ? <p className="muted">연습용 방에는 다른 학생이 입장할 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 표시돼요.</p> : <RoomCode code={room.code} large />}
             </section>
           )}
-          <section className="panel">
-            <h3>
+          <details className="panel" open={!speaking}>
+            <summary>
               참여 현황{" "}
               <span className="muted small">
                 {count}명 · {room.minStudents}~{room.maxStudents}명
               </span>
-            </h3>
+            </summary>
             <ParticipationBoard
               room={room}
               participants={participants}
@@ -238,7 +289,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               busy={busy}
               onKick={phase === "lobby" && !practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
             />
-          </section>
+          </details>
           <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
           <details className="panel guide">
             <summary>

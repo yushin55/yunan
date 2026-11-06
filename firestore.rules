@@ -21,12 +21,12 @@ service cloud.firestore {
         allow read: if member(roomId);
         allow write: if false;
       }
-      // Published statements, moderated chat and, after voting, the reveal.
+      // The moderated discussion record, its summary and, after voting, the reveal.
       match /publicRounds/{roundId} {
         allow read: if member(roomId);
         allow write: if false;
       }
-      // Role preferences, assigned role, switcher status, own vote and moderation notices:
+      // Role preferences, assigned role, switcher status and own vote:
       // the student alone. The teacher cannot read these either.
       match /privatePlayers/{uid} {
         allow get: if isStudent(roomId) && request.auth.uid == uid;

@@ -17,22 +17,19 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
         service.action(rid, uid, "confirm-role", {})
     assert service.repository.read(rid)["room"]["phase"] == "statement"
     seen.append("statement")
-    for i, uid in enumerate(uids):
-        result = service.post_text(rid, uid, "statement", {"text": f"저는 제 역할의 입장에서 {i}번 의견을 말합니다."})
-        assert result["moderation"]["status"] == "published"
+    service.transcriber = lambda audio, mime: "제 역할의 입장에서 말합니다."
+    for uid in uids:
+        version = service.action(rid, uid, "mic-on", {"kind": "statement"})["room"]["phaseVersion"]
+        assert service.speech(rid, uid, {"audio": "QUJD", "mimeType": "audio/wav", "phaseVersion": version})["speech"] == "published"
+        service.action(rid, uid, "end-turn", {})
     state = service.repository.read(rid)
     assert state["room"]["phase"] == "event"
     seen.append("event")
     assert state["room"]["event"]["title"]
-    assert [row["uid"] for row in state["rounds"]["statements"]] == uids  # Seat order.
-    service.post_text(rid, uids[0], "response", {"kind": "response", "text": "사건에 대한 제 역할의 대응입니다."})
-    service.post_text(rid, uids[1], "question", {"kind": "question", "text": "진짜 그렇게 생각하세요?", "targetUid": uids[0]})
-    service.post_text(rid, uids[0], "answer", {"kind": "answer", "text": "네, 제 역할의 목표 때문이에요.", "targetUid": uids[1]})
+    assert [line["uid"] for line in state["rounds"]["transcript"]] == uids  # Seat order.
     service.action(rid, TEACHER, "next", {})
     seen.append("rebuttal")
-    service.post_text(rid, uids[2], "rebuttal", {"kind": "rebuttal", "text": "그 대응은 학생 의견을 충분히 듣지 않았다고 생각해요.", "targetUid": uids[0]})
-    with pytest.raises(HTTPException):
-        service.post_text(rid, uids[2], "response", {"kind": "response", "text": "사건 대응은 이전 단계 발언이에요."})
+    assert service.repository.read(rid)["room"]["phase"] == "rebuttal"
     service.action(rid, TEACHER, "next", {})
     seen.append("vote")
     state = service.repository.read(rid)
@@ -45,7 +42,6 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
     seen.append("reveal")
     reveal = state["rounds"]["reveal"]
     assert reveal["switchers"][0]["uid"] == switcher and reveal["outcome"] == "found"
-    assert [m["kind"] for m in state["rounds"]["chat"]] == ["response", "question", "answer", "rebuttal"]
     service.action(rid, TEACHER, "end", {})
     seen.append("ended")
     assert seen == PHASES
@@ -121,7 +117,7 @@ def test_only_the_teacher_runs_the_game_and_only_students_play(client, game):
     actor[0] = TEACHER
     assert api.post(f"/api/rooms/{rid}/preferences", json={"first": role_ids(service, rid)[0], "second": role_ids(service, rid)[1]}).status_code == 403
     assert api.post(f"/api/rooms/{rid}/start", json={}).status_code == 200
-    assert api.post(f"/api/rooms/{rid}/statement", json={"text": "선생님 발언"}).status_code == 403
+    assert api.post(f"/api/rooms/{rid}/end-turn", json={}).status_code == 403
     code = service.repository.read(rid)["room"]["code"]
     assert api.post("/api/rooms/join", json={"nickname": "선생님", "code": code}).status_code == 409
 
@@ -148,46 +144,13 @@ def test_timeouts_never_stall_the_game(game):
     service, clock = game
     rid, uids = started_room(service)
     expire(service, clock, rid)  # Nobody confirmed the role.
-    service.post_text(rid, uids[0], "statement", {"text": "저만 발표했어요."})
-    state = expire(service, clock, rid)
-    assert state["room"]["phase"] == "event"
-    rows = state["rounds"]["statements"]
-    assert rows[0]["text"] == "저만 발표했어요." and all(r.get("timedOut") for r in rows[1:])
-    expire(service, clock, rid)
-    expire(service, clock, rid)
+    while service.repository.read(rid)["room"]["phase"] != "vote":  # Nobody spoke; every turn just runs out.
+        expire(service, clock, rid)
     service.action(rid, uids[0], "vote", {"targets": [uids[1]]})
     state = expire(service, clock, rid)
     assert state["room"]["phase"] == "reveal"
     ballots = {b["uid"]: b for b in state["rounds"]["reveal"]["ballots"]}
     assert ballots[uids[0]]["voted"] and not ballots[uids[1]]["voted"]
-
-
-def test_late_submission_after_deadline_is_rejected_and_phase_moves(game):
-    service, clock = game
-    rid, uids = started_room(service)
-    to_phase(service, rid, "statement")
-    clock[0] = service.repository.read(rid)["room"]["phaseEndsAt"] + 5
-    with pytest.raises(HTTPException) as error:
-        service.post_text(rid, uids[0], "statement", {"text": "늦었어요"})
-    assert error.value.status_code == 409
-
-
-def test_pause_freezes_timer_and_submissions(game):
-    service, clock = game
-    rid, uids = started_room(service)
-    to_phase(service, rid, "statement")
-    remaining = service.repository.read(rid)["room"]["phaseEndsAt"] - clock[0]
-    service.action(rid, TEACHER, "pause", {})
-    clock[0] += 10 * 60 * 1000
-    state = service.action(rid, TEACHER, "sync", {"phaseVersion": service.repository.read(rid)["room"]["phaseVersion"]})
-    assert state["room"]["phase"] == "statement" and state["room"]["paused"]
-    with pytest.raises(HTTPException) as error:
-        service.post_text(rid, uids[0], "statement", {"text": "멈춘 동안"})
-    assert "멈췄" in error.value.detail
-    room = service.action(rid, TEACHER, "resume", {})["room"]
-    assert room["phaseEndsAt"] - clock[0] == remaining
-    room = service.action(rid, TEACHER, "extend", {"seconds": 60})["room"]
-    assert room["phaseEndsAt"] - clock[0] == remaining + 60_000
 
 
 def test_teacher_can_tune_phase_seconds_and_remove_students_in_lobby(game):

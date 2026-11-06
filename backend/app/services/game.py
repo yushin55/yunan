@@ -6,16 +6,20 @@ import uuid
 from fastapi import HTTPException
 
 from app.repositories.topics import find_topic, load_game_config, load_topics, public_topic
+from app.services.ai import AIUnavailable
+from app.services.discussion import build_summary, transcribe
 from app.services.moderation import Moderator, check_rate, validate_text_fields
-from app.services.phase_engine import CHAT_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.phase_engine import MAX_TURNS, MIC_KINDS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
-HOST_ACTIONS = {"settings", "kick", "start", "pause", "resume", "next", "extend", "end", "review"}
-STUDENT_ACTIONS = {"preferences", "confirm-role", "vote"}
-MAX_CHAT = 400
-MAX_PER_PHASE = 40
+HOST_ACTIONS = {"settings", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete"}
+STUDENT_ACTIONS = {"preferences", "confirm-role", "end-turn", "mic-on", "mic-off", "vote"}
+MAX_LINES = 300
 MAX_LOG = 100
-MAX_NOTICES = 10
+MAX_FLOORS = 300  # The log of who spoke lives in the room document, which has a size limit.
+LINE_LIMIT = 400
+LATEST = 10 ** 9  # Typed lines have no clip number; they follow what the microphone caught in that turn.
+LATE_AUDIO_MS = 90_000  # Audio said in time can still be on its way, with one retry, after the floor moved on.
 
 
 def _student(uid, nickname, seat, now):
@@ -24,15 +28,17 @@ def _student(uid, nickname, seat, now):
 
 def _private():
     # Preferences and switcher status live only here (readable by the student alone) and in the server aggregate.
-    return {"preferences": None, "roleId": None, "isSwitcher": None, "preferenceRank": None, "vote": None, "notices": []}
+    return {"preferences": None, "roleId": None, "isSwitcher": None, "preferenceRank": None, "vote": None}
 
 
 class GameService:
-    def __init__(self, repository, clock=now_ms, moderator=None, rng=None):
+    def __init__(self, repository, clock=now_ms, moderator=None, rng=None, transcriber=transcribe, summarizer=build_summary):
         self.repository = repository
         self.clock = clock
         self.moderator = moderator or Moderator()
         self.rng = rng or random.SystemRandom()
+        self.transcriber = transcriber
+        self.summarizer = summarizer
 
     # ── Rooms ────────────────────────────────────────────────────────────────
     def create(self, uid, data):
@@ -45,13 +51,13 @@ class GameService:
                 "roomId": room_id, "code": "".join(secrets.choice("ABCDEFGHJKLMNPQRSTUVWXYZ23456789") for _ in range(6)),
                 "hostUid": uid, "phase": "lobby", "phaseVersion": 0, "phaseEndsAt": None, "paused": False, "pausedRemainingMs": None,
                 "participantCount": 0, "minStudents": config["minStudents"], "maxStudents": config["maxStudents"],
-                "topicId": topic["topicId"], "topic": public_topic(topic), "event": None,
-                "settings": self._settings(data, {"switcherCount": config["defaultSwitcherCount"], "phaseSeconds": default_phase_seconds()}),
+                "topicId": topic["topicId"], "topic": public_topic(topic), "event": None, "turn": None, "floor": None,
+                "settings": self._settings(data, {"switcherCount": config["defaultSwitcherCount"], "phaseSeconds": default_phase_seconds(), "micSeconds": config["micSeconds"]}),
                 "createdAt": now, "updatedAt": now, "endedAt": None,
             },
             "participants": {}, "privatePlayers": {},
             "host": {"uid": uid, "teacherGuide": copy.deepcopy(topic["teacherGuide"]), "moderation": []},
-            "statements": {}, "votes": {}, "rounds": {"statements": [], "chat": []},
+            "votes": {}, "rounds": {"transcript": []}, "turnLog": {}, "transcriptRev": 0,
             "eventCard": None, "assignment": None, "rate": {}, "seq": 0,
         }
         return snapshot(self.repository.create(state, uid, now), uid)
@@ -74,7 +80,7 @@ class GameService:
             if len(state["participants"]) >= room["maxStudents"]:
                 raise HTTPException(409, f"방이 가득 찼어요. 한 게임에는 최대 {room['maxStudents']}명이 참여해요.")
             if any(p["nickname"] == nickname for p in state["participants"].values()):
-                raise HTTPException(409, "같은 닉네임이 있어요. 다른 닉네임을 정해 주세요.")
+                raise HTTPException(409, "같은 이름이 이미 들어와 있어요. 구분할 수 있게 적어 주세요. (예: 김민준2)")
             state["participants"][uid] = _student(uid, nickname, len(state["participants"]), now)
             state["privatePlayers"][uid] = _private()
             room["participantCount"] = len(state["participants"])
@@ -108,7 +114,7 @@ class GameService:
                 raise HTTPException(403, "학생 참가자만 할 수 있어요.")
             check_rate(state["rate"].setdefault(uid, {}), now)
             if action in HOST_ACTIONS:
-                getattr(self, "_host_" + action)(state, data, now)
+                getattr(self, "_host_" + action.replace("-", "_"))(state, data, now)
                 return
             # Deadlines are enforced at submission time even if no client has synced yet.
             advance_if_needed(state, now)
@@ -121,48 +127,89 @@ class GameService:
             raise HTTPException(409, deferred_error[0])
         return snapshot(state, uid)
 
-    def post_text(self, room_id, uid, kind, data):
-        """Statements and chat messages are checked before anyone else can see them."""
+    # ── Discussion record ────────────────────────────────────────────────────
+    def speech(self, room_id, uid, data):
+        """A student's microphone: only what they said while holding the floor is transcribed."""
+        version = data["phaseVersion"]
+
+        def gate(state):
+            # Rate-limited before the paid transcription call, not after it.
+            turn = self._turn_of(state, version)
+            if viewer(state, uid) != "student" or turn["uid"] != uid:
+                raise HTTPException(403, "마이크를 켠 학생의 기기에서만 녹음할 수 있어요.")
+            if self.clock() > turn.get("until", 0) + LATE_AUDIO_MS:
+                raise HTTPException(409, "마이크를 켜고 말한 내용만 기록할 수 있어요.")
+            self._check_room_for_line(state)
+            check_rate(state["rate"].setdefault(uid, {}), self.clock())
+
+        self.repository.mutate(room_id, gate)
+        try:
+            text = self.transcriber(data["audio"], data["mimeType"])
+        except AIUnavailable as exc:
+            raise HTTPException(503, "음성을 글로 바꾸지 못했어요. 잠시 후 다시 시도하거나 직접 입력해 주세요.") from exc
+        if not text:
+            return {**self.read(room_id, uid), "speech": "silent"}
+        return self._post_line(room_id, uid, text[:LINE_LIMIT], version, "voice", data.get("clip"))
+
+    def add_line(self, room_id, uid, data):
+        """Typed by the teacher when a microphone missed something. Goes to the current speaker."""
         validate_text_fields(data)
-        data = {**data, "text": data["text"].strip()}
-        precheck = self.repository.read(room_id)
-        error = self._text_error(precheck, uid, kind, data)
-        if error:
-            raise HTTPException(409, error)
-        verdict = self.moderator.review(data["text"])
+        state = self.repository.read(room_id)
+        if viewer(state, uid) != "host":
+            raise HTTPException(403, "선생님만 발언 기록을 넣을 수 있어요.")
+        version = data.get("phaseVersion")
+        if version is None:
+            if not (state["room"].get("turn") or state["room"].get("floor")):
+                raise HTTPException(409, "지금 말하는 사람이 없어요.")
+            version = state["room"]["phaseVersion"]
+        return self._post_line(room_id, uid, data["text"].strip(), version, "typed")
+
+    def _post_line(self, room_id, uid, text, version, source, clip=None):
+        verdict = self.moderator.review(text)
         outcome = {}
-        deferred_error = []
 
         def update(state):
             outcome.clear()
-            deferred_error.clear()
             now = self.clock()
-            advance_if_needed(state, now)
-            error = self._text_error(state, uid, kind, data)
-            if error:
-                deferred_error.append(error)
-                return
-            check_rate(state["rate"].setdefault(uid, {}), now)
+            turn = self._turn_of(state, version)
+            self._check_room_for_line(state)
             state["seq"] += 1
-            entry = {
-                "id": f"m{state['seq']}", "uid": uid, "kind": kind, "phase": state["room"]["phase"],
-                "text": data["text"], "targetUid": data.get("targetUid"), "at": now,
-            }
-            if kind == "statement":
-                self._withdraw_pending_statement(state, uid)
+            entry = {"id": f"m{state['seq']}", "uid": turn["uid"], "phase": turn["phase"], "kind": turn["kind"], "turn": version, "clip": clip, "text": text, "source": source, "at": now}
             if verdict.status == "ok":
-                self._publish(state, entry, now)
-                outcome.update(status="published", messageId=entry["id"])
-                return
-            status = "needs_edit" if verdict.status == "flag" else "pending_review"
-            self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
-            self._notice(state, entry, status, verdict.hint, verdict.excerpt)
-            outcome.update(status=status, messageId=entry["id"], hint=verdict.hint, excerpt=verdict.excerpt, category=verdict.category)
+                self._publish(state, entry)
+                outcome["speech"] = "published"
+            else:
+                self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
+                outcome["speech"] = "held"
+            advance_if_needed(state, now)
 
         state = self.repository.mutate(room_id, update)
-        if deferred_error:
-            raise HTTPException(409, deferred_error[0])
-        return {**snapshot(state, uid), "moderation": outcome}
+        return {**snapshot(state, uid), **outcome}
+
+    def summarize(self, room_id, uid):
+        state = self.repository.read(room_id)
+        if viewer(state, uid) != "host":
+            raise HTTPException(403, "선생님 화면에서만 정리할 수 있어요.")
+        revision = state.get("transcriptRev", 0)
+        current = state["rounds"].get("summary")
+        lines = state["rounds"].get("transcript", [])
+        if not lines or (current and current["revision"] >= revision):
+            return snapshot(state, uid)  # Nothing new: no AI call.
+        people = state["participants"]
+        try:
+            # The AI sees a seat number, never who that is; the number is mapped back to a person here.
+            summary = self.summarizer(state["room"]["topic"], [{"roleId": people[l["uid"]].get("roleId"), "speaker": people[l["uid"]]["seat"] + 1, "phase": l["phase"], "kind": l["kind"], "text": l["text"]} for l in lines])
+        except AIUnavailable as exc:
+            raise HTTPException(503, "토론 정리를 만들지 못했어요. 발언 기록은 그대로 남아 있어요.") from exc
+        seats = {p["seat"] + 1: p["uid"] for p in people.values()}
+        summary["statements"] = [{"uid": seats[row["speaker"]], "text": row["text"]} for row in summary.get("statements", []) if row["speaker"] in seats]
+
+        def update(fresh):
+            existing = fresh["rounds"].get("summary")
+            if not existing or existing["revision"] <= revision:
+                fresh["rounds"]["summary"] = {**summary, "revision": revision, "at": self.clock()}
+
+        return snapshot(self.repository.mutate(room_id, update), uid)
 
     # ── Teacher controls ─────────────────────────────────────────────────────
     def _host_settings(self, state, data, now):
@@ -224,7 +271,7 @@ class GameService:
         room = state["room"]
         if room["phase"] not in TIMED_PHASES or room["paused"]:
             return
-        room.update(paused=True, pausedRemainingMs=max(0, room["phaseEndsAt"] - now), phaseEndsAt=None, updatedAt=now)
+        room.update(paused=True, pausedRemainingMs=max(0, room["phaseEndsAt"] - now), phaseEndsAt=None, floor=None, updatedAt=now)
 
     def _host_resume(self, state, data, now):
         room = state["room"]
@@ -243,6 +290,31 @@ class GameService:
         else:
             raise HTTPException(409, "지금은 다음 단계로 넘길 수 없어요.")
 
+    def _host_skip_phase(self, state, data, now):
+        room = state["room"]
+        if data.get("phaseVersion") is not None and data["phaseVersion"] != room["phaseVersion"]:
+            return
+        if room["phase"] not in TIMED_PHASES:
+            raise HTTPException(409, "지금은 다음 단계로 넘길 수 없어요.")
+        finish_phase(state, now)
+
+    def _host_speaker(self, state, data, now):
+        """Give the next statement to someone right now. The queue then carries on."""
+        room = state["room"]
+        turn = room.get("turn")
+        target = data["targetUid"]
+        if not turn:
+            raise HTTPException(409, "차례대로 말하는 단계에서만 차례를 줄 수 있어요.")
+        if target not in state["participants"]:
+            raise HTTPException(404, "이 방의 참가자가 아니에요.")
+        if target == turn["uid"] or (data.get("phaseVersion") is not None and data["phaseVersion"] != room["phaseVersion"]):
+            return
+        if len(turn["order"]) >= MAX_TURNS:
+            raise HTTPException(409, "이 단계에서 지목할 수 있는 횟수를 넘었어요.")
+        index = turn["index"]
+        turn["order"] = turn["order"][:index + 1] + [target] + [u for u in turn["order"][index + 1:] if u != target]
+        next_turn(state, now)
+
     def _host_extend(self, state, data, now):
         room = state["room"]
         if room["phase"] not in TIMED_PHASES:
@@ -251,6 +323,10 @@ class GameService:
             room["pausedRemainingMs"] += data["seconds"] * 1000
         else:
             room["phaseEndsAt"] = max(room["phaseEndsAt"], now) + data["seconds"] * 1000
+            if room.get("turn") and room.get("floor"):
+                # A turn's microphone stays on for the whole turn, however long it gets.
+                room["floor"]["endsAt"] = room["phaseEndsAt"]
+                state["turnLog"][str(room["floor"]["version"])]["until"] = room["phaseEndsAt"]
         room["updatedAt"] = now
 
     def _host_end(self, state, data, now):
@@ -262,19 +338,25 @@ class GameService:
     def _host_review(self, state, data, now):
         entry = next((e for e in state["host"]["moderation"] if e["id"] == data["entryId"]), None)
         if not entry or entry["status"] not in ("pending_review", "flagged"):
-            raise HTTPException(409, "이미 처리된 메시지예요.")
-        if entry["uid"] not in state["participants"]:
-            raise HTTPException(409, "방을 나간 학생의 메시지예요.")
+            raise HTTPException(409, "이미 처리한 발언이에요.")
         if data["decision"] == "approve":
-            if entry["kind"] == "statement" and entry["uid"] in state["statements"] and state["room"]["phase"] == "statement":
-                raise HTTPException(409, "이 학생의 입장 발표가 이미 공개되었어요.")
             entry["status"] = "approved"
-            self._publish(state, {k: entry[k] for k in ("id", "uid", "kind", "phase", "text", "targetUid", "at")}, now, via_teacher=True)
-            self._update_notice(state, entry, "approved")
+            self._publish(state, {k: entry[k] for k in ("id", "uid", "phase", "kind", "turn", "clip", "text", "source", "at")}, via_teacher=True)
         else:
             entry["status"] = "returned"
-            self._update_notice(state, entry, "returned")
         entry["reviewedAt"] = now
+
+    def _host_line_edit(self, state, data, now):
+        """Speech recognition makes mistakes; the teacher corrects them on the shared record."""
+        line = self._line(state, data["lineId"])
+        line["text"] = data["text"].strip()
+        line["editedAt"] = now
+        state["transcriptRev"] = state.get("transcriptRev", 0) + 1
+
+    def _host_line_delete(self, state, data, now):
+        line = self._line(state, data["lineId"])
+        state["rounds"]["transcript"].remove(line)
+        state["transcriptRev"] = state.get("transcriptRev", 0) + 1
 
     # ── Student actions ──────────────────────────────────────────────────────
     def _student_action(self, state, uid, action, data, now):
@@ -290,6 +372,11 @@ class GameService:
             private["preferences"] = {"first": data["first"], "second": data["second"]}
             participant["prefsDone"] = True
             return None
+        if action == "mic-off":
+            floor = room.get("floor")
+            if floor and floor["uid"] == uid and data.get("phaseVersion") in (None, floor["version"]):
+                room.update(floor=None, updatedAt=now)
+            return None  # The time limit or a pause may already have switched it off.
         if room["paused"]:
             return "선생님이 진행을 잠시 멈췄어요. 다시 시작하면 이어서 할 수 있어요."
         if action == "confirm-role":
@@ -299,6 +386,13 @@ class GameService:
                 participant["submitted"].append("role")
             advance_if_needed(state, now)
             return None
+        if action == "end-turn":
+            turn = room.get("turn")
+            if turn and turn["uid"] == uid and data.get("phaseVersion") in (None, room["phaseVersion"]):
+                transition(state, now)
+            return None  # A late tap after the floor moved on is harmless.
+        if action == "mic-on":
+            return self._mic_on(state, uid, data["kind"], now)
         if action == "vote":
             targets = data["targets"]
             if private["vote"] is not None:
@@ -321,83 +415,66 @@ class GameService:
             return None
         raise HTTPException(404, "알 수 없는 행동이에요.")
 
-    # ── Helpers ──────────────────────────────────────────────────────────────
-    def _text_error(self, state, uid, kind, data):
-        if viewer(state, uid) != "student":
-            raise HTTPException(403, "학생 참가자만 발언할 수 있어요.")
+    def _mic_on(self, state, uid, kind, now):
+        """One microphone in the room. This check is what stops two people talking into the record."""
         room = state["room"]
-        limits = load_game_config()["textLimits"]
-        if not data["text"] or len(data["text"]) > limits["statement" if kind == "statement" else "message"]:
-            raise HTTPException(422, "발언 길이를 확인해 주세요.")
-        if room["paused"]:
-            return "선생님이 진행을 잠시 멈췄어요. 다시 시작하면 이어서 할 수 있어요."
-        if kind == "statement":
-            if room["phase"] != "statement":
-                return "입장 발표 시간이 끝났어요."
-            if uid in state["statements"]:
-                return "입장 발표는 한 번만 할 수 있어요."
-            return None
-        if room["phase"] not in CHAT_PHASES:
-            return "지금은 채팅으로 발언하는 단계가 아니에요."
-        if kind not in CHAT_PHASES[room["phase"]]:
-            return "이 단계에서 쓸 수 없는 발언 종류예요."
-        target = data.get("targetUid")
-        if target is not None and (target == uid or target not in state["participants"]):
-            raise HTTPException(422, "다른 참가자를 골라 주세요.")
-        mine = sum(1 for m in state["rounds"]["chat"] if m["uid"] == uid and m["phase"] == room["phase"])
-        if mine >= MAX_PER_PHASE or len(state["rounds"]["chat"]) >= MAX_CHAT:
-            return "이 단계에서 보낼 수 있는 메시지 수를 넘었어요."
+        if kind not in MIC_KINDS.get(room["phase"], ()):
+            return "지금은 이 버튼으로 마이크를 켤 수 없어요."
+        floor = room.get("floor")
+        if floor and floor["endsAt"] > now:
+            if floor["uid"] == uid and floor["kind"] == kind:
+                return None  # Idempotent retry.
+            return f"{state['participants'][floor['uid']]['nickname']}님이 말하고 있어요. 끝나면 마이크를 켤 수 있어요."
+        turn = room.get("turn")
+        if turn:
+            if turn["uid"] != uid:
+                return "내 차례가 오면 마이크를 켤 수 있어요."
+            ends = room["phaseEndsAt"]
+        else:
+            if len(state["turnLog"]) >= MAX_FLOORS:
+                return "이 게임에서 마이크를 켤 수 있는 횟수를 넘었어요."
+            room["phaseVersion"] += 1
+            ends = min(now + room["settings"]["micSeconds"] * 1000, room["phaseEndsAt"])
+            state["turnLog"][str(room["phaseVersion"])] = {"uid": uid, "phase": room["phase"], "kind": kind}
+        state["turnLog"][str(room["phaseVersion"])]["until"] = ends
+        room.update(floor={"uid": uid, "kind": kind, "version": room["phaseVersion"], "endsAt": ends}, updatedAt=now)
         return None
 
-    def _publish(self, state, entry, now, via_teacher=False):
-        uid = entry["uid"]
-        if entry["kind"] == "statement":
-            row = {"uid": uid, "text": entry["text"], "at": now, **({"viaTeacher": True} if via_teacher else {})}
-            if state["room"]["phase"] == "statement":
-                state["statements"][uid] = row
-                if "statement" not in state["participants"][uid]["submitted"]:
-                    state["participants"][uid]["submitted"].append("statement")
-                advance_if_needed(state, now)
-            else:
-                # Approved after the statement round closed: replace the "no statement" row.
-                state["statements"][uid] = row
-                rows = state["rounds"]["statements"]
-                index = next((i for i, r in enumerate(rows) if r["uid"] == uid), None)
-                if index is None:
-                    rows.append({**row, "late": True})
-                else:
-                    rows[index] = {**row, "late": True}
-            return
-        message = {k: entry[k] for k in ("id", "uid", "kind", "phase", "text", "targetUid")}
-        message["at"] = now
-        if via_teacher:
-            message["viaTeacher"] = True
-        state["rounds"]["chat"].append(message)
+    # ── Helpers ──────────────────────────────────────────────────────────────
+    @staticmethod
+    def _turn_of(state, version):
+        turn = state.get("turnLog", {}).get(str(version))
+        if not turn:
+            raise HTTPException(409, "지금은 말하는 단계가 아니에요.")
+        return turn
 
-    def _withdraw_pending_statement(self, state, uid):
-        for entry in state["host"]["moderation"]:
-            if entry["uid"] == uid and entry["kind"] == "statement" and entry["status"] in ("pending_review", "flagged"):
-                entry["status"] = "withdrawn"
-                self._update_notice(state, entry, "withdrawn")
+    @staticmethod
+    def _check_room_for_line(state):
+        if len(state["rounds"].get("transcript", [])) >= MAX_LINES:
+            raise HTTPException(409, "이 게임에서 기록할 수 있는 발언 수를 넘었어요.")
+
+    @staticmethod
+    def _line(state, line_id):
+        line = next((l for l in state["rounds"].get("transcript", []) if l["id"] == line_id), None)
+        if not line:
+            raise HTTPException(404, "이미 지운 발언이에요.")
+        return line
+
+    @staticmethod
+    def _publish(state, entry, via_teacher=False):
+        line = {**entry, **({"viaTeacher": True} if via_teacher else {})}
+        lines = state["rounds"].setdefault("transcript", [])
+        lines.append(line)
+        # A line that arrived or was approved late goes back to where it was said.
+        lines.sort(key=lambda l: (l["turn"], LATEST if l.get("clip") is None else l["clip"], int(l["id"][1:])))
+        state["transcriptRev"] = state.get("transcriptRev", 0) + 1
 
     def _log(self, state, entry, status, verdict):
         log = state["host"]["moderation"]
-        log.append({**entry, "nickname": state["participants"][entry["uid"]]["nickname"], "status": status,
-                    "category": verdict.category, "excerpt": verdict.excerpt, "source": verdict.source})
+        speaker = state["participants"].get(entry["uid"])
+        log.append({**entry, "nickname": speaker["nickname"] if speaker else "", "status": status,
+                    "category": verdict.category, "excerpt": verdict.excerpt, "verdictSource": verdict.source})
         del log[:-MAX_LOG]
-
-    def _notice(self, state, entry, status, hint, excerpt):
-        notices = state["privatePlayers"][entry["uid"]]["notices"]
-        notices.append({"id": entry["id"], "kind": entry["kind"], "phase": entry["phase"], "status": status, "hint": hint,
-                        "excerpt": excerpt, "text": entry["text"], "targetUid": entry["targetUid"], "at": entry["at"]})
-        del notices[:-MAX_NOTICES]
-
-    @staticmethod
-    def _update_notice(state, entry, status):
-        private = state["privatePlayers"].get(entry["uid"])
-        for notice in private["notices"] if private else []:
-            if notice["id"] == entry["id"]:
-                notice["status"] = status
 
     def _choose_topic(self, data, current):
         topics = load_topics()
@@ -417,6 +494,8 @@ class GameService:
     def _settings(data, current):
         config = load_game_config()
         result = copy.deepcopy(current)
+        if data.get("micSeconds") is not None:
+            result["micSeconds"] = data["micSeconds"]
         if data.get("switcherCount") is not None:
             if data["switcherCount"] not in config["switcherCounts"]:
                 raise HTTPException(422, "역할 전환자는 1명 또는 2명으로 정할 수 있어요.")

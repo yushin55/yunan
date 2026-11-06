@@ -1,36 +1,26 @@
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Check, Maximize2, Megaphone, Minimize2, Pause, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, Maximize2, Minimize2, Pause, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
 import RoleCard from "../components/RoleCard";
 import Sheet from "../components/Sheet";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RulesVideo from "../features/briefing/RulesVideo";
-import ChatFeed, { roleName } from "../features/chat/ChatFeed";
-import Composer from "../features/chat/Composer";
-import ModerationNotice from "../features/chat/ModerationNotice";
-import { RULES, STUDENT_TODO } from "../features/game/phases";
-import StatementBoard from "../features/game/StatementBoard";
+import { ExchangeFeed, MemoPad, StatementList } from "../features/discussion/DiscussionNotes";
+import { useFloor } from "../features/discussion/floor";
+import MicControls from "../features/discussion/MicControls";
+import SummaryBoard from "../features/discussion/SummaryBoard";
+import TranscriptFeed from "../features/discussion/TranscriptFeed";
+import type { SpeechEngine } from "../features/discussion/useSpeechCapture";
+import { KIND_LABEL, RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import PreferencePicker from "../features/roles/PreferencePicker";
 import SecretRole, { IdentityBanner } from "../features/roles/SecretRole";
 import type { RoomApi } from "../features/room/useRoom";
 import RevealView from "../features/voting/RevealView";
 import VotePanel, { togglePick } from "../features/voting/VotePanel";
-import type { ChatMessage, MessageKind, Me, ModerationResult, Notice, Participant, Room, Rounds } from "../types/game";
-
-const TEXT_LIMIT = 200;
-const idNum = (id: string) => Number(id.slice(1)) || 0;
-
-/** The notice to show next to the composer, hidden once a later message went through. */
-function currentNotice(me: Me, room: Room, chat: ChatMessage[], statement: boolean): Notice | null {
-  const notices = me.notices.filter((n) => n.phase === room.phase && (n.kind === "statement") === statement && n.status !== "withdrawn");
-  const latest = notices.at(-1);
-  if (!latest) return null;
-  const published = chat.filter((m) => m.uid === me.uid && !m.viaTeacher).map((m) => idNum(m.id));
-  if (published.some((id) => id > idNum(latest.id))) return null;
-  return latest;
-}
+import { roleName } from "../features/roles/roleName";
+import type { Floor, Me, Participant, Room, Rounds } from "../types/game";
 
 function stored(key: string, fallback: boolean) {
   try {
@@ -43,14 +33,15 @@ function stored(key: string, fallback: boolean) {
 
 /**
  * `lobbyAction` is shown under the to-do note in the lobby and `barControls` inside the game bar
- * (practice mode puts its start and next-step buttons there).
+ * (practice mode puts its start and next-step buttons there). Practice has no server, so it hears
+ * through the browser's own recognition (`micEngine`) and can fall back to typing (`allowTyping`).
  */
-export default function StudentRoomPage({ api, lobbyAction, barControls }: { api: RoomApi; lobbyAction?: React.ReactNode; barControls?: React.ReactNode }) {
+export default function StudentRoomPage({ api, lobbyAction, barControls, micEngine = "server", allowTyping }: { api: RoomApi; lobbyAction?: React.ReactNode; barControls?: React.ReactNode; micEngine?: SpeechEngine; allowTyping?: boolean }) {
   const { state, action, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const me = state!.me!;
   const [roleOpen, setRoleOpen] = useState(false);
-  // The person picked at the table: chat recipient and, while voting, a candidate.
+  // The person picked at the table: while voting, a candidate.
   const [focus, setFocus] = useState("");
   const [votePicked, setVotePicked] = useState<string[]>([]);
   const [show3d, setShow3d] = useState(() => stored("bridge.table3d", true));
@@ -59,11 +50,11 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
   const others = participants.filter((p) => p.uid !== me.uid);
   const phase = room.phase;
   const secretStillHidden = phase !== "reveal" && phase !== "ended";
+  // With the 3D table off, a wide window has room to show the record beside the game.
+  const wideWindow = useMinWidth(1000);
+  const spread = !show3d && wideWindow;
+  const discussing = SPEAKING.includes(phase) || phase === "vote";
 
-  const sendMessage = async (kind: MessageKind, text: string, targetUid: string | null) => {
-    const next = await action("messages", { kind, text, ...(targetUid ? { targetUid } : {}) });
-    return next?.moderation ?? null;
-  };
   const selectAtTable = (uid: string) => {
     if (phase === "vote" && !me.vote) setVotePicked((current) => togglePick(current, uid, room.settings.switcherCount));
     setFocus((current) => (current === uid ? "" : uid));
@@ -94,7 +85,7 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
       />
       {!online && <p className="banner warn">연결이 끊겼어요. 다시 연결되면 지금 단계와 내 역할로 자동으로 돌아와요.</p>}
 
-      <div className={`room-layout${show3d ? " with-table" : ""}`}>
+      <div className={`room-layout${show3d ? " with-table" : ""}${spread && discussing ? " spread" : ""}`}>
         {show3d && (
           <div className="stage">
             <TableView room={room} participants={participants} rounds={rounds} selfUid={me.uid} focusUid={focus || undefined} onSelect={selectAtTable} offset={offset} />
@@ -135,39 +126,13 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
             </section>
           )}
 
-          {phase === "statement" && (
-            <StatementStage
-              room={room}
-              me={me}
-              participant={self}
-              participants={participants}
-              busy={busy}
-              notice={currentNotice(me, room, rounds.chat, true)}
-              onSubmit={async (text) => {
-                const next = await action("statement", { text });
-                return next?.moderation ?? null;
-              }}
-            />
-          )}
-
-          {(phase === "event" || phase === "rebuttal") && (
-            <ChatStage
-              key={phase}
-              room={room}
-              rounds={rounds}
-              participants={participants}
-              me={me}
-              others={others}
-              busy={busy}
-              focus={focus}
-              onFocus={setFocus}
-              notice={currentNotice(me, room, rounds.chat, false)}
-              onSend={sendMessage}
-            />
+          {SPEAKING.includes(phase) && (
+            <SpeakingStage room={room} rounds={rounds} participants={participants} me={me} api={api} micEngine={micEngine} allowTyping={allowTyping} spread={spread} />
           )}
 
           {phase === "vote" && (
-            <>
+            <div className={`speaking-stage${spread ? " spread" : ""}`}>
+              <div className="speaking-main">
               <section className="panel">
                 <VotePanel
                   candidates={others}
@@ -181,11 +146,10 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
                   onVote={(targets) => void action("vote", { targets })}
                 />
               </section>
-              <details className="panel">
-                <summary>지난 발언 다시 보기 ({rounds.chat.length})</summary>
-                <ChatFeed messages={rounds.chat} participants={participants} topic={room.topic} myUid={me.uid} />
-              </details>
-            </>
+              {spread && <Roster participants={participants} room={room} />}
+              </div>
+              <DiscussionMemo room={room} rounds={rounds} participants={participants} me={me} floor={null} />
+            </div>
           )}
 
           {(phase === "reveal" || phase === "ended") && rounds.reveal && (
@@ -195,7 +159,8 @@ export default function StudentRoomPage({ api, lobbyAction, barControls }: { api
             </section>
           )}
 
-          {!show3d && phase !== "lobby" && <Roster participants={participants} room={room} />}
+          {!show3d && phase !== "lobby" && !(spread && discussing) && <Roster participants={participants} room={room} />}
+          {discussing && <MemoPad key={room.roomId} room={room} />}
         </div>
       </div>
 
@@ -390,147 +355,97 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
 }
 
 /**
- * Discussion phases on one screen: the event card (foldable) on top, the conversation in the
- * middle, the composer always at the bottom. The statements open in a sheet when needed.
+ * Discussion on a student's device: whose turn it is and the buttons that switch on the microphone.
+ * The role card and example questions stay close by; the notes are there for catching up.
  */
-function ChatStage({
-  room,
-  rounds,
-  participants,
-  me,
-  others,
-  busy,
-  focus,
-  onFocus,
-  notice,
-  onSend,
-}: {
-  room: Room;
-  rounds: Rounds;
-  participants: Participant[];
-  me: Me;
-  others: Participant[];
-  busy: boolean;
-  focus: string;
-  onFocus: (uid: string) => void;
-  notice: Notice | null;
-  onSend: (kind: MessageKind, text: string, targetUid: string | null) => Promise<ModerationResult | null>;
-}) {
-  const [statementsOpen, setStatementsOpen] = useState(false);
-  const phaseMessages = rounds.chat.filter((m) => m.phase === room.phase).length;
+function SpeakingStage({ room, rounds, participants, me, api, micEngine, allowTyping, spread }: { room: Room; rounds: Rounds; participants: Participant[]; me: Me; api: RoomApi; micEngine: SpeechEngine; allowTyping?: boolean; spread: boolean }) {
+  const { floor } = useFloor(room, api.offset);
+  const turn = room.turn;
+  const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
+  const mine = speaker?.uid === me.uid;
+  const waitingAhead = turn ? turn.order.slice(turn.index + 1).indexOf(me.uid) : -1;
+  const role = room.topic.roles.find((r) => r.id === me.roleId);
+  const eyebrow = turn ? (mine ? "내 차례예요" : "지금 말하는 사람") : !floor ? "마이크가 비어 있어요" : `${mine ? "내가 말하는 중" : "지금 말하는 사람"} · ${KIND_LABEL[floor.kind]}`;
+  const headline = mine ? (floor ? "말해 주세요. 끝나면 다시 눌러 주세요." : "마이크를 켜고 말해 주세요.") : (speaker?.nickname ?? "먼저 누르는 사람이 말해요");
+  const hint = mine ? "" : turn ? (waitingAhead === -1 ? "이번 단계에서 내 차례는 끝났어요. 잘 듣고 누가 역할 전환자일지 생각해 보세요." : waitingAhead === 0 ? "다음이 내 차례예요. 준비해 주세요." : `내 차례까지 ${waitingAhead}명 남았어요.`) : floor ? "끝나면 마이크를 켤 수 있어요." : "";
   return (
-    <section className="chat-stage">
-      {room.event && <EventCard event={room.event} collapsible defaultOpen={room.phase === "event"} />}
-      <div className="chat-stage-head">
-        <span className="muted small">이번 단계 발언 {phaseMessages}개</span>
-        <button className="link-button" onClick={() => setStatementsOpen(true)}>
-          <Megaphone size={14} aria-hidden /> 입장 발표 보기
-        </button>
+    <section className={`speaking-stage${spread ? " spread" : ""}`}>
+      <div className="speaking-main">
+        <div className={`floor-card${mine ? " mine" : ""}`} data-testid="floor-card" aria-live="polite">
+          <span className="eyebrow">{eyebrow}</span>
+          <p className="floor-name" data-testid="floor-name">
+            {headline}
+          </p>
+          {!mine && speaker?.roleId && <p className="muted">{roleName(room.topic, speaker.roleId)}</p>}
+          {hint && <p className="muted small">{hint}</p>}
+          <MicControls room={room} me={me} api={api} engine={micEngine} allowTyping={allowTyping} />
+        </div>
+        {room.event && <EventCard key={room.phase} event={room.event} collapsible defaultOpen={room.phase === "event"} />}
+        {role && (
+          <details className="panel" open={mine && Boolean(turn)}>
+            <summary>무슨 말을 할까요?</summary>
+            <p className="role-reminder">
+              <strong>{role.name}</strong>의 목표: {role.goal}
+            </p>
+            <ul className="role-tips">
+              {room.topic.questionPrompts.map((q) => (
+                <li key={q}>{q}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+        {spread && <Roster participants={participants} room={room} />}
       </div>
-      <ChatFeed
-        messages={rounds.chat}
-        participants={participants}
-        topic={room.topic}
-        myUid={me.uid}
-        emptyText={room.phase === "event" ? "사건 카드를 읽고 먼저 말을 꺼내 보세요." : "다른 역할의 발언에 반론해 보세요."}
-      />
-      <Composer
-        phase={room.phase}
-        others={others}
-        prompts={room.topic.questionPrompts}
-        limit={TEXT_LIMIT}
-        busy={busy}
-        disabled={room.paused}
-        notice={notice}
-        target={focus}
-        onTargetChange={onFocus}
-        onSend={onSend}
-      />
-      {statementsOpen && (
-        <Sheet title="입장 발표" onClose={() => setStatementsOpen(false)}>
-          <StatementBoard rows={rounds.statements} participants={participants} topic={room.topic} />
-        </Sheet>
-      )}
+      <DiscussionMemo room={room} rounds={rounds} participants={participants} me={me} floor={floor} />
     </section>
   );
 }
 
-function StatementStage({
-  room,
-  me,
-  participant,
-  participants,
-  busy,
-  notice,
-  onSubmit,
-}: {
-  room: Room;
-  me: Me;
-  participant?: Participant;
-  participants: Participant[];
-  busy: boolean;
-  notice: Notice | null;
-  onSubmit: (text: string) => Promise<ModerationResult | null>;
-}) {
-  const [text, setText] = useState("");
-  const done = participant?.submitted.includes("statement");
-  const count = participants.filter((p) => p.submitted.includes("statement")).length;
-  const role = room.topic.roles.find((r) => r.id === me.roleId);
+/** What was said, sorted out: questions and answers, each statement in short, then the full record. */
+function DiscussionMemo({ room, rounds, participants, me, floor }: { room: Room; rounds: Rounds; participants: Participant[]; me: Me; floor: Floor | null }) {
   return (
-    <section className="panel">
-      <span className="eyebrow">주제</span>
-      <h3 className="topic-title">{room.topic.title}</h3>
-      {role && (
-        <p className="role-reminder">
-          <strong>{role.name}</strong>의 목표: {role.goal}
-        </p>
-      )}
-      {done ? (
-        <p className="success-line" data-testid="statement-done">
-          <Check size={18} aria-hidden /> 발표를 냈어요. 모두 내거나 시간이 끝나면 함께 공개돼요. ({count}/{participants.length})
-        </p>
-      ) : (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            await onSubmit(text.trim());
-          }}
-        >
-          <label className="field-label" htmlFor="statement">
-            {role ? `${role.name}(으)로서` : "내 역할로서"} 이 주제에 대해 어떻게 생각하나요?
-          </label>
-          <textarea
-            id="statement"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={TEXT_LIMIT}
-            rows={4}
-            placeholder={`저는 ${role?.name ?? "제 역할"}로서 … 라고 생각합니다. 왜냐하면 …`}
-            disabled={room.paused}
-          />
-          <ModerationNotice notice={notice} onEdit={setText} />
-          <div className="composer-foot">
-            <span className="muted small">
-              발표한 학생 {count}/{participants.length}
-            </span>
-            <span className="count">
-              {text.length}/{TEXT_LIMIT}
-            </span>
-            <button className="button primary" type="submit" disabled={busy || room.paused || !text.trim()}>
-              발표하기
-            </button>
+    <div className="speaking-memo">
+      <section className={`panel notes${room.phase === "statement" ? "" : " both"}`}>
+        {room.phase !== "statement" && (
+          <div className="notes-part">
+            <h3 className="memo-title">질문과 답변</h3>
+            <ExchangeFeed participants={participants} rounds={rounds} floor={floor} myUid={me.uid} />
           </div>
-        </form>
-      )}
-    </section>
+        )}
+        <div className="notes-part">
+          <h3 className="memo-title">입장 발표 정리</h3>
+          <StatementList room={room} participants={participants} rounds={rounds} myUid={me.uid} />
+        </div>
+      </section>
+      <details className="panel memo-fold">
+        <summary>전체 발언 기록과 토론 정리</summary>
+        <p className="muted small">말한 내용은 말한 사람의 기기로 받아써요. 음성은 저장하지 않아요.</p>
+        <SummaryBoard summary={rounds.summary} topic={room.topic} status="idle" />
+        <h3 className="memo-title">발언 기록</h3>
+        <TranscriptFeed lines={rounds.transcript} participants={participants} topic={room.topic} myUid={me.uid} speakingUid={floor?.uid ?? room.turn?.uid} />
+      </details>
+    </div>
   );
+}
+
+function useMinWidth(px: number) {
+  const query = `(min-width: ${px}px)`;
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return matches;
 }
 
 function Roster({ participants, room }: { participants: Participant[]; room: Room }) {
   return (
     <details className="panel roster">
       <summary>
-        <Users size={17} aria-hidden /> 함께하는 사람 {participants.length}명
+        함께하는 사람 {participants.length}명
         {room.phase === "lobby" && <span className="muted small"> · {room.minStudents}~{room.maxStudents}명이 모이면 시작해요</span>}
       </summary>
       <ul>

@@ -6,17 +6,30 @@ import "./TableScene.css";
 export interface TablePlayer {
   uid: string;
   nickname: string;
+  /** Their number at the table, the same as their card's. */
+  order?: number;
   color?: string;
   /** Public role name, once roles are public. */
   tag?: string;
   status?: { label: string; tone: "done" | "waiting" | "alert" };
   /** The words this person just said, shown as a speech bubble. */
   bubble?: string;
-  bubbleKind?: string;
+}
+
+/** A card in the viewer's hand: one person's statement, boiled down. */
+export interface HandCard {
+  uid: string;
+  order: number;
+  name: string;
+  role: string;
+  text: string;
+  state: "waiting" | "speaking" | "done";
 }
 
 interface TableSceneProps {
   players: TablePlayer[];
+  /** The hand, once there are statements to hold. Without it the cards stay face down. */
+  cards?: HandCard[];
   /** The viewer's own seat (a student). The teacher has no seat and watches the whole table. */
   selfUid?: string;
   focusPlayerUid?: string;
@@ -55,6 +68,77 @@ const SKIN = ["#e0ae8a", "#b98060", "#f0c6a0", "#cb9476", "#a66c52"];
 const HAIR = ["#35271f", "#6d4330", "#23282a", "#9a6941", "#402e32"];
 const COATS = ["#a56b53", "#7e987c", "#b88f6e", "#667f9c", "#a78297"];
 
+type HeldCard = {
+  group: THREE.Group;
+  home: THREE.Vector3;
+  homeTurn: THREE.Quaternion;
+  /** 0 in the hand, 1 held up in front of the camera to read. */
+  lift: number;
+  /** 0 or 1: the pointer is on it, so it rises a little out of the fan. */
+  rise: number;
+  face?: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; drawn: string };
+};
+
+const CARD_W = 0.31;
+const CARD_H = 0.43;
+const CARD_FONT = '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif';
+
+/** Wraps between words where it can (Korean reads badly split inside a word), inside one only if it must. */
+function wrapText(paint: CanvasRenderingContext2D, text: string, width: number, maxLines: number) {
+  const lines: string[] = [];
+  let line = "";
+  const push = () => {
+    lines.push(line);
+    line = "";
+  };
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const joined = line ? `${line} ${word}` : word;
+    if (paint.measureText(joined).width <= width) {
+      line = joined;
+      continue;
+    }
+    if (line) push();
+    for (const char of word) {
+      if (paint.measureText(line + char).width > width) push();
+      line += char;
+    }
+  }
+  if (line) push();
+  if (lines.length > maxLines) {
+    lines.length = maxLines;
+    lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, -1)}…`;
+  }
+  return lines;
+}
+
+function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
+  const paint = canvas.getContext("2d");
+  if (!paint) return;
+  const { width: W, height: H } = canvas;
+  const margin = 44;
+  paint.fillStyle = card.state === "speaking" ? "#f6dca2" : "#f5eedd";
+  paint.fillRect(0, 0, W, H);
+  paint.strokeStyle = card.state === "speaking" ? "#b5852c" : "#c9b48d";
+  paint.lineWidth = 6;
+  paint.strokeRect(16, 16, W - 32, H - 32);
+  paint.textBaseline = "top";
+  paint.fillStyle = "#2a2218";
+  paint.font = `800 104px ${CARD_FONT}`;
+  paint.fillText(String(card.order), margin, 40);
+  const left = margin + paint.measureText(String(card.order)).width + 20;
+  paint.font = `800 50px ${CARD_FONT}`;
+  paint.fillText(wrapText(paint, card.name, W - left - margin, 1)[0] ?? "", left, 50);
+  paint.fillStyle = "#6e5f49";
+  paint.font = `500 34px ${CARD_FONT}`;
+  paint.fillText(wrapText(paint, card.role, W - left - margin, 1)[0] ?? "", left, 108);
+  paint.fillStyle = "#c9b48d";
+  paint.fillRect(margin, 168, W - margin * 2, 3);
+  const body = card.text || (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요");
+  paint.fillStyle = card.text ? "#2a2218" : "#8a7a60";
+  paint.font = `500 46px ${CARD_FONT}`;
+  wrapText(paint, body, W - margin * 2, 8).forEach((line, i) => paint.fillText(line, margin, 194 + i * 62));
+}
+
 function seatAngles(count: number) {
   if (count <= 1) return [0];
   const span = count >= 8 ? 3.0 : count === 7 ? 2.82 : count === 6 ? 2.6 : count === 5 ? 2.28 : count === 4 ? 1.98 : count === 3 ? 1.55 : 1.05;
@@ -66,6 +150,7 @@ function seatAngles(count: number) {
 /** The viewer sits at the near edge of the table; everyone else faces that seat. Up to eight people. */
 export default function TableScene({
   players,
+  cards,
   selfUid,
   activePlayer,
   focusPlayerUid,
@@ -86,7 +171,12 @@ export default function TableScene({
   const cameraModeRef = useRef(cameraMode);
   cameraModeRef.current = cameraMode;
   const resetRef = useRef<() => void>(() => {});
+  const cardsRef = useRef(cards);
+  cardsRef.current = cards;
+  const dealRef = useRef<(hand?: HandCard[]) => void>(() => {});
+  const cardsKey = JSON.stringify(cards ?? null);
   const [failed, setFailed] = useState(false);
+  const [reading, setReading] = useState(false);
   const [hovered, setHovered] = useState<string | null>(null);
   const people = (players?.length ? players : DEMO_PLAYERS)
     .filter((person) => person.uid !== selfUid)
@@ -676,23 +766,105 @@ export default function TableScene({
       box(world, 0.24, 0.16, 0.36, ownSkin, side * 0.47, 1.18, 2.05, 0.075);
       box(world, 0.29, 0.055, 0.17, cream, side * 0.57, 1.21, 2.25, 0.018);
     }
-    // A fan of cards faces the camera: you occupy this seat and have a hand to play.
+    // A fan of cards faces the camera. Face down until there are statements, then one per person.
     const cardBack = material("#733f42", 0.6);
     const cardFan = new THREE.Group();
     cardFan.visible = !attractRef.current;
     world.add(cardFan);
-    for (let i = 0; i < 3; i += 1) {
-      const card = new THREE.Group();
-      card.position.set((i - 1) * 0.145, 1.39 + (1 - Math.abs(i - 1)) * 0.035, 2.11 + Math.abs(i - 1) * 0.025);
-      card.rotation.z = (i - 1) * -0.16;
-      card.rotation.x = -0.23;
-      cardFan.add(card);
-      box(card, 0.31, 0.43, 0.02, cream, 0, 0, 0, 0.018);
-      box(card, 0.275, 0.395, 0.007, cardBack, 0, 0, 0.015, 0.012);
-      box(card, 0.215, 0.335, 0.007, mutedBrass, 0, 0, 0.023, 0.004);
-      box(card, 0.197, 0.316, 0.007, cardBack, 0, 0, 0.029, 0.003);
-      sphere(card, 0.048, brass, 0, 0, 0.038, 8, 6).scale.z = 0.18;
-    }
+    const cardFaceShape = geometry("card-face", () => new THREE.PlaneGeometry(CARD_W - 0.018, CARD_H - 0.018));
+    const anisotropy = rich ? renderer.capabilities.getMaxAnisotropy() : 1;
+    let held: HeldCard[] = [];
+    const heldFaces: THREE.Object3D[] = [];
+    let openCard = -1;
+    let hoverCard = -1;
+    const openCardAt = (index: number) => {
+      openCard = index;
+      setReading(index >= 0);
+      needsRender = true;
+    };
+    const clearHand = () => {
+      for (const card of held) {
+        cardFan.remove(card.group);
+        card.face?.texture.dispose();
+        card.face?.material.dispose();
+      }
+      held = [];
+      heldFaces.length = 0;
+      hoverCard = -1;
+    };
+    const placeCard = (i: number, count: number, group: THREE.Group) => {
+      // Wider apart when there are few; the numbers and names stay visible when there are many.
+      const middle = (count - 1) / 2;
+      const gap = count <= 1 ? 0 : Math.min(0.2, 1.05 / (count - 1));
+      const off = i - middle;
+      group.position.set(off * gap, 1.39 - off * off * 0.0032, 2.11 + i * 0.0085);
+      group.rotation.set(-0.23, 0, off * (count > 3 ? -0.05 : -0.16));
+    };
+    const dealBacks = () => {
+      clearHand();
+      for (let i = 0; i < 3; i += 1) {
+        const group = new THREE.Group();
+        placeCard(i, 3, group);
+        cardFan.add(group);
+        box(group, CARD_W, CARD_H, 0.006, cream, 0, 0, 0, 0.004);
+        box(group, 0.275, 0.395, 0.004, cardBack, 0, 0, 0.005, 0.002);
+        box(group, 0.215, 0.335, 0.004, mutedBrass, 0, 0, 0.0085, 0.002);
+        box(group, 0.197, 0.316, 0.004, cardBack, 0, 0, 0.012, 0.002);
+        sphere(group, 0.048, brass, 0, 0, 0.018, 8, 6).scale.z = 0.12;
+        held.push({ group, home: group.position.clone(), homeTurn: group.quaternion.clone(), lift: 0, rise: 0 });
+      }
+    };
+    const deal = (hand?: HandCard[]) => {
+      needsRender = true;
+      if (!hand?.length) {
+        if (openCard >= 0) openCardAt(-1);
+        if (!held.length || held[0].face) dealBacks();
+        return;
+      }
+      if (held.length !== hand.length || !held[0].face) {
+        clearHand();
+        if (openCard >= 0) openCardAt(-1);
+        hand.forEach((_, i) => {
+          const group = new THREE.Group();
+          placeCard(i, hand.length, group);
+          cardFan.add(group);
+          box(group, CARD_W, CARD_H, 0.006, cream, 0, 0, 0, 0.004);
+          const canvas = document.createElement("canvas");
+          canvas.width = 640;
+          canvas.height = 888;
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.colorSpace = THREE.SRGBColorSpace;
+          texture.anisotropy = anisotropy;
+          // Read as printed paper: unlit, so the words keep their contrast under the room's lights.
+          const faceMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, fog: false });
+          const face = new THREE.Mesh(cardFaceShape, faceMaterial);
+          face.position.z = 0.0035;
+          face.userData.cardIndex = i;
+          group.add(face);
+          heldFaces.push(face);
+          held.push({ group, home: group.position.clone(), homeTurn: group.quaternion.clone(), lift: 0, rise: 0, face: { canvas, texture, material: faceMaterial, drawn: "" } });
+        });
+      }
+      hand.forEach((card, i) => {
+        const face = held[i].face!;
+        const drawn = JSON.stringify(card);
+        if (face.drawn === drawn) return;
+        face.drawn = drawn;
+        paintCard(face.canvas, card);
+        face.texture.needsUpdate = true;
+      });
+    };
+    dealRef.current = deal;
+    // needsRender and friends are declared just below; this runs once they exist.
+    queueMicrotask(() => {
+      if (dealRef.current === deal) deal(cardsRef.current);
+    });
+    // Canvas text falls back to a system font if the web font is not ready yet.
+    void document.fonts?.ready.then(() => {
+      if (dealRef.current !== deal) return;
+      for (const card of held) if (card.face) card.face.drawn = "";
+      deal(cardsRef.current);
+    });
 
     let width = 1;
     let height = 1;
@@ -719,6 +891,10 @@ export default function TableScene({
     let fovTarget = 64;
     let aimedFocus: string | undefined;
     let aimedMode: string | undefined;
+    const READ_DISTANCE = 0.62;
+    const readForward = new THREE.Vector3();
+    const readSpot = new THREE.Vector3();
+    const cardHome = new THREE.Vector3();
     const pointer = new THREE.Vector2();
     const raycaster = new THREE.Raycaster();
     const screen = new THREE.Vector3();
@@ -757,15 +933,23 @@ export default function TableScene({
     };
     document.addEventListener("visibilitychange", onVisibility);
 
-    const pick = (event: PointerEvent) => {
+    const aim = (event: PointerEvent) => {
       const bounds = renderer.domElement.getBoundingClientRect();
       pointer.set(
         ((event.clientX - bounds.left) / bounds.width) * 2 - 1,
         -((event.clientY - bounds.top) / bounds.height) * 2 + 1,
       );
       raycaster.setFromCamera(pointer, camera);
+    };
+    const pick = (event: PointerEvent) => {
+      aim(event);
       return raycaster.intersectObjects(selectable, false)[0]?.object.userData
         .playerUid as string | undefined;
+    };
+    const pickCard = (event: PointerEvent) => {
+      aim(event);
+      const index = raycaster.intersectObjects(heldFaces, false)[0]?.object.userData.cardIndex as number | undefined;
+      return index ?? -1;
     };
     const onPointerMove = (event: PointerEvent) => {
       needsRender = true;
@@ -786,12 +970,15 @@ export default function TableScene({
           dragging = true;
         return;
       }
-      const next = pick(event) ?? null;
+      // Cards are nearer than people, and a card held up to read covers the whole view.
+      const card = pickCard(event);
+      hoverCard = card;
+      const next = card >= 0 || openCard >= 0 ? null : (pick(event) ?? null);
       if (next !== hoverUid) {
         hoverUid = next;
         setHovered(next);
-        renderer.domElement.style.cursor = next ? "pointer" : "grab";
       }
+      renderer.domElement.style.cursor = next || card >= 0 ? "pointer" : "grab";
     };
     const onPointerDown = (event: PointerEvent) => {
       down = true;
@@ -803,8 +990,13 @@ export default function TableScene({
     };
     const onPointerUp = (event: PointerEvent) => {
       if (!dragging) {
-        const selected = pick(event);
-        if (selected) selectRef.current?.(selected);
+        const card = pickCard(event);
+        if (openCard >= 0) openCardAt(card === openCard || card < 0 ? -1 : card);
+        else if (card >= 0) openCardAt(card);
+        else {
+          const selected = pick(event);
+          if (selected) selectRef.current?.(selected);
+        }
       }
       down = false;
       if (renderer.domElement.hasPointerCapture(event.pointerId))
@@ -813,9 +1005,14 @@ export default function TableScene({
     };
     const onPointerLeave = () => {
       hoverUid = null;
+      hoverCard = -1;
       setHovered(null);
       needsRender = true;
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && openCard >= 0) openCardAt(-1);
+    };
+    window.addEventListener("keydown", onKeyDown);
     const onPointerCancel = () => {
       down = false;
       dragging = false;
@@ -831,6 +1028,7 @@ export default function TableScene({
       fovTarget = baseFov;
       hoverUid = null;
       setHovered(null);
+      openCardAt(-1);
       needsRender = true;
     };
 
@@ -896,6 +1094,26 @@ export default function TableScene({
         camera.position.z - Math.cos(yaw) * 5,
       );
       camera.updateMatrixWorld();
+      // Hover lifts a card out of the fan; a press brings it up in front of the camera to read.
+      const cardSpeed = stopMotion ? 1 : 1 - Math.exp(-delta * 11);
+      const viewHeight = 2 * READ_DISTANCE * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+      const readScale = Math.min((viewHeight * 0.8) / CARD_H, (viewHeight * camera.aspect * 0.86) / CARD_W) / cardFan.scale.x;
+      camera.getWorldDirection(readForward);
+      readSpot.copy(camera.position).addScaledVector(readForward, READ_DISTANCE).sub(cardFan.position).divideScalar(cardFan.scale.x);
+      held.forEach((card, i) => {
+        const liftGoal = i === openCard ? 1 : 0;
+        const riseGoal = i === hoverCard && openCard < 0 ? 1 : 0;
+        card.lift += (liftGoal - card.lift) * cardSpeed;
+        card.rise += (riseGoal - card.rise) * cardSpeed;
+        if (Math.abs(liftGoal - card.lift) < 0.001) card.lift = liftGoal;
+        if (Math.abs(riseGoal - card.rise) < 0.001) card.rise = riseGoal;
+        if (card.lift !== liftGoal || card.rise !== riseGoal) needsRender = true;
+        cardHome.copy(card.home);
+        cardHome.y += card.rise * 0.075;
+        card.group.position.lerpVectors(cardHome, readSpot, card.lift);
+        card.group.quaternion.slerpQuaternions(card.homeTurn, camera.quaternion, card.lift);
+        card.group.scale.setScalar(1 + (readScale - 1) * card.lift);
+      });
       for (const avatar of avatars) {
         avatar.head.rotation.y = stopMotion
           ? 0
@@ -945,6 +1163,9 @@ export default function TableScene({
 
     return () => {
       cancelAnimationFrame(frame);
+      clearHand();
+      dealRef.current = () => {};
+      window.removeEventListener("keydown", onKeyDown);
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
@@ -968,8 +1189,12 @@ export default function TableScene({
     };
   }, [peopleKey, selfColor, quality, reducedMotion]);
 
+  useEffect(() => {
+    dealRef.current(cardsRef.current);
+  }, [cardsKey]);
+
   return (
-    <div className={`immersive-scene${attract ? " attract" : ""}`} ref={hostRef}>
+    <div className={`immersive-scene${attract ? " attract" : ""}${reading ? " reading" : ""}`} ref={hostRef} data-reading={reading}>
       <div className="immersive-scene__vignette" aria-hidden="true" />
       {failed ? (
         <div className="immersive-scene__fallback" role="img" aria-label="원탁에 앉아 다른 플레이어와 마주 보는 게임 장면">
@@ -991,7 +1216,7 @@ export default function TableScene({
                 data-player-uid={person.uid}
               >
                 {person.bubble && (
-                  <p className={`table-bubble kind-${person.bubbleKind ?? "say"}`} data-testid="table-bubble">
+                  <p className="table-bubble" data-testid="table-bubble">
                     {person.bubble}
                   </p>
                 )}
@@ -1004,7 +1229,10 @@ export default function TableScene({
                   style={{ "--avatar-color": person.color || COATS[0] } as React.CSSProperties}
                 >
                   <span className="immersive-scene__name-dot" />
-                  <span className="table-nick">{person.nickname}</span>
+                  <span className="table-nick">
+                    {person.order && <span className="table-order">{person.order}</span>}
+                    {person.nickname}
+                  </span>
                   {person.tag && <span className="table-tag">{person.tag}</span>}
                   {person.status && <span className={`table-status ${person.status.tone}`}>{person.status.label}</span>}
                 </button>
@@ -1015,7 +1243,7 @@ export default function TableScene({
       )}
       {!attract && (
       <div className="immersive-scene__controls">
-        <span className="immersive-scene__hint">드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요</span>
+        <span className="immersive-scene__hint">{reading ? "다시 누르면 내려놓아요" : cards?.length ? "카드를 누르면 크게 읽어요 · 드래그해서 둘러보기" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
         <button
           className="immersive-scene__reset"
           type="button"

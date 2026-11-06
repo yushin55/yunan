@@ -1,5 +1,8 @@
-import { chromium, devices, expect } from '@playwright/test';
+import { chromium, devices, expect as baseExpect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+
+// Many browsers on one machine can be slow; a late answer is not a failure.
+const expect = baseExpect.configure({ timeout: 30000 });
 
 // Needs only the web server: the practice mode runs without the API or Firebase.
 const origin = process.env.BRIDGE_UI_URL || 'http://localhost:5173';
@@ -32,10 +35,40 @@ async function pickRoles(page, indices) {
   await page.getByTestId('wardrobe-submit').click();
 }
 
+// A slow machine must not lose the race against the game's clocks: this test moves the game on itself.
+async function longTimers(page) {
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('bridge.practice'));
+    state.snapshot.room.settings.phaseSeconds = { role: 900, statement: 900, event: 900, rebuttal: 900, vote: 900 };
+    state.snapshot.room.settings.micSeconds = 120;
+    localStorage.setItem('bridge.practice', JSON.stringify(state));
+  });
+  await page.reload();
+}
+
+// A blocked or slow font server must not hold up the page's load event.
+const noWebFonts = (context) => context.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
+
 async function play(label, options) {
   const errors = [];
   const context = await browser.newContext(options);
+  await noWebFonts(context);
   const page = await context.newPage();
+  // A stand-in for the browser's speech recognition, which headless Chromium does not have.
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      start() { window.__speech.current = this; }
+      stop() {}
+    }
+    window.SpeechRecognition = FakeRecognition;
+    window.__speech = {
+      say(text) {
+        const result = [{ transcript: text }];
+        result.isFinal = true;
+        this.current.onresult({ resultIndex: 0, results: [result] });
+      },
+    };
+  });
   page.on('pageerror', (e) => errors.push(e.message));
   // A practice game must not reach the API or Firebase.
   page.on('request', (r) => {
@@ -47,12 +80,12 @@ async function play(label, options) {
 
   await page.goto(origin);
   await page.getByTestId('practice-link').click();
-  // Pick a topic card, press start, then give a nickname to enter the room.
+  // Pick a topic card, press start, then give a name to enter the room.
   await expect(page.getByTestId('practice-start-setup')).toBeDisabled();
   await page.getByRole('radio', { name: /학교 내 CCTV/ }).click();
   await page.screenshot({ path: `artifacts/practice-${label}-topics.png` });
   await page.getByTestId('practice-start-setup').click();
-  await page.getByRole('textbox', { name: '닉네임' }).fill('연습생');
+  await page.getByRole('textbox', { name: '이름' }).fill('연습생');
   await page.getByTestId('practice-begin').click();
   await expect(page.getByTestId('flow-overlay')).toBeVisible(); // Briefing, rules and roles fill the screen.
   // Leaving the full-screen steps returns to the lobby, which offers to continue.
@@ -69,6 +102,8 @@ async function play(label, options) {
   await page.screenshot({ path: `artifacts/practice-${label}-wardrobe.png` });
   await expect(page.getByTestId('wardrobe-submit')).toBeInViewport(); // No scrolling to reach it.
   await pickRoles(page, [0, 1]);
+  await expect(page.getByTestId('practice-start')).toBeInViewport();
+  await longTimers(page);
   await expect(page.getByTestId('practice-start')).toBeInViewport();
   await page.getByTestId('practice-view-toggle').click();
   await expect(page.getByTestId('teacher-practice-note')).toBeVisible();
@@ -111,41 +146,210 @@ async function play(label, options) {
   // Nothing may push the page sideways (the status bar must fit on a phone).
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: '역할을 확인했어요' }).click();
-  // Partners confirm within seconds; the phase moves on without the stand-in teacher.
-  await expect(title).toContainText('입장 발표', { timeout: 15000 });
 
-  await page.getByLabel(/이 주제에 대해 어떻게 생각하나요/).fill('닥쳐');
-  await page.getByRole('button', { name: '발표하기' }).click();
-  await expect(page.getByTestId('moderation-notice')).toContainText('표현을 다듬어 주세요');
-  await page.getByLabel(/이 주제에 대해 어떻게 생각하나요/).fill('저는 제 역할로서 학생의 사생활도 함께 지켜야 한다고 생각합니다.');
-  await page.getByRole('button', { name: '발표하기' }).click();
-  await expect(title).toContainText('사건·질문', { timeout: 40000 });
-  await expect(page.locator('.event-card')).toBeVisible();
+  // The discussion: no chat box anywhere, only a small memo. Partners speak by themselves.
+  const mic = page.getByTestId('mic-controls');
+  // Fingers on a phone, keys at a desk: the same two controls.
+  const touch = Boolean(options.hasTouch);
+  const press = async (kind, key) => {
+    await page.locator('#memo-text').blur();
+    if (touch) await page.getByTestId(`mic-${kind}`).click();
+    else await page.keyboard.press(key);
+  };
+  await expect(title).toContainText('입장 발표', { timeout: 40000 });
+  await expect(page.getByTestId('floor-card')).toBeVisible();
+  await expect(page.locator('textarea')).toHaveCount(1);
+  await expect(page.getByTestId('line-input')).toHaveCount(0);
+  await expect(page.getByTestId('statement-item')).toHaveCount(6); // One card per person.
+
+  // The memo: typing "z" in it must not switch on the microphone, and it stays on this device.
+  await page.locator('#memo-text').fill('도윤 말이 조금 이상해');
+  await page.locator('#memo-text').press('z');
+  await expect(page.getByRole('heading', { name: '마이크를 켤까요?' })).toHaveCount(0);
+  await expect(mic).toHaveAttribute('data-live', 'false');
+  await expect(page.locator('#memo-text')).toHaveValue('도윤 말이 조금 이상해z');
+
+  // Only the person whose turn it is can switch on; the teacher can bring a turn forward.
   await page.getByTestId('practice-view-toggle').click();
-  await expect(page.locator('.teacher-room')).toBeVisible();
+  const callMe = page.getByTestId('call-speaker').filter({ hasText: '연습생' });
+  if (await callMe.count()) await callMe.click();
+  await expect(page.getByTestId('current-speaker')).toHaveText('연습생');
+  await page.getByTestId('line-input').fill('마이크가 놓친 말을 적었습니다');
+  await page.getByTestId('line-add').click();
+  await expect(page.locator('.transcript')).toContainText('마이크가 놓친 말을 적었습니다');
+  await page.getByTestId('practice-view-toggle').click();
+
+  // My turn: press, read the notice once, talk.
+  await expect(page.getByTestId('mic-statement')).toBeEnabled();
+  await page.screenshot({ path: `artifacts/practice-${label}-my-turn.png` });
+  await press('statement', 'z');
+  await page.screenshot({ path: `artifacts/practice-${label}-mic-notice.png` });
+  await page.getByTestId('mic-confirm').click();
+  await expect(mic).toHaveAttribute('data-live', 'true');
+  await expect(page.getByTestId('mic-statement')).toContainText('말 끝내기');
+  // Rude words stay off the shared record and wait for the teacher.
+  await page.evaluate(() => window.__speech.say('닥쳐 다 틀렸어'));
+  // What the microphone hears is written down under my name.
+  await page.evaluate(() => window.__speech.say('저는 제 역할로서 학생의 사생활도 함께 지켜야 한다고 생각합니다'));
+  await expect(page.getByTestId('statement-list')).toContainText('사생활도 함께');
+  await expect(page.getByTestId('statement-list')).not.toContainText('닥쳐');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `artifacts/practice-${label}-mic-on.png` });
+  // Pressing again ends the turn. Words the recognizer only hands over afterwards still count as mine.
+  await press('statement', 'z');
+  await expect(mic).toHaveAttribute('data-live', 'false');
+  await expect(page.getByTestId('end-turn')).toHaveCount(0);
+  await page.evaluate(() => window.__speech.say('마지막 한마디도 제 발표입니다'));
+  await expect(page.getByTestId('statement-list')).toContainText('마지막 한마디');
+
+  await expect(title).toContainText('사건·질문', { timeout: 60000 });
+  await expect(page.locator('.event-card')).toBeVisible();
+  await expect(page.getByTestId('end-turn')).toHaveCount(0); // Nobody's turn any more.
+  await expect(page.getByTestId('mic-answer')).toBeVisible();
+
+  // One microphone: while a partner talks mine stays off, whatever I press.
+  await expect(page.getByTestId('mic-question')).toBeDisabled({ timeout: 30000 });
+  await expect(page.getByTestId('mic-answer')).toBeDisabled();
+  await page.keyboard.press('z');
+  await page.keyboard.press('x');
+  await expect(mic).toHaveAttribute('data-live', 'false');
+  await page.screenshot({ path: `artifacts/practice-${label}-locked.png` });
+  await expect(page.getByTestId('exchange-row').last()).toContainText(/질문|답변/);
+  await expect(page.getByTestId('table-bubble').or(page.locator('.exchange-row'))).not.toHaveCount(0);
+
+  // From here on the partners stay quiet, so the microphone is free whenever this test wants it.
+  await expect(page.getByTestId('mic-question')).toBeEnabled({ timeout: 30000 });
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('bridge.practice'));
+    state.schedule = state.schedule.filter((job) => job.action !== 'floor');
+    localStorage.setItem('bridge.practice', JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.locator('#memo-text')).toHaveValue('도윤 말이 조금 이상해z'); // The memo survived the reload.
+
+  // A question: the record says who asked and what.
+  await expect(page.getByTestId('mic-question')).toBeEnabled();
+  await press('question', 'z');
+  await expect(mic).toHaveAttribute('data-live', 'true');
+  await expect(page.getByTestId('mic-answer')).toBeDisabled(); // My own second button waits too.
+  await page.evaluate(() => window.__speech.say('급한 연락은 어떻게 하면 좋을까요'));
+  await expect(page.getByTestId('exchange-row').last()).toContainText('나 질문');
+  await expect(page.getByTestId('exchange-row').last()).toContainText('급한 연락은');
+  await press('question', 'z');
+  await expect(mic).toHaveAttribute('data-live', 'false');
+  // An answer, on the other control.
+  await expect(page.getByTestId('mic-answer')).toBeEnabled({ timeout: 30000 });
+  await press('answer', 'x');
+  await expect(mic).toHaveAttribute('data-live', 'true');
+  await page.evaluate(() => window.__speech.say('담임 선생님께 먼저 연락하면 됩니다'));
+  await expect(page.getByTestId('exchange-row').last()).toContainText('나 답변');
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: `artifacts/practice-${label}-event.png` });
+  await press('answer', 'x');
+  await expect(mic).toHaveAttribute('data-live', 'false');
+  if (!touch) {
+    // With the Korean keyboard on, Z arrives as another letter; it is the key that counts.
+    await expect(page.getByTestId('mic-question')).toBeEnabled({ timeout: 30000 });
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyZ', key: 'ㅋ', bubbles: true })));
+    await expect(mic).toHaveAttribute('data-live', 'true');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyZ', key: 'ㅋ', bubbles: true })));
+    await page.waitForTimeout(200);
+    await expect(mic).toHaveAttribute('data-live', 'true'); // A quick press stays on.
+    await page.keyboard.press('z');
+    await expect(mic).toHaveAttribute('data-live', 'false');
+    // Held down it works like a walkie-talkie: letting go switches off.
+    await expect(page.getByTestId('mic-question')).toBeEnabled({ timeout: 30000 });
+    await page.keyboard.down('z');
+    await expect(mic).toHaveAttribute('data-live', 'true');
+    await page.waitForTimeout(1700);
+    await page.keyboard.up('z');
+    await expect(mic).toHaveAttribute('data-live', 'false');
+  }
+
+  // The time limit switches the microphone off by itself and frees it for the next person.
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('bridge.practice'));
+    state.snapshot.room.settings.micSeconds = 3;
+    localStorage.setItem('bridge.practice', JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.getByTestId('mic-question')).toBeEnabled();
+  await press('question', 'z');
+  await expect(mic).toHaveAttribute('data-live', 'true');
+  await expect(page.getByTestId('mic-remaining')).toContainText('00:0');
+  await expect(mic).toHaveAttribute('data-live', 'false', { timeout: 6000 });
+  await expect(page.getByTestId('mic-question')).toBeEnabled();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')).snapshot.room.floor)).toBeNull();
+
+  // The hand on the table: a card per person, and pressing one holds it up to read.
+  if (await page.getByTestId('table-view').count()) {
+    const scene = page.locator('.immersive-scene');
+    const box = await scene.boundingBox();
+    await expect(scene).toHaveAttribute('data-reading', 'false');
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `artifacts/practice-${label}-hand.png` });
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.7);
+    await expect(scene).toHaveAttribute('data-reading', 'true');
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `artifacts/practice-${label}-card-read.png` });
+    await page.keyboard.press('Escape');
+    await expect(scene).toHaveAttribute('data-reading', 'false');
+  }
+
+  // The shared screen runs the same discussion.
+  await page.getByTestId('practice-view-toggle').click();
+  await expect(page.getByTestId('speaker-stage')).toBeVisible();
+  await expect(page.getByTestId('speaker-eyebrow')).toContainText(/마이크가 비어|지금 말하는 사람/);
+  await expect(page.getByTestId('call-speaker')).toHaveCount(0); // The floor is open: nobody to call on.
   await expect(page.getByTestId('participant-row')).toHaveCount(6);
+  await expect(page.locator('body')).not.toContainText('당신은 역할 전환자');
+  await expect(page.getByTestId('transcript-turn').first()).toBeVisible();
+  await expect(page.locator('.transcript-phase').first()).toHaveText('입장 발표'); // The record is grouped by phase.
+  await expect(page.locator('.transcript .turn-kind').first()).toHaveText(/질문|답변/);
+  await expect(page.getByTestId('summary-position').first()).toBeVisible({ timeout: 40000 });
+  await page.screenshot({ path: `artifacts/practice-${label}-teacher-event.png`, fullPage: true });
+  // Recognition mistakes can be fixed or deleted.
+  const line = page.getByTestId('transcript-line').first();
+  await line.getByRole('button', { name: '이 발언 고치기' }).click();
+  await page.getByRole('textbox', { name: '발언 고치기' }).fill('선생님이 고친 문장입니다');
+  await page.getByRole('button', { name: '고친 내용 저장' }).click();
+  await expect(page.getByTestId('transcript-line').first()).toContainText('선생님이 고친 문장입니다');
+  await page.getByTestId('transcript-line').first().getByRole('button', { name: '이 발언 지우기' }).click();
+  await expect(page.locator('.transcript')).not.toContainText('선생님이 고친 문장입니다');
   await page.getByTestId('moderation-toggle').click();
   await expect(page.getByTestId('moderation-entry')).toHaveCount(1);
   await expect(page.getByRole('button', { name: '문제없음 · 그대로 공개' })).toBeDisabled();
-  await page.screenshot({ path: `artifacts/practice-${label}-teacher-event.png` });
+  await page.getByTestId('moderation-toggle').click();
+  // Classroom display: no teacher panels, only a count of what needs a look.
+  await page.getByTestId('present-toggle').click();
+  await expect(page.locator('.teacher-side')).toBeHidden();
+  await expect(page.getByTestId('review-badge')).toContainText('1');
+  await page.screenshot({ path: `artifacts/practice-${label}-classroom.png`, fullPage: true });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(0);
+  await page.getByTestId('present-toggle').click();
   await page.getByTestId('practice-view-toggle').click();
 
-  // Tapping someone at the table makes them the recipient of the next message.
-  await plate().getByRole('button').click();
-  await page.getByRole('radio', { name: '질문' }).click();
-  await expect(page.getByLabel('받는 사람')).not.toHaveValue('');
-  await page.getByLabel('질문 입력').fill('진짜 그렇게 생각하세요?');
-  await page.getByRole('button', { name: '보내기' }).click();
-  // The asked partner answers, and others respond to the event card.
-  await expect(page.locator('.chat-message.kind-answer')).toHaveCount(1, { timeout: 20000 });
-  await expect(page.locator('.chat-message.kind-response').first()).toBeVisible({ timeout: 45000 });
-  await expect(page.getByTestId('table-bubble').first()).toBeAttached({ timeout: 30000 });
-  await page.screenshot({ path: `artifacts/practice-${label}-event.png` });
-
+  if (page.viewportSize().width >= 1000) {
+    await page.locator('.table-toggle').click();
+    await expect(page.locator('.speaking-memo .notes')).toBeInViewport();
+    await expect(page.getByTestId('memo-pad')).toBeInViewport();
+    await page.screenshot({ path: `artifacts/practice-${label}-table-off.png` });
+    // The full record stays one fold away. Phases read left to right, even before a phase has anything in it.
+    await page.locator('.memo-fold summary').click();
+    const columns = page.locator('.speaking-memo .transcript-phase');
+    await expect(columns).toHaveText(['입장 발표', '사건·질문', '반론']);
+    const [first, second, third] = await Promise.all([0, 1, 2].map(async (i) => (await columns.nth(i).boundingBox()).x));
+    expect(first).toBeLessThan(second);
+    expect(second).toBeLessThan(third);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
+    await page.locator('.memo-fold summary').click();
+    await page.locator('.table-toggle').click();
+    await expect(page.getByTestId('table-view')).toBeVisible();
+  }
   await page.getByTestId('practice-next').click();
   await expect(title).toContainText('반론');
-  await page.getByLabel('반론 입력').fill('그 걱정은 이해하지만 안전도 중요해요.');
-  await page.getByRole('button', { name: '보내기' }).click();
+  await expect(page.getByTestId('mic-rebuttal')).toContainText('반론하기');
+  await expect(page.getByTestId('mic-answer')).toContainText('답변하기');
   await page.getByTestId('practice-next').click();
 
   await expect(title).toContainText('투표');
@@ -157,8 +361,16 @@ async function play(label, options) {
   await expect(page.locator('body')).not.toContainText(/1순위|2순위|최종 의견|진짜 의견/);
   await page.screenshot({ path: `artifacts/practice-${label}-reveal.png` });
 
+  // A reload with lines already said must not stop the summary from refreshing.
   await page.reload();
   await expect(page.getByTestId('reveal')).toBeVisible(); // Saved in this browser.
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('bridge.practice'));
+    delete state.snapshot.rounds.summary;
+    localStorage.setItem('bridge.practice', JSON.stringify(state));
+  });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')).snapshot.rounds.summary?.positions.length ?? 0), { timeout: 15000 }).toBeGreaterThan(0);
   await page.getByTestId('practice-view-toggle').click();
   await page.getByRole('button', { name: '게임 종료' }).click();
   await expect(page.getByTestId('game-summary')).toBeVisible();
@@ -171,6 +383,7 @@ async function play(label, options) {
 
 async function teacherEntry() {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await noWebFonts(context);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

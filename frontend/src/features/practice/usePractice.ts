@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ModerationResult, Snapshot } from "../../types/game";
+import type { Snapshot } from "../../types/game";
 import type { RoomApi } from "../room/useRoom";
 import { act, createPractice, PracticeError, teacherSnapshot, tick, type PracticeState } from "./engine";
 
@@ -8,7 +8,7 @@ const KEY = "bridge.practice";
 function load(): PracticeState | null {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || "null");
-    return value?.version === 2 ? value : null;
+    return value?.version === 4 ? value : null;
   } catch {
     return null;
   }
@@ -45,13 +45,13 @@ export function usePractice() {
   }, [commit]);
 
   const action = useCallback(
-    async (name: string, body: Record<string, unknown> = {}): Promise<(Snapshot & { moderation?: ModerationResult }) | null> => {
+    async (name: string, body: Record<string, unknown> = {}): Promise<Snapshot | null> => {
       if (!current.current) return null;
       setError("");
       try {
         const result = act(current.current, name, body);
         commit(result.state);
-        return { ...result.state.snapshot, moderation: result.moderation };
+        return result.state.snapshot;
       } catch (e) {
         if (!(e instanceof PracticeError)) throw e;
         setError(e.message);
@@ -61,7 +61,14 @@ export function usePractice() {
     [commit],
   );
 
-  const api: RoomApi = { state: practice?.snapshot ?? null, status: "ready", error, setError, busy: false, online: true, offset: 0, action };
+  const quiet = useCallback(
+    async (name: string, body: Record<string, unknown> = {}) => {
+      if (current.current) commit(act(current.current, name, body).state);
+    },
+    [commit],
+  );
+
+  const api: RoomApi = { state: practice?.snapshot ?? null, status: "ready", error, setError, busy: false, online: true, offset: 0, action, quiet };
   return {
     api,
     teacherApi: { ...api, state: practice ? teacherSnapshot(practice) : null } satisfies RoomApi,

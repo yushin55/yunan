@@ -1,9 +1,14 @@
-import { chromium, devices, expect } from '@playwright/test';
+import { chromium, devices, expect as baseExpect } from '@playwright/test';
 import { mkdir } from 'node:fs/promises';
+
+// Many browsers on one machine can be slow; a late answer is not a failure.
+const expect = baseExpect.configure({ timeout: 30000 });
 
 // Requires the frontend, the FastAPI server and the Auth/Firestore emulators.
 // One teacher (desktop) and six students (mobile), each in an isolated browser context.
-// Every move is made through the UI.
+// Every move is made through the UI. Run the API with MODERATION_MODE=rules and no GEMINI_API_KEY.
+// Students take the one microphone from their own phones, but these browsers have no microphone to
+// open: what is said is typed by the teacher. The real audio path has its own test (ui-voice.mjs).
 const origin = process.env.BRIDGE_UI_URL || 'http://localhost:5173';
 const browser = await chromium.launch({ headless: true });
 const pageErrors = [];
@@ -16,10 +21,12 @@ function step(label) {
 
 async function open(name, options) {
   const context = await browser.newContext(options);
+  // A blocked or slow font server must not hold up the page's load event.
+  await context.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
   const page = await context.newPage();
   page.on('pageerror', (error) => pageErrors.push(`${name}: ${error.message}`));
   page.on('console', (msg) => {
-    if (msg.type() === 'error' && !/Failed to load resource|permission-denied/.test(msg.text())) pageErrors.push(`${name}: ${msg.text()}`);
+    if (msg.type() === 'error' && !/Failed to load resource|permission-denied|Could not reach Cloud Firestore|ERR_FAILED/.test(msg.text())) pageErrors.push(`${name}: ${msg.text()}`);
   });
   return { name, context, page };
 }
@@ -64,13 +71,20 @@ try {
   const code = (await teacher.page.getByTestId('room-code').first().textContent()).trim();
   expect(code).toMatch(/^[A-Z0-9]{6}$/);
 
-  step('six students join with nicknames');
+  // Generous clocks so a slow machine does not lose the race; one person's microphone is short enough to watch expire.
+  for (const [name, seconds] of [[/역할 확인/, 300], [/입장 발표/, 300], [/사건 공개/, 600], [/^반론/, 300], [/역할 전환자 투표/, 300], [/1번 말할 때/, 20]]) await teacher.page.getByRole('spinbutton', { name }).fill(String(seconds));
+  await teacher.page.getByRole('button', { name: '설정 저장' }).click();
+  await expect(teacher.page.getByRole('button', { name: '설정 저장' })).toBeDisabled();
+
+  step('six students join with their names');
   const students = [];
   for (let i = 0; i < 6; i++) {
     const student = await open(`student${i}`, { ...devices['Pixel 7'] });
+    // Six software-rendered 3D tables can starve the machine; the phones work the same without them.
+    await student.context.addInitScript(() => localStorage.setItem('bridge.table3d', 'off'));
     student.nickname = `학생${i + 1}`;
     await student.page.goto(`${origin}/join?code=${code}`);
-    await student.page.getByLabel('닉네임').fill(student.nickname);
+    await student.page.getByLabel('이름').fill(student.nickname);
     await student.page.getByRole('button', { name: '입장하기' }).click();
     await student.page.waitForURL(/\/room\//);
     students.push(student);
@@ -115,60 +129,167 @@ try {
   await shot(switcher, 'student-secret-role');
   for (const student of students) await student.page.getByRole('button', { name: '역할을 확인했어요' }).click();
 
-  step('statements: a rude one is sent back privately, then everyone presents');
-  for (const student of students) await expect(phaseTitle(student)).toContainText('입장 발표');
-  await students[0].page.getByLabel(/이 주제에 대해 어떻게 생각하나요/).fill('닥쳐 너희는 다 틀렸어');
-  await students[0].page.getByRole('button', { name: '발표하기' }).click();
-  await expect(students[0].page.getByTestId('moderation-notice')).toContainText('표현을 다듬어 주세요');
-  await expect(students[1].page.getByTestId('moderation-notice')).toHaveCount(0);
-  await shot(students[0], 'student-moderation-notice');
+  // Takes the microphone from a student's phone, reading the notice the first time.
+  const take = async (student, kind) => {
+    await student.page.getByTestId(`mic-${kind}`).click();
+    if (!student.noticed) await student.page.getByTestId('mic-confirm').click();
+    student.noticed = true;
+    await expect(student.page.getByTestId(`mic-${kind}`)).toHaveAttribute('aria-pressed', 'true');
+  };
+  const say = async (text) => {
+    await teacher.page.getByTestId('line-input').fill(text);
+    await teacher.page.getByTestId('line-add').click();
+  };
+  const speakerNow = async () => {
+    const name = (await teacher.page.getByTestId('current-speaker').textContent()).trim();
+    return students.find((s) => s.nickname === name);
+  };
+  const micFree = () => expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('마이크가 비어');
+
+  step('statements: in seat order, only the speaker can switch on');
+  for (const student of students) {
+    await expect(phaseTitle(student)).toContainText('입장 발표');
+    await expect(student.page.getByTestId('line-input')).toHaveCount(0); // Nobody types what is said.
+    await expect(student.page.locator('textarea')).toHaveCount(1); // Only the small memo.
+    await expect(student.page.getByTestId('statement-item')).toHaveCount(6);
+  }
+  // A rude line never reaches the shared record; only the teacher gets to see it.
+  await say('닥쳐 너희는 다 틀렸어');
+  await expect(teacher.page.getByTestId('moderation-toggle')).toContainText('확인 필요 1');
+  await expect(teacher.page.locator('.transcript')).not.toContainText('닥쳐');
   for (const [i, student] of students.entries()) {
-    await student.page.getByLabel(/이 주제에 대해 어떻게 생각하나요/).fill(`저는 ${student.roleName}로서 규칙에 예외가 필요하다고 생각합니다. (${i + 1})`);
-    await student.page.getByRole('button', { name: '발표하기' }).click();
-    if (i < 5) await expect(student.page.getByTestId('statement-done')).toBeVisible();
+    const speaker = await speakerNow();
+    expect(speaker).toBe(student); // Seat order.
+    const other = students[(i + 1) % 6];
+    await expect(speaker.page.getByTestId('mic-statement')).toBeEnabled();
+    await expect(other.page.getByTestId('floor-name')).toHaveText(speaker.nickname);
+    await expect(other.page.getByTestId('mic-statement')).toBeDisabled();
+    await expect(other.page.getByTestId('end-turn')).toHaveCount(0);
+    await say(`저는 ${speaker.roleName}로서 규칙에 예외가 필요하다고 생각합니다. (${i + 1})`);
+    await expect(teacher.page.getByTestId('transcript-turn')).toHaveCount(i + 1);
+    await expect(teacher.page.getByTestId('transcript-turn').nth(i)).toContainText(speaker.nickname);
+    // Everyone's list, and the card behind it, fills in under that person's number.
+    await expect(other.page.getByTestId('statement-item').nth(i)).toContainText(`(${i + 1})`);
+    if (i === 1) await shot(teacher, 'teacher-statement');
+    if (i === 1) await shot(speaker, 'student-my-turn');
+    if (i === 1) await shot(other, 'student-next-up');
+    if (i === 0) {
+      // Pressing once starts and pressing again finishes, handing over to the next person.
+      await take(speaker, 'statement');
+      await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('마이크 켜짐');
+      await expect(speaker.page.getByTestId('end-turn')).toHaveCount(0);
+      await speaker.page.getByTestId('mic-statement').click();
+    } else await speaker.page.getByTestId('end-turn').click();
+    if (i < 5) await expect(teacher.page.getByTestId('current-speaker')).toHaveText(students[i + 1].nickname);
   }
 
-  step('event card, questions and answers');
+  step('event card; the floor is open and there is one microphone');
   for (const who of [teacher, ...students]) await expect(who.page.locator('.event-card')).toBeVisible();
-  // The statements open in a sheet next to the conversation.
-  await students[3].page.getByRole('button', { name: /입장 발표 보기/ }).click();
-  await expect(students[3].page.getByTestId('statement-row')).toHaveCount(6);
-  await students[3].page.getByRole('button', { name: '닫기' }).click();
-  const s0 = students[0].page;
-  await s0.getByRole('radio', { name: '질문' }).click();
-  await s0.getByLabel('받는 사람').selectOption({ label: students[1].nickname });
-  await s0.getByLabel('질문 입력').fill('진짜 그렇게 생각하세요? 급한 연락은 어떻게 하죠?');
-  await s0.getByRole('button', { name: '보내기' }).click();
-  const s1 = students[1].page;
-  await expect(s1.getByTestId('chat-message')).toHaveCount(1);
-  await s1.getByRole('radio', { name: '답변' }).click();
-  await s1.getByLabel('답변 입력').fill('담임 선생님을 통해 연락하면 된다고 봐요.');
-  await s1.getByRole('button', { name: '보내기' }).click();
-  await students[2].page.getByLabel('사건 대응 입력').fill('수행평가 중에는 선생님이 대신 확인해 주면 좋겠어요.');
-  await students[2].page.getByRole('button', { name: '보내기' }).click();
-  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(3);
-  await shot(students[1], 'student-event-chat');
+  await micFree();
+  await expect(teacher.page.getByTestId('call-speaker')).toHaveCount(0);
+  await expect(teacher.page.getByTestId('line-input')).toHaveCount(0); // Nobody is talking, so there is nobody to write for.
+  // Two phones press at the same moment: one gets it and the other is told who did.
+  const [a, b, c] = [students[1], students[3], students[5]];
+  await Promise.all([a, b].map((s) => s.page.getByTestId('mic-question').click()));
+  await Promise.all([a, b].map((s) => s.page.getByTestId('mic-confirm').click()));
+  a.noticed = b.noticed = true;
+  await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('지금 말하는 사람 · 질문');
+  const asker = await speakerNow();
+  const loser = asker === a ? b : a;
+  await expect(asker.page.getByTestId('mic-question')).toHaveAttribute('aria-pressed', 'true');
+  await expect(loser.page.getByTestId('mic-question')).toHaveAttribute('aria-pressed', 'false');
+  await expect(loser.page.getByRole('alert').first()).toContainText(`${asker.nickname}님이 말하고 있어요`);
+  // Everyone else's buttons wait, and so does the asker's other one.
+  for (const student of students) await expect(student.page.getByTestId('mic-answer')).toBeDisabled();
+  await expect(c.page.getByTestId('mic-question')).toBeDisabled();
+  await expect(c.page.getByTestId('floor-name')).toHaveText(asker.nickname);
+  await shot(c, 'student-locked');
+  await say('진짜 그렇게 생각하세요? 급한 연락은 어떻게 하죠?');
+  for (const student of [asker, loser, c]) await expect(student.page.getByTestId('exchange-row').last()).toContainText(`${student === asker ? '나' : asker.nickname} 질문`);
+  await expect(c.page.getByTestId('exchange-row').last()).toContainText('급한 연락은');
+  await asker.page.getByTestId('mic-question').click();
+  await micFree();
+  await take(c, 'answer');
+  await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('답변');
+  await say('담임 선생님을 통해 연락하면 된다고 봐요.');
+  await expect(loser.page.getByTestId('exchange-row').last()).toContainText(`${c.nickname} 답변`);
+  await expect(loser.page.getByTestId('exchange-row').last()).toContainText('담임 선생님');
+  await expect(teacher.page.getByTestId('transcript-turn').nth(6)).toContainText(asker.nickname);
+  await expect(teacher.page.getByTestId('transcript-turn').nth(6)).toContainText('질문');
+  await expect(teacher.page.getByTestId('transcript-turn').nth(7)).toContainText(c.nickname);
+  await expect(teacher.page.getByTestId('transcript-turn').nth(7)).toContainText('답변');
   await shot(teacher, 'teacher-event');
+  await shot(loser, 'student-event');
+  await c.page.getByTestId('mic-answer').click();
+  await micFree();
+
+  step('the teacher corrects a line; students see the correction');
+  await teacher.page.getByTestId('transcript-line').nth(7).getByRole('button', { name: '이 발언 고치기' }).click();
+  await teacher.page.getByRole('textbox', { name: '발언 고치기' }).fill('담임 선생님께 먼저 연락하면 된다고 봐요.');
+  await teacher.page.getByRole('button', { name: '고친 내용 저장' }).click();
+  const reader = loser;
+  await expect(reader.page.getByTestId('exchange-feed')).toContainText('담임 선생님께 먼저');
+  await reader.page.locator('details', { hasText: '전체 발언 기록' }).first().locator('summary').click();
+  await expect(reader.page.locator('.transcript')).toContainText('담임 선생님께 먼저');
+  await expect(reader.page.locator('.line-tools')).toHaveCount(0); // Only the teacher edits.
+  await expect(reader.page.locator('.transcript')).not.toContainText('닥쳐');
+
+  step('the time limit frees the microphone by itself');
+  await take(a, 'question');
+  await expect(teacher.page.getByTestId('current-speaker')).toHaveText(a.nickname);
+  await expect(b.page.getByTestId('mic-question')).toBeDisabled();
+  await micFree(); // Twenty seconds later, with nobody pressing anything.
+  await expect(a.page.getByTestId('mic-question')).toHaveAttribute('aria-pressed', 'false');
+  await expect(b.page.getByTestId('mic-question')).toBeEnabled();
 
   step('a student reloads and returns to the same phase and role');
   await students[2].page.reload();
   await expect(phaseTitle(students[2])).toContainText('사건·질문');
   await expect(students[2].page.getByTestId('role-chip')).toContainText(students[2].roleName);
+  await expect(students[2].page.locator('#memo-text')).toBeVisible();
 
-  step('teacher pauses, resumes and moves to rebuttal');
+  step('reloading while talking gives the microphone back');
+  await take(b, 'question');
+  await expect(teacher.page.getByTestId('current-speaker')).toHaveText(b.nickname);
+  await b.page.reload();
+  await micFree();
+
+  step('teacher pauses with the microphone on, resumes and moves to rebuttal');
+  await take(a, 'question');
   await teacher.page.getByRole('button', { name: '일시정지' }).click();
   await expect(students[4].page.locator('.todo-callout.paused')).toBeVisible();
+  await expect(a.page.getByTestId('mic-question')).toHaveAttribute('aria-pressed', 'false');
+  await expect(a.page.getByTestId('mic-question')).toBeDisabled();
   await teacher.page.getByRole('button', { name: '재개' }).click();
   await expect(students[4].page.locator('.todo-callout.paused')).toHaveCount(0);
+  await micFree();
   await teacher.page.getByTestId('next-phase').click();
   for (const student of students) await expect(phaseTitle(student)).toContainText('반론');
-  await students[3].page.getByLabel('받는 사람').selectOption({ label: students[2].nickname });
-  await students[3].page.getByLabel('반론 입력').fill('선생님이 대신 확인하면 사생활 문제가 생길 수 있어요.');
-  await students[3].page.getByRole('button', { name: '보내기' }).click();
-  await expect(teacher.page.getByTestId('chat-message')).toHaveCount(4);
+  await take(c, 'rebuttal');
+  await say('선생님이 대신 확인하면 사생활 문제가 생길 수 있어요.');
+  await expect(teacher.page.locator('.transcript')).toContainText('사생활 문제');
+  await expect(a.page.getByTestId('exchange-row').last()).toContainText(`${c.nickname} 반론`);
+  await c.page.getByTestId('mic-rebuttal').click();
+  await micFree();
+
+  step('classroom display hides the teacher panels');
+  await teacher.page.getByTestId('present-toggle').click();
+  await expect(teacher.page.locator('.teacher-side')).toBeHidden();
+  await expect(teacher.page.getByTestId('review-badge')).toContainText('1');
+  await expect(teacher.page.locator('body')).not.toContainText('닥쳐');
+  await shot(teacher, 'teacher-classroom');
+  await teacher.page.getByTestId('present-toggle').click();
+
+  step('the teacher decides about the held line');
+  await teacher.page.getByTestId('moderation-toggle').click();
+  await expect(teacher.page.getByTestId('moderation-entry')).toContainText('닥쳐');
+  await teacher.page.getByRole('button', { name: '공개하지 않기' }).click();
+  await expect(teacher.page.getByTestId('moderation-entry')).toContainText('공개하지 않음');
+  await teacher.page.getByTestId('moderation-toggle').click();
 
   step('vote for the switcher');
   await teacher.page.getByTestId('next-phase').click();
+  await expect(teacher.page.getByTestId('transcript-panel')).toBeVisible(); // Still there to look back on.
   for (const student of students) {
     await expect(phaseTitle(student)).toContainText('투표');
     const target = student === switcher ? students.find((s) => s !== switcher) : switcher;
@@ -188,7 +309,7 @@ try {
   await teacher.page.getByRole('button', { name: '게임 종료' }).click();
   await expect(teacher.page.getByTestId('game-summary')).toContainText('참여 인원 6명');
   await expect(students[0].page.getByText('게임이 끝났어요. 참여해 줘서 고마워요!').first()).toBeVisible();
-  await expect(students[0].page.locator('textarea')).toHaveCount(0);
+  await expect(students[0].page.locator('textarea')).toHaveCount(0); // The memo was for the discussion.
   await shot(teacher, 'teacher-ended');
 
   expect(pageErrors).toEqual([]);

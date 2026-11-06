@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import { api, ApiError } from "../../lib/api";
 import { authenticate, db } from "../../lib/firebase";
-import type { HostState, Me, ModerationResult, Participant, Room, Rounds, Snapshot, Viewer } from "../../types/game";
+import type { HostState, Me, Participant, Room, Rounds, Snapshot, Viewer } from "../../types/game";
 import { rememberRoom } from "./roomStorage";
 
 export interface RoomState {
@@ -89,10 +89,10 @@ export function useRoom(roomId: string) {
           patch((s) => ({ ...s, participants: list }));
         }, lost),
         onSnapshot(collection(db, `${root}/publicRounds`), (snap) => {
-          const rounds: Rounds = { statements: [], chat: [] };
+          const rounds: Rounds = { transcript: [] };
           for (const d of snap.docs) {
-            if (d.id === "statements") rounds.statements = d.data().items ?? [];
-            else if (d.id === "chat") rounds.chat = d.data().items ?? [];
+            if (d.id === "transcript") rounds.transcript = d.data().items ?? [];
+            else if (d.id === "summary") rounds.summary = d.data() as Rounds["summary"];
             else if (d.id === "reveal") rounds.reveal = d.data() as Rounds["reveal"];
           }
           patch((s) => ({ ...s, rounds }));
@@ -152,7 +152,7 @@ export function useRoom(roomId: string) {
       setBusy(true);
       setError("");
       try {
-        const next = await api<Snapshot & { moderation?: ModerationResult }>(`/api/rooms/${roomId}/${name}`, body);
+        const next = await api(`/api/rooms/${roomId}/${name}`, body);
         adopt(next);
         setOnline(true);
         return next;
@@ -167,7 +167,16 @@ export function useRoom(roomId: string) {
     [roomId, adopt],
   );
 
-  return { state, status, error, setError, busy, online, offset, action };
+  // Background work (audio clips, summaries): no spinner on the teacher's buttons, and the caller
+  // handles failures. Transcription needs longer than an ordinary request.
+  const quiet = useCallback(
+    async (name: string, body: Record<string, unknown> = {}) => {
+      adopt(await api(`/api/rooms/${roomId}/${name}`, body, 70000));
+    },
+    [roomId, adopt],
+  );
+
+  return { state, status, error, setError, busy, online, offset, action, quiet };
 }
 
 export type RoomApi = ReturnType<typeof useRoom>;

@@ -11,5 +11,5 @@ def topics():
     config = load_game_config()
     return {
         "topics": [public_topic(topic) for topic in load_topics()],
-        "config": {k: config[k] for k in ("minStudents", "maxStudents", "switcherCounts", "defaultSwitcherCount", "phaseSeconds", "phaseSecondsRange", "textLimits")},
+        "config": {k: config[k] for k in ("minStudents", "maxStudents", "switcherCounts", "defaultSwitcherCount", "phaseSeconds", "micSeconds", "phaseSecondsRange", "textLimits")},
     }

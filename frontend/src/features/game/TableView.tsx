@@ -1,11 +1,15 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { TablePlayer } from "../../components/scene/TableScene";
-import type { Participant, Room, Rounds } from "../../types/game";
-import { roleName } from "../chat/ChatFeed";
+import type { Floor, Participant, Room, Rounds } from "../../types/game";
+import { activeFloor, statementCards } from "../discussion/floor";
+import { roleName } from "../roles/roleName";
+import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
 const COLORS = ["#c98d66", "#aaad83", "#a2b3cf", "#86ad98", "#b09bbf", "#d9b263", "#739dba", "#c790a0"];
 const BUBBLE_MS = 25_000;
+// The hand fills up once statements begin; before that it is just cards, face down.
+const CARD_PHASES = ["statement", "event", "rebuttal", "vote", "reveal", "ended"];
 
 function useNow(every: number) {
   const [now, setNow] = useState(Date.now());
@@ -17,7 +21,7 @@ function useNow(every: number) {
 }
 
 /** Status shown on each name plate. Only public facts: nothing about preferences or switchers before the reveal. */
-function status(room: Room, p: Participant, rounds: Rounds): TablePlayer["status"] {
+function status(room: Room, p: Participant, rounds: Rounds, floor: Floor | null): TablePlayer["status"] {
   const done = (key: string, yes: string, no: string) => (p.submitted.includes(key) ? { label: yes, tone: "done" as const } : { label: no, tone: "waiting" as const });
   switch (room.phase) {
     case "lobby":
@@ -25,7 +29,10 @@ function status(room: Room, p: Participant, rounds: Rounds): TablePlayer["status
     case "role":
       return done("role", "확인 완료", "역할 확인 중");
     case "statement":
-      return done("statement", "발표 완료", "작성 중");
+    case "event":
+    case "rebuttal":
+      if (floor?.uid === p.uid) return { label: floor.kind === "statement" ? "말하는 중" : `${KIND_LABEL[floor.kind]} 중`, tone: "done" };
+      return room.turn?.uid === p.uid ? { label: "차례", tone: "waiting" } : undefined;
     case "vote":
       return done("vote", "투표 완료", "고민 중");
     case "reveal":
@@ -59,21 +66,24 @@ export default function TableView({
   onSelect?: (uid: string) => void;
   offset?: number;
 }) {
-  const now = useNow(3000) + offset;
+  const now = useNow(1000) + offset;
+  const floor = activeFloor(room, now);
   const narrow = typeof window !== "undefined" && window.innerWidth < 700;
   const players: TablePlayer[] = participants.map((p) => {
-    const latest = [...rounds.chat].reverse().find((m) => m.uid === p.uid && m.phase === room.phase);
-    const speaking = latest && now - latest.at < BUBBLE_MS;
+    const latest = [...rounds.transcript].reverse().find((m) => m.uid === p.uid && m.phase === room.phase);
+    // Only whoever has the floor gets a bubble, so bubbles never pile up around the table.
+    const speaking = latest && latest.turn === room.phaseVersion && now - latest.at < BUBBLE_MS;
     return {
       uid: p.uid,
       nickname: p.nickname,
+      order: CARD_PHASES.includes(room.phase) ? p.seat + 1 : undefined,
       color: COLORS[p.seat % COLORS.length],
       tag: p.roleId ? roleName(room.topic, p.roleId) : undefined,
-      status: status(room, p, rounds),
-      bubble: speaking ? latest.text : undefined,
-      bubbleKind: speaking ? latest.kind : undefined,
+      status: status(room, p, rounds, floor),
+      bubble: speaking ? (latest.kind === "statement" ? latest.text : `${KIND_LABEL[latest.kind]}: ${latest.text}`) : undefined,
     };
   });
+  const cards = CARD_PHASES.includes(room.phase) ? statementCards(room, participants, rounds, selfUid) : undefined;
   return (
     <div className="table-view" data-testid="table-view">
       <Suspense
@@ -83,7 +93,7 @@ export default function TableView({
           </div>
         }
       >
-        <TableScene players={players} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} phase={room.phase} quality={narrow ? "low" : "high"} />
+        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
     </div>
   );
