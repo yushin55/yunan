@@ -31,7 +31,7 @@ export default function GameBar({
   extra?: React.ReactNode;
 }) {
   const timer = usePhaseTimer(room, offset);
-  const index = STEPS.indexOf(room.phase === "ended" ? "reveal" : room.phase);
+  const index = STEPS.indexOf(room.phase === "ended" ? "reveal" : room.phase === "rebuttal" ? "event" : room.phase);
   const urgent = !timer.paused && timer.remaining !== null && timer.remaining <= 10;
   return (
     <header className="game-bar">

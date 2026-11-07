@@ -168,7 +168,7 @@
   }
 }
 
-/* Name plates float over each head; a speech bubble rises above when someone just spoke. */
+/* Name plates float over each head. */
 .table-label {
   position: absolute;
   top: 0;
@@ -213,48 +213,9 @@
 .table-status.waiting { background: #ffffff14; color: #c9cfca; }
 .table-status.alert { background: #e7735f40; color: #ffc2b6; }
 
-.table-bubble {
-  position: relative;
-  margin: 0;
-  max-width: 220px;
-  padding: 8px 11px;
-  border-radius: 14px;
-  background: #fbf5e8;
-  color: #23201a;
-  font-size: 13px;
-  line-height: 1.4;
-  box-shadow: 0 8px 22px #0008;
-  pointer-events: none;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  animation: bubble-in 260ms ease-out;
-}
-.table-bubble::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -6px;
-  width: 12px;
-  height: 12px;
-  background: inherit;
-  transform: translateX(-50%) rotate(45deg);
-}
-
-@keyframes bubble-in {
-  from { opacity: 0; transform: translateY(6px) scale(0.96); }
-  to { opacity: 1; transform: none; }
-}
-
 @media (max-width: 620px) {
-  .table-label, .table-label .immersive-scene__name, .table-bubble { max-width: 150px; }
+  .table-label, .table-label .immersive-scene__name { max-width: 150px; }
   .table-label .immersive-scene__name { font-size: 12px; padding: 5px 8px; }
-  .table-bubble { font-size: 12px; -webkit-line-clamp: 2; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .table-bubble { animation: none; }
 }
 
 .table-label.is-active { z-index: 2; }
@@ -271,10 +232,45 @@
 .is-narrow .table-status.done { background: #7fc79c; }
 .is-narrow .table-status.waiting { background: #6f7a74; }
 .is-narrow .table-status.alert { background: #e7735f; }
-.is-narrow .table-bubble { max-width: 130px; }
 
 /* A card held up to read: the name plates must not sit on top of its words. */
 .immersive-scene.reading .immersive-scene__labels { visibility: hidden; }
 
 /* Title screen: the table is scenery only. */
 .immersive-scene.attract .immersive-scene__canvas { pointer-events: none; cursor: default; }
+
+/* The card held up to read, as page text so long statements can scroll. It lines up with the
+   3D card lifted behind it (80% of the height, card proportions). */
+.card-reader {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 50%;
+  height: 80%;
+  aspect-ratio: 31 / 43;
+  max-width: 86%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 14px 16px;
+  border: 3px solid #c9b48d;
+  border-radius: 6px;
+  background: #f5eedd;
+  color: #2a2218;
+  box-shadow: 0 18px 40px #000a;
+  animation: reader-in 220ms ease-out 180ms both;
+}
+.card-reader header { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid #c9b48d; }
+.card-reader-no { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+.card-reader header div { display: grid; flex: 1; min-width: 0; }
+.card-reader header strong { font-size: 1.1rem; }
+.card-reader header small { color: #6e5f49; }
+.card-reader header button { padding: 6px 10px; border: 1px solid #c9b48d; border-radius: 8px; background: #fffaf0; color: #2a2218; font: inherit; font-size: 0.85rem; cursor: pointer; }
+.card-reader-body { overflow-y: auto; overscroll-behavior: contain; padding-top: 10px; line-height: 1.65; word-break: keep-all; overflow-wrap: anywhere; scrollbar-width: thin; }
+.card-reader-body p { margin: 0 0 10px; }
+.card-reader-body .muted { color: #8a7a60; }
+.card-reader-body h4 { margin: 6px 0 4px; color: #a0742a; font-size: 0.85rem; }
+@keyframes reader-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .card-reader { animation: none; }
+}

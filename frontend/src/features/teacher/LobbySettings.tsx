@@ -3,7 +3,7 @@ import { Save } from "lucide-react";
 import type { GameSettings, TimedPhase } from "../../types/game";
 import { PHASE_LABELS } from "../game/phases";
 
-const PHASES: TimedPhase[] = ["role", "statement", "event", "rebuttal", "vote"];
+const PHASES: TimedPhase[] = ["role", "statement", "event", "vote"];
 const PER_STUDENT: TimedPhase[] = ["statement"];
 const MIC_RANGE = { min: 10, max: 120 };
 
@@ -57,11 +57,11 @@ export default function LobbySettings({
             </label>
           ))}
           <label>
-            <span>질문·답변·반론 (1번 말할 때)</span>
+            <span>질문·답변 (1번 말할 때)</span>
             <input type="number" min={MIC_RANGE.min} max={MIC_RANGE.max} step={5} value={micSeconds} onChange={(e) => setMicSeconds(Number(e.target.value))} />
           </label>
         </div>
-        <small className="muted">학생 {students}명 기준 진행 시간 합계 약 {Math.round(total / 60)}분 (대기실·결과 확인 제외). 입장 발표는 1명당 시간이 끝나면 다음 학생으로 넘어가요. 사건·반론 단계는 단계 전체 시간 안에서 누구나 마이크를 켜고, 한 번 켜면 정해진 시간까지 말할 수 있어요.</small>
+        <small className="muted">학생 {students}명 기준 진행 시간 합계 약 {Math.round(total / 60)}분 (대기실·결과 확인 제외). 입장 발표는 1명당 시간이 끝나면 다음 학생으로 넘어가요. 사건·질문 단계는 단계 전체 시간 안에서 누구나 마이크를 켜고, 한 번 켜면 정해진 시간까지 말할 수 있어요.</small>
       </fieldset>
       <button
         className="button secondary"

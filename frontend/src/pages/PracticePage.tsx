@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowRight, Bot, FastForward, Flag, Monitor, Play, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
+import { ArrowRight, Bot, FastForward, Flag, Monitor, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
 import { TOPICS } from "../features/practice/engine";
 import { usePractice } from "../features/practice/usePractice";
+import { allReady, useAutoStart } from "../features/game/useAutoStart";
 import { rememberNickname, savedNickname } from "../features/room/roomStorage";
 import Sheet from "../components/Sheet";
 import TopicPicker from "../features/topics/TopicPicker";
@@ -16,6 +17,8 @@ export default function PracticePage() {
   const { api, teacherApi, started, begin, reset } = usePractice();
   // There is no teacher to keep the summary fresh while the player is on the student screen.
   useAutoSummary(api.state?.rounds.transcript ?? [], () => api.quiet("summary"));
+  // No teacher here: the practice page starts the game itself once everyone has picked.
+  const startIn = useAutoStart(allReady(api.state?.room, api.state?.participants), () => void api.action("start"));
   const [teacherView, selectTeacherView] = useState(() => {
     try {
       return sessionStorage.getItem("bridge.practice.view") === "teacher";
@@ -38,7 +41,6 @@ export default function PracticePage() {
   }} />;
   const room = api.state.room;
   const next = PHASE_ORDER[PHASE_ORDER.indexOf(room.phase) + 1];
-  const prefsDone = Boolean(api.state.me?.preferences);
   const restart = () => {
     if (room.phase === "ended" || confirm("지금 연습을 그만두고 처음부터 다시 할까요?")) {
       reset();
@@ -80,25 +82,14 @@ export default function PracticePage() {
       )}
     </>
   );
-  if (teacherView) return <TeacherRoomPage api={teacherApi} practice barControls={controls} />;
+  if (teacherView) return <TeacherRoomPage api={teacherApi} practice barControls={controls} startIn={startIn} />;
   return (
     <StudentRoomPage
       api={api}
       barControls={controls}
       micEngine="browser"
       allowTyping
-      lobbyAction={
-        prefsDone && (
-          <section className="panel practice-start-panel">
-            <p>
-              <strong>준비 완료!</strong> 함께하는 5명은 컴퓨터 연습 상대예요. 선생님 대신 내가 게임을 시작하고, 위의 <strong>다음</strong> 버튼으로 단계를 넘겨요.
-            </p>
-            <button className="button primary full large" data-testid="practice-start" onClick={() => void api.action("start")}>
-              <Play size={18} /> 게임 시작
-            </button>
-          </section>
-        )
-      }
+      startIn={startIn}
     />
   );
 }

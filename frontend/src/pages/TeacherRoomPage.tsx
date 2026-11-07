@@ -10,6 +10,7 @@ import TranscriptFeed, { LineInput } from "../features/discussion/TranscriptFeed
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
+import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
@@ -30,7 +31,8 @@ function useServerNow(offset: number) {
   return now;
 }
 
-export default function TeacherRoomPage({ api, practice = false, barControls }: { api: RoomApi; practice?: boolean; barControls?: React.ReactNode }) {
+/** `startIn` comes from the practice page, which starts the game itself; a real room starts from here. */
+export default function TeacherRoomPage({ api, practice = false, barControls, startIn }: { api: RoomApi; practice?: boolean; barControls?: React.ReactNode; startIn?: number | null }) {
   const { state, action, quiet, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
   const host = state!.host!;
@@ -54,10 +56,17 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
     count > room.maxStudents && `학생은 최대 ${room.maxStudents}명이에요`,
     waiting > 0 && `${waiting}명이 아직 선호 역할을 고르는 중이에요`,
   ].filter(Boolean) as string[];
+  // The game has no rebuttal any more, but the server still steps into it: move straight on to the vote.
+  useEffect(() => {
+    if (phase === "rebuttal" && !practice) void quiet("skip-phase", { phaseVersion: room.phaseVersion }).catch(() => {});
+  }, [phase, practice, quiet, room.phaseVersion]);
+  const autoLeft = useAutoStart(!practice && allReady(room, participants), () => void action("start"));
+  const countdown = practice ? (startIn ?? null) : autoLeft;
   const submittedNow = (key: string) => participants.filter((p) => p.submitted.includes(key)).length;
 
   return (
     <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}${present ? " present" : ""}`}>
+      <StartCountdown left={countdown} />
       <header className="teacher-top">
         <span className="brand-mark">
           브릿지<span>.</span>

@@ -46,15 +46,3 @@ export function answerLine(role: Role, switcher: boolean, rng: Rng) {
     rng,
   );
 }
-
-export function rebuttalLine(role: Role, targetName: string, targetRole: Role | undefined, switcher: boolean, rng: Rng) {
-  if (switcher) return `${targetName}님 말도 맞는 것 같은데… 저는 그래도 조금 다르게 봐요.`;
-  const theirs = targetRole ? strip(targetRole.concerns[0]) : "그 걱정";
-  return pick(
-    [
-      `${targetName}님이 말한 ‘${theirs}’는 이해해요. 하지만 저는 ‘${strip(role.concerns[0])}’라는 점도 함께 봐야 한다고 생각해요.`,
-      `${targetName}님 의견에는 동의하기 어려워요. ${role.name}로서는 ‘${strip(role.goal)}’가 더 우선이에요.`,
-    ],
-    rng,
-  );
-}

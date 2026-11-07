@@ -2,7 +2,7 @@
 // Mirrors the server's phases, turns and rules; the real game never uses this code.
 import topicData from "../../data/practiceTopics.json";
 import type { DiscussionSummary, EventCard, HostState, ModerationEntry, Participant, Phase, Room, Snapshot, SpeakingPhase, SpeechKind, Topic, TranscriptLine } from "../../types/game";
-import { answerLine, rebuttalLine, responseLine, statementLine } from "./lines";
+import { answerLine, responseLine, statementLine } from "./lines";
 import { assignRoles, buildReveal, pick, practiceCheck, shuffle, type Assigned } from "./rules";
 
 interface FullTopic extends Topic {
@@ -12,7 +12,7 @@ interface FullTopic extends Topic {
 type BotAction = "confirm" | "speak" | "finish" | "vote" | "floor" | "release";
 
 export interface PracticeState {
-  version: 4;
+  version: 5;
   snapshot: Snapshot;
   prefs: Record<string, [string, string]>;
   assigned: Record<string, Assigned>;
@@ -29,13 +29,14 @@ export interface PracticeState {
 export const TOPICS = topicData as FullTopic[];
 export const ME = "me";
 const BOTS = ["하늘", "도윤", "서연", "지우", "민준"];
-const ORDER: Phase[] = ["lobby", "role", "statement", "event", "rebuttal", "vote", "reveal", "ended"];
-const TIMED = ["role", "statement", "event", "rebuttal", "vote"];
-const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"], rebuttal: ["rebuttal", "answer"] };
-const SECONDS = { role: 30, statement: 30, event: 120, rebuttal: 90, vote: 60 };
+// No rebuttal phase: the question-and-answer time is longer instead.
+const ORDER: Phase[] = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"];
+const TIMED = ["role", "statement", "event", "vote"];
+const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"] };
+const SECONDS = { role: 20, statement: 30, event: 210, rebuttal: 20, vote: 20 };
 const MIC_SECONDS = 30;
 // Partners leave room to get a word in, then go quiet so the player is never crowded out.
-const BOT_FLOORS = 6;
+const BOT_FLOORS = 9;
 const rng = Math.random;
 const between = (min: number, max: number) => Math.round((min + rng() * (max - min)) * 1000);
 
@@ -57,7 +58,7 @@ export function createPractice(nickname: string, topicId: string | null, now = D
     settings: { switcherCount: 1, phaseSeconds: SECONDS, micSeconds: MIC_SECONDS }, createdAt: now, endedAt: null,
   };
   return {
-    version: 4,
+    version: 5,
     snapshot: {
       viewer: "student", room,
       participants: seats.map((uid, seat) => participant(uid, name(uid), seat)),
@@ -122,14 +123,14 @@ function startPhase(s: PracticeState, phase: Phase, now: number) {
   const plan = (uid: string, action: BotAction, at: number) => s.schedule.push({ uid, action, at: now + at, phaseVersion: v });
   for (const uid of bots(s)) {
     if (phase === "role") plan(uid, "confirm", between(2, 6));
-    if (phase === "vote") plan(uid, "vote", between(3, 12));
+    if (phase === "vote") plan(uid, "vote", between(3, 14));
   }
   if (phase === "statement") {
     const order = s.snapshot.participants.map((p) => p.uid);
     room.turn = { order, index: 0, uid: order[0] };
     planTurn(s, now);
   }
-  if (phase === "event" || phase === "rebuttal") planFloor(s, now + between(3, 5), BOT_FLOORS);
+  if (phase === "event") planFloor(s, now + between(3, 5), BOT_FLOORS);
 }
 
 function nextTurn(s: PracticeState, now: number) {
@@ -194,9 +195,7 @@ function botLine(s: PracticeState, job: PracticeState["schedule"][number]) {
   if (!role) return "";
   if (kind === "statement") return statementLine(role, switcher, rng);
   if (kind === "question") return pick(room.topic.questionPrompts, rng);
-  if (kind === "answer") return room.phase === "event" && s.eventCard && rng() < 0.5 ? responseLine(role, s.eventCard, switcher, rng) : answerLine(role, switcher, rng);
-  const target = pick(s.snapshot.participants.map((p) => p.uid).filter((u) => u !== uid), rng);
-  return rebuttalLine(role, person(s, target).nickname, roleOf(s, target), switcher, rng);
+  return s.eventCard && rng() < 0.5 ? responseLine(role, s.eventCard, switcher, rng) : answerLine(role, switcher, rng);
 }
 
 /** A partner takes the free microphone: an answer if the last person asked something, otherwise the phase's own kind of speech. */
@@ -247,11 +246,8 @@ function localSummary(s: PracticeState): DiscussionSummary {
     if (roleId) roles.set(roleId, [...(roles.get(roleId) ?? []), short(line.text)].slice(-2));
   }
   const questions = lines.filter((l) => l.kind === "question").map((l) => short(l.text));
-  const statements = s.snapshot.participants.flatMap((p) => {
-    const said = lines.filter((l) => l.uid === p.uid && l.kind === "statement").map((l) => l.text);
-    return said.length ? [{ uid: p.uid, text: short(said.join(" ")) }] : [];
-  });
-  return { positions: [...roles].map(([roleId, points]) => ({ roleId, points: [...new Set(points)] })), clashes: [], questions: [...new Set(questions)].slice(-3), statements, source: "local", revision: s.revision, at: Date.now() };
+  // No AI here to sum statements up, so the cards keep every word instead of a cut-off line.
+  return { positions: [...roles].map(([roleId, points]) => ({ roleId, points: [...new Set(points)] })), clashes: [], questions: [...new Set(questions)].slice(-3), source: "local", revision: s.revision, at: Date.now() };
 }
 
 /** Advance time: run partner actions that are due, then check the phase deadline. */

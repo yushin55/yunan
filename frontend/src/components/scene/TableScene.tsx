@@ -12,19 +12,22 @@ export interface TablePlayer {
   /** Public role name, once roles are public. */
   tag?: string;
   status?: { label: string; tone: "done" | "waiting" | "alert" };
-  /** The words this person just said, shown as a speech bubble. */
-  bubble?: string;
 }
 
-/** A card in the viewer's hand: one person's statement, boiled down. */
+/** A card in the viewer's hand: one person's statement boiled down, or a card of my own (roles, identity). */
 export interface HandCard {
   uid: string;
-  order: number;
+  /** The big number in the corner; cards of my own may have none. */
+  order?: number;
   name: string;
   role: string;
   text: string;
+  /** Everything said, shown in full (scrolling) when the card is held up to read. */
+  full?: string;
   state: "waiting" | "speaking" | "done";
 }
+
+const emptyText = (card: HandCard) => (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요");
 
 interface TableSceneProps {
   players: TablePlayer[];
@@ -41,6 +44,8 @@ interface TableSceneProps {
   quality?: "high" | "low";
   /** Title-screen mode: no name plates or controls; the camera slowly looks around the table. */
   attract?: boolean;
+  /** The person my own right hand points at (voting). */
+  pointAt?: string;
 }
 
 type LoungePlayer = TablePlayer;
@@ -124,8 +129,9 @@ function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
   paint.textBaseline = "top";
   paint.fillStyle = "#2a2218";
   paint.font = `800 104px ${CARD_FONT}`;
-  paint.fillText(String(card.order), margin, 40);
-  const left = margin + paint.measureText(String(card.order)).width + 20;
+  const number = card.order === undefined ? "" : String(card.order);
+  paint.fillText(number, margin, 40);
+  const left = number ? margin + paint.measureText(number).width + 20 : margin;
   paint.font = `800 50px ${CARD_FONT}`;
   paint.fillText(wrapText(paint, card.name, W - left - margin, 1)[0] ?? "", left, 50);
   paint.fillStyle = "#6e5f49";
@@ -133,21 +139,31 @@ function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
   paint.fillText(wrapText(paint, card.role, W - left - margin, 1)[0] ?? "", left, 108);
   paint.fillStyle = "#c9b48d";
   paint.fillRect(margin, 168, W - margin * 2, 3);
-  const body = card.text || (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요");
+  const body = card.text || emptyText(card);
   paint.fillStyle = card.text ? "#2a2218" : "#8a7a60";
   paint.font = `500 46px ${CARD_FONT}`;
-  wrapText(paint, body, W - margin * 2, 8).forEach((line, i) => paint.fillText(line, margin, 194 + i * 62));
+  const lines = wrapText(paint, body, W - margin * 2, 99);
+  const more = lines.length > 8 || Boolean(card.full && card.full !== card.text);
+  // Whatever does not fit stays readable: pressing the card opens all of it.
+  const shown = more ? lines.slice(0, 7) : lines;
+  shown.forEach((line, i) => paint.fillText(line, margin, 194 + i * 62));
+  if (more) {
+    paint.fillStyle = "#a0742a";
+    paint.font = `700 40px ${CARD_FONT}`;
+    paint.fillText(lines.length > 7 ? "… 눌러서 전체 보기" : "눌러서 전체 발언 보기", margin, 194 + shown.length * 62);
+  }
 }
 
 function seatAngles(count: number) {
   if (count <= 1) return [0];
-  const span = count >= 8 ? 3.0 : count === 7 ? 2.82 : count === 6 ? 2.6 : count === 5 ? 2.28 : count === 4 ? 1.98 : count === 3 ? 1.55 : 1.05;
+  // Spread out around the far side of the table, with room between neighbours.
+  const span = Math.min(3.2, 1.12 * (count >= 8 ? 3.0 : count === 7 ? 2.82 : count === 6 ? 2.6 : count === 5 ? 2.28 : count === 4 ? 1.98 : count === 3 ? 1.55 : 1.05));
   return Array.from({ length: count }, (_, index) =>
     -span / 2 + (span * index) / (count - 1),
   );
 }
 
-/** The viewer sits at the near edge of the table; everyone else faces that seat. Up to eight people. */
+/** The viewer sits at the near edge of the table; everyone else faces the middle of the table. Up to eight people. */
 export default function TableScene({
   players,
   cards,
@@ -160,7 +176,10 @@ export default function TableScene({
   reducedMotion = false,
   quality = "high",
   attract = false,
+  pointAt,
 }: TableSceneProps) {
+  const pointRef = useRef(pointAt);
+  pointRef.current = pointAt;
   const attractRef = useRef(attract);
   attractRef.current = attract;
   const hostRef = useRef<HTMLDivElement>(null);
@@ -176,7 +195,10 @@ export default function TableScene({
   const dealRef = useRef<(hand?: HandCard[]) => void>(() => {});
   const cardsKey = JSON.stringify(cards ?? null);
   const [failed, setFailed] = useState(false);
-  const [reading, setReading] = useState(false);
+  // The card held up to read (-1: none). Its words are shown as page text so they can scroll.
+  const [readIndex, setReadIndex] = useState(-1);
+  const reading = readIndex >= 0;
+  const closeRef = useRef<() => void>(() => {});
   const [hovered, setHovered] = useState<string | null>(null);
   const people = (players?.length ? players : DEMO_PLAYERS)
     .filter((person) => person.uid !== selfUid)
@@ -631,7 +653,7 @@ export default function TableScene({
       const root = new THREE.Group();
       root.position.set(x, 0, z);
       root.scale.setScalar(seatScale);
-      root.rotation.y = Math.atan2(-x, 3.25 - z);
+      root.rotation.y = Math.atan2(-x, -z);
       world.add(root);
 
       const skin = material(SKIN[index % SKIN.length]);
@@ -749,23 +771,33 @@ export default function TableScene({
       /^#[0-9a-fA-F]{3,8}$/.test(selfColor ?? "") ? selfColor! : "#617885",
     );
     const ownSkin = material("#d7a37e");
-    // Nobody sits in the near seat on the title screen.
+    // Nobody sits in the near seat on the title screen. Each arm turns at the shoulder,
+    // so the right one can point at someone across the table.
+    const shoulder = new THREE.Vector3(0.83, 1.145, 3.14);
+    const armRest = new THREE.Vector3(0.47 - 0.83, 1.18 - 1.145, 2.05 - 3.14).normalize();
+    let rightArm: THREE.Group | null = null;
+    let finger: THREE.Mesh | null = null;
     for (const side of attractRef.current ? [] : [-1, 1]) {
-      const arm = box(
-        world,
-        0.34,
-        0.27,
-        1.15,
-        ownCoat,
-        side * 0.68,
-        1.145,
-        2.59,
-        0.095,
-      );
+      const pivot = new THREE.Group();
+      pivot.position.set(side * shoulder.x, shoulder.y, shoulder.z);
+      world.add(pivot);
+      const at = (x: number, y: number, z: number) => [x - side * shoulder.x, y - shoulder.y, z - shoulder.z] as const;
+      const arm = box(pivot, 0.34, 0.27, 1.15, ownCoat, ...at(side * 0.68, 1.145, 2.59), 0.095);
       arm.rotation.y = side * 0.27;
-      box(world, 0.24, 0.16, 0.36, ownSkin, side * 0.47, 1.18, 2.05, 0.075);
-      box(world, 0.29, 0.055, 0.17, cream, side * 0.57, 1.21, 2.25, 0.018);
+      box(pivot, 0.24, 0.16, 0.36, ownSkin, ...at(side * 0.47, 1.18, 2.05), 0.075);
+      box(pivot, 0.29, 0.055, 0.17, cream, ...at(side * 0.57, 1.21, 2.25), 0.018);
+      if (side === 1) {
+        rightArm = pivot;
+        finger = box(pivot, 0.07, 0.07, 0.2, ownSkin, ...at(0.47 + armRest.x * 0.26, 1.2, 2.05 + armRest.z * 0.26), 0.03);
+        finger.rotation.y = 0.32;
+        finger.visible = false;
+      }
     }
+    let point = 0;
+    let lastPoint: string | undefined;
+    const aimTurn = new THREE.Quaternion();
+    const restTurn = new THREE.Quaternion();
+    const headSpot = new THREE.Vector3();
     // A fan of cards faces the camera. Face down until there are statements, then one per person.
     const cardBack = material("#733f42", 0.6);
     const cardFan = new THREE.Group();
@@ -779,7 +811,7 @@ export default function TableScene({
     let hoverCard = -1;
     const openCardAt = (index: number) => {
       openCard = index;
-      setReading(index >= 0);
+      setReadIndex(index);
       needsRender = true;
     };
     const clearHand = () => {
@@ -1022,6 +1054,7 @@ export default function TableScene({
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointerleave", onPointerLeave);
     renderer.domElement.addEventListener("pointercancel", onPointerCancel);
+    closeRef.current = () => openCardAt(-1);
     resetRef.current = () => {
       yawTarget = 0;
       pitchTarget = -0.025;
@@ -1042,6 +1075,7 @@ export default function TableScene({
         !needsRender &&
         lastFocus === focusRef.current &&
         lastPhase === phaseRef.current &&
+        lastPoint === pointRef.current &&
         aimedMode === cameraModeRef.current
       )
         return;
@@ -1052,6 +1086,7 @@ export default function TableScene({
       lastRender = now;
       lastFocus = focusRef.current;
       lastPhase = phaseRef.current;
+      lastPoint = pointRef.current;
       needsRender = false;
       const t = stopMotion ? 0 : (now - startTime) / 1000;
       if (aimedFocus !== focusRef.current || aimedMode !== cameraModeRef.current) {
@@ -1114,6 +1149,22 @@ export default function TableScene({
         card.group.quaternion.slerpQuaternions(card.homeTurn, camera.quaternion, card.lift);
         card.group.scale.setScalar(1 + (readScale - 1) * card.lift);
       });
+      // Voting: the right arm swings up from the hand of cards and points at the chosen person.
+      if (rightArm && finger) {
+        const target = avatars.find((avatar) => avatar.uid === pointRef.current);
+        if (target) {
+          target.head.getWorldPosition(headSpot);
+          aimTurn.setFromUnitVectors(armRest, headSpot.sub(rightArm.position).normalize());
+        }
+        const goal = target ? 1 : 0;
+        point += (goal - point) * cardSpeed;
+        if (Math.abs(goal - point) < 0.001) point = goal;
+        else needsRender = true;
+        rightArm.quaternion.slerpQuaternions(restTurn, aimTurn, point);
+        finger.visible = point > 0.5;
+        // The hand of cards dips out of the way while pointing.
+        cardFan.position.y = (width < 620 ? 0.18 : 0) - point * 0.32;
+      }
       for (const avatar of avatars) {
         avatar.head.rotation.y = stopMotion
           ? 0
@@ -1128,7 +1179,7 @@ export default function TableScene({
           ? 0
           : Math.sin(t * 0.82 + avatar.index + 1.3) * 0.042;
         const focused =
-          focusRef.current === avatar.uid || hoverUid === avatar.uid;
+          focusRef.current === avatar.uid || hoverUid === avatar.uid || pointRef.current === avatar.uid;
         avatar.halo.visible = focused;
         avatar.root.scale.setScalar(seatScale * (focused ? 1.025 : 1));
         const label = labelRefs.current.get(avatar.uid);
@@ -1186,6 +1237,7 @@ export default function TableScene({
       renderer.domElement.remove();
       scene.clear();
       resetRef.current = () => {};
+      closeRef.current = () => {};
     };
   }, [peopleKey, selfColor, quality, reducedMotion]);
 
@@ -1204,7 +1256,7 @@ export default function TableScene({
       ) : attract ? null : (
         <div className="immersive-scene__labels" aria-label="원탁의 참가자">
           {people.map((person) => {
-            const active = focusPlayerUid === person.uid || activePlayer === person.uid || hovered === person.uid;
+            const active = focusPlayerUid === person.uid || activePlayer === person.uid || pointAt === person.uid || hovered === person.uid;
             return (
               <div
                 key={person.uid}
@@ -1215,11 +1267,6 @@ export default function TableScene({
                 className={`table-label${active ? " is-active" : ""}`}
                 data-player-uid={person.uid}
               >
-                {person.bubble && (
-                  <p className="table-bubble" data-testid="table-bubble">
-                    {person.bubble}
-                  </p>
-                )}
                 <button
                   type="button"
                   className={`immersive-scene__name${active ? " immersive-scene__name--active" : ""}`}
@@ -1241,9 +1288,10 @@ export default function TableScene({
           })}
         </div>
       )}
+      {reading && cards?.[readIndex] && <CardReader card={cards[readIndex]} onClose={() => closeRef.current()} />}
       {!attract && (
       <div className="immersive-scene__controls">
-        <span className="immersive-scene__hint">{reading ? "다시 누르면 내려놓아요" : cards?.length ? "카드를 누르면 크게 읽어요 · 드래그해서 둘러보기" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
+        <span className="immersive-scene__hint">{reading ? "다시 누르면 내려놓아요" : phase === "vote" ? "사람을 눌러 가리키면 투표할 사람으로 골라요" : cards?.length ? "카드를 누르면 크게 읽어요 · 드래그해서 둘러보기" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
         <button
           className="immersive-scene__reset"
           type="button"
@@ -1257,6 +1305,34 @@ export default function TableScene({
         </button>
       </div>
       )}
+    </div>
+  );
+}
+
+/** A card held up to read: all of its words, scrolling when they are long. */
+function CardReader({ card, onClose }: { card: HandCard; onClose: () => void }) {
+  const extra = card.full && card.full !== card.text ? card.full : "";
+  return (
+    <div className="card-reader" role="dialog" aria-label={`${card.name} 카드`} data-testid="card-reader">
+      <header>
+        {card.order !== undefined && <span className="card-reader-no">{card.order}</span>}
+        <div>
+          <strong>{card.name}</strong>
+          <small>{card.role}</small>
+        </div>
+        <button type="button" onClick={onClose}>
+          내려놓기
+        </button>
+      </header>
+      <div className="card-reader-body" tabIndex={0}>
+        <p className={card.text ? undefined : "muted"}>{card.text || emptyText(card)}</p>
+        {extra && (
+          <>
+            <h4>전체 발언</h4>
+            <p>{extra}</p>
+          </>
+        )}
+      </div>
     </div>
   );
 }

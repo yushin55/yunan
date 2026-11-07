@@ -14,6 +14,6 @@ export function usePhaseTimer(room: Room | undefined, offset: number) {
     return { remaining, label: formatSeconds(remaining), paused: true };
   }
   if (!room.phaseEndsAt) return { remaining: null, label: "" };
-  const remaining = Math.max(0, Math.ceil((room.phaseEndsAt - now - offset) / 1000));
+  const remaining = Math.max(0, Math.ceil((room.phaseEndsAt - Math.max(now, Date.now()) - offset) / 1000));
   return { remaining, label: formatSeconds(remaining), paused: false };
 }

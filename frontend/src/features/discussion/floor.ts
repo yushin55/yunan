@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import type { Floor, Participant, Room, Rounds, SpeechKind, TranscriptLine } from "../../types/game";
 import { roleName } from "../roles/roleName";
 
-const CARD_LIMIT = 70;
-
 /** The microphone, unless its time ran out. A speaker whose device died still frees it for everyone. */
 export function activeFloor(room: Room, serverNow: number): Floor | null {
   return room.floor && room.floor.endsAt > serverNow ? room.floor : null;
@@ -29,17 +27,16 @@ export interface StatementCard {
   order: number;
   name: string;
   role: string;
+  /** The AI's short version once there is one, otherwise everything they said. */
   text: string;
+  /** Everything they said, word for word. */
+  full: string;
   state: "waiting" | "speaking" | "done";
 }
 
-function shorten(text: string) {
-  return text.length > CARD_LIMIT ? `${text.slice(0, CARD_LIMIT)}…` : text;
-}
-
 /**
- * One card per person: what they said in their statement, the AI's short version once there is one
- * and their first words until then. The list on the desk and the cards in hand both read this.
+ * One card per person: their statement, summed up, with every word they said kept beside it.
+ * The list on the desk and the cards in hand both read this.
  */
 export function statementCards(room: Room, participants: Participant[], rounds: Rounds, myUid?: string): StatementCard[] {
   const turn = room.phase === "statement" ? room.turn : null;
@@ -53,7 +50,8 @@ export function statementCards(room: Room, participants: Participant[], rounds: 
       order: p.seat + 1,
       name: p.uid === myUid ? "나" : p.nickname,
       role: roleName(room.topic, p.roleId),
-      text: summary ?? shorten(said.map((l) => l.text).join(" ")),
+      text: summary ?? said.map((l) => l.text).join(" "),
+      full: said.map((l) => l.text).join(" "),
       state,
     };
   });

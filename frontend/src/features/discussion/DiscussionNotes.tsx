@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
-import { KIND_LABEL } from "../game/phases";
-import { exchangeRows, statementCards } from "./floor";
+import { exchangeRows, statementCards, type ExchangeRow } from "./floor";
 
 const MEMO_LIMIT = 500;
 
@@ -18,6 +17,7 @@ export function StatementList({ room, participants, rounds, myUid }: { room: Roo
               <strong>{card.name}</strong> {card.role && <span>{card.role}</span>}
             </p>
             <p className={card.text ? "statement-text" : "statement-text muted"}>{card.text || (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요")}</p>
+            {card.full && card.full !== card.text && <p className="statement-full">{card.full}</p>}
           </div>
         </li>
       ))}
@@ -25,29 +25,41 @@ export function StatementList({ room, participants, rounds, myUid }: { room: Roo
   );
 }
 
-/** "민준 질문 …", "서연 답변 …": who asked and answered what, newest at the bottom. */
-export function ExchangeFeed({ participants, rounds, floor, myUid }: { participants: Participant[]; rounds: Rounds; floor: Floor | null; myUid?: string }) {
-  const rows = exchangeRows(rounds.transcript, floor);
-  const list = useRef<HTMLOListElement>(null);
-  const last = `${rows.length}.${rows.at(-1)?.text.length ?? 0}`;
-  useEffect(() => {
-    list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" });
-  }, [last]);
-  if (!rows.length) return <p className="muted small exchange-empty">아직 질문이 없어요. 궁금한 것이 있으면 먼저 눌러 주세요.</p>;
+/**
+ * Just the questions ("Q. …"), each opening to the answers given after it. Rebuttals head their
+ * own group the same way, since answers follow them too.
+ */
+export function QuestionList({ participants, rounds, floor, myUid }: { participants: Participant[]; rounds: Rounds; floor: Floor | null; myUid?: string }) {
+  const groups: { head: ExchangeRow; replies: ExchangeRow[] }[] = [];
+  for (const row of exchangeRows(rounds.transcript, floor)) {
+    if (row.kind === "answer" && groups.length) groups.at(-1)!.replies.push(row);
+    else groups.push({ head: row, replies: [] });
+  }
+  const who = (uid: string) => (uid === myUid ? "나" : (participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자"));
+  const said = (row: ExchangeRow) => (row.pending ? "말하는 중이에요" : row.text);
+  if (!groups.length) return <p className="muted small exchange-empty">아직 질문이 없어요. 궁금한 것이 있으면 먼저 눌러 주세요.</p>;
   return (
-    <ol className="exchange-feed" ref={list} role="log" tabIndex={0} aria-label="질문과 답변" data-testid="exchange-feed">
-      {rows.map((row) => {
-        const person = participants.find((p) => p.uid === row.uid);
-        return (
-          <li key={row.key} className={`exchange-row kind-${row.kind}`} data-testid="exchange-row">
-            <p className="exchange-who">
-              <strong>{row.uid === myUid ? "나" : (person?.nickname ?? "나간 참가자")}</strong> {KIND_LABEL[row.kind]}
-            </p>
-            <p className={row.pending ? "muted" : undefined}>{row.pending ? "말하는 중이에요" : row.text}</p>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="question-list" data-testid="question-list">
+      {groups.map(({ head, replies }) => (
+        <details key={head.key} className={`question kind-${head.kind}`} data-testid="question">
+          <summary>
+            <b>{head.kind === "question" ? "Q." : head.kind === "rebuttal" ? "반론." : "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
+            <small className="muted"> · {who(head.uid)}</small>
+          </summary>
+          {replies.length ? (
+            <ol className="question-replies">
+              {replies.map((r) => (
+                <li key={r.key}>
+                  <b>A.</b> <strong>{who(r.uid)}</strong> <span className={r.pending ? "muted" : undefined}>{said(r)}</span>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="muted small">아직 답변이 없어요.</p>
+          )}
+        </details>
+      ))}
+    </div>
   );
 }
 

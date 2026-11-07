@@ -52,7 +52,7 @@
 /* Sorted-out notes: each statement in short, then who asked and answered what. Words on the panel, nothing boxed. */
 .notes { display: grid; gap: 18px; word-break: keep-all; overflow-wrap: anywhere; }
 .notes-part { display: grid; align-content: start; gap: 8px; min-width: 0; }
-.statement-list, .exchange-feed { display: grid; align-content: start; margin: 0; padding: 0; list-style: none; }
+.statement-list { display: grid; align-content: start; margin: 0; padding: 0; list-style: none; }
 .statement-list { gap: 10px; }
 .statement-list li { display: grid; grid-template-columns: 1.5em minmax(0, 1fr); gap: 2px 8px; }
 .statement-no { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -60,13 +60,8 @@
 .statement-who { margin: 0; }
 .statement-who span { color: var(--muted); font-size: 0.86rem; }
 .statement-text { margin: 2px 0 0; line-height: 1.6; }
-.statement-list p, .exchange-row p { font-weight: 400; }
-.statement-who strong, .exchange-who strong { font-weight: 700; }
-.exchange-feed { gap: 12px; max-height: 42vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-.exchange-row p { margin: 0; line-height: 1.6; }
-.exchange-who { color: var(--gold); font-size: 0.92rem; }
-.exchange-who strong { color: var(--text); font-size: 1rem; }
-.exchange-row.kind-answer { margin-left: 16px; }
+.statement-list p { font-weight: 400; }
+.statement-who strong { font-weight: 700; }
 .exchange-empty { margin: 0; }
 .turn-kind { color: var(--gold); font-size: 0.86rem; font-weight: 700; }
 
@@ -203,36 +198,29 @@ details.panel .transcript { max-height: none; padding-right: 0; overflow: visibl
 .floor-card .floor-name { margin: 0; font-family: var(--serif); font-size: 1.7rem; line-height: 1.25; overflow-wrap: anywhere; }
 .floor-card p { margin: 0; }
 .floor-card .button { justify-self: start; margin-top: 8px; }
-.role-tips { margin: 6px 0 0; padding-left: 18px; font-weight: 400; }
 .room-layout .todo-callout:not(.paused) { padding: 0; border: 0; background: none; font-weight: 400; }
 .room-layout .todo-callout:not(.paused) > span { color: var(--muted); font-weight: 600; letter-spacing: 0; }
 
-.speaking-main { padding: 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
-.speaking-main > * + * { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-.speaking-main > .panel, .speaking-main > .event-card { margin-bottom: 0; padding-inline: 0; padding-bottom: 0; border-inline: 0; border-bottom: 0; border-radius: 0; background: none; }
-.speaking-main > .panel:first-child { padding-top: 0; border-top: 0; }
-.speaking-main > .event-card.collapsible { padding: 16px 0 0; }
-.speaking-main .event-card-head { padding: 0; }
-.speaking-main .event-card.collapsible p { margin: 8px 0 6px; font-weight: 400; }
-.speaking-main .event-card.collapsible small { margin: 0; }
-.speaking-main .role-reminder { margin: 0 0 8px; padding: 0; border: 0; background: none; font-weight: 400; }
-.speaking-main .roster li { padding: 4px 0; background: none; }
+/* Side panel beside the table: the microphone pops out on top, then the event, questions and memo. */
+.speaking-side { display: grid; gap: 12px; margin-bottom: 12px; }
+.speaking-side > * { margin: 0; }
+.mic-popup { border-color: var(--gold); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45); }
+.questions h3 { margin: 0 0 8px; }
+.question-list { display: grid; gap: 6px; max-height: 46vh; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; word-break: keep-all; overflow-wrap: anywhere; }
+.question { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-2); }
+.question summary { cursor: pointer; padding: 8px 10px; line-height: 1.5; }
+.question summary b { color: var(--gold); }
+.question[open] summary { border-bottom: 1px solid var(--line); }
+.question > p { margin: 0; padding: 8px 10px; }
+.question-replies { display: grid; gap: 6px; margin: 0; padding: 8px 10px; list-style: none; line-height: 1.5; }
+.question-replies b { color: #a6e3bd; }
+.vote-pointed { margin: 10px 0; padding: 10px 12px; border-radius: 10px; border: 1px dashed var(--gold); background: var(--gold-soft); }
 
-.speaking-stage > * { margin-bottom: 12px; }
-
-/* 3D table off on a wide window: what to do on the left, the record beside it. Each column scrolls
-   by itself, so the current turn stays in sight without moving the page. */
-@media (min-width: 1000px) {
-  .room-layout.spread { max-width: 1760px; }
-  .student-room .room-layout.spread .desk { overflow: hidden; }
-  .student-room .desk > .speaking-stage.spread { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); gap: 14px; margin-bottom: 12px; }
-  .speaking-stage.spread > * { margin: 0; min-height: 0; }
-  .speaking-stage.spread .speaking-main { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-  /* The notes get the room, questions beside statements; the full record stays folded until someone wants it. */
-  .speaking-stage.spread .speaking-memo { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 14px; }
-  .speaking-stage.spread .notes { min-height: 0; margin: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; align-content: start; }
-  .speaking-stage.spread .notes.both { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
-  .speaking-stage.spread .exchange-feed { max-height: none; overflow: visible; }
-  .speaking-stage.spread .memo-fold { margin: 0; padding-block: 14px; max-height: 42vh; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+/* "모두 역할을 골랐어요 · 3, 2, 1" before the game starts by itself. */
+.start-countdown { position: fixed; inset: 0; z-index: 90; display: grid; place-content: center; justify-items: center; gap: 8px; background: rgba(6, 10, 9, 0.72); pointer-events: none; text-align: center; }
+.start-countdown span { font-size: 1.2rem; font-weight: 700; }
+.start-countdown strong { font-family: var(--serif); font-size: clamp(5rem, 22vw, 10rem); line-height: 1; color: var(--gold); animation: count-pop 0.6s ease-out; }
+@keyframes count-pop { from { transform: scale(1.5); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .start-countdown strong { animation: none; }
 }
-.role-tips { margin: 6px 0 0; padding-left: 18px; }

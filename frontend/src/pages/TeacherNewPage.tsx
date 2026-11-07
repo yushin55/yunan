@@ -5,6 +5,10 @@ import { api } from "../lib/api";
 import TopicPicker from "../features/topics/TopicPicker";
 import { useTopics } from "../features/topics/useTopics";
 
+// Role check and voting are kept short and questions get the time rebuttals used to have
+// (240 + 180 seconds). The teacher can still change them in the lobby.
+const QUICK_PHASES = { role: 20, event: 420, vote: 20 };
+
 export default function TeacherNewPage() {
   const { catalog, error: loadError } = useTopics();
   const [topicId, setTopicId] = useState<string | null>(null);
@@ -18,7 +22,7 @@ export default function TeacherNewPage() {
     setBusy(true);
     setError("");
     try {
-      const snapshot = await api("/api/rooms", { ...(random ? { randomTopic: true } : { topicId }), switcherCount: switchers });
+      const snapshot = await api("/api/rooms", { ...(random ? { randomTopic: true } : { topicId }), switcherCount: switchers, phaseSeconds: QUICK_PHASES });
       navigate(`/room/${snapshot.room.roomId}`);
     } catch (e) {
       setError((e as Error).message);

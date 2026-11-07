@@ -8,7 +8,7 @@ const KEY = "bridge.practice";
 function load(): PracticeState | null {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) || "null");
-    return value?.version === 4 ? value : null;
+    return value?.version === 5 ? value : null;
   } catch {
     return null;
   }

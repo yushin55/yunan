@@ -18,6 +18,7 @@ export default function VotePanel({
   onVote,
   picked,
   onPick,
+  atTable = false,
 }: {
   candidates: Participant[];
   topic: Topic;
@@ -28,6 +29,8 @@ export default function VotePanel({
   onVote: (targets: string[]) => void;
   picked: string[];
   onPick: (picked: string[]) => void;
+  /** With the 3D table on, people are picked by pointing at them there instead of with buttons. */
+  atTable?: boolean;
 }) {
   if (myVote) {
     const names = myVote.map((uid) => candidates.find((c) => c.uid === uid)?.nickname).join(", ");
@@ -43,6 +46,17 @@ export default function VotePanel({
       <p className="muted">
         {count === 1 ? "역할 전환자라고 생각하는 사람 1명을 고르세요." : "역할 전환자라고 생각하는 서로 다른 2명을 고르세요."} 나 자신에게는 투표할 수 없어요.
       </p>
+      {atTable ? (
+        <p className="vote-pointed" data-testid="vote-pointed">
+          {picked.length ? (
+            <>
+              가리킨 사람: <strong>{picked.map((uid) => candidates.find((c) => c.uid === uid)?.nickname).join(", ")}</strong>
+            </>
+          ) : (
+            "테이블에서 의심 가는 사람을 눌러 가리켜 주세요. 다시 누르면 취소돼요."
+          )}
+        </p>
+      ) : (
       <div className="candidates" role="group" aria-label="투표 후보">
         {candidates.map((p) => (
           <button
@@ -58,6 +72,7 @@ export default function VotePanel({
           </button>
         ))}
       </div>
+      )}
       <button className="button primary full" disabled={busy || disabled || picked.length !== count} onClick={() => onVote(picked)}>
         <Vote size={17} /> {picked.length === count ? "이대로 투표하기" : `${count - picked.length}명 더 골라 주세요`}
       </button>

@@ -35,7 +35,6 @@ export default function ParticipationBoard({
             {started && <th scope="col">역할 확인</th>}
             {started && <th scope="col">입장 발표</th>}
             {started && <th scope="col">사건·질문</th>}
-            {started && <th scope="col">반론</th>}
             {started && <th scope="col">투표</th>}
             <th scope="col">연결</th>
             {onKick && <th scope="col" className="sr-only">내보내기</th>}
@@ -52,7 +51,6 @@ export default function ParticipationBoard({
                 {started && <td>{mark(p.submitted.includes("role"))}</td>}
                 {started && <td>{turnsSpoken(rounds, "statement", p.uid)}</td>}
                 {started && <td>{turnsSpoken(rounds, "event", p.uid)}</td>}
-                {started && <td>{turnsSpoken(rounds, "rebuttal", p.uid)}</td>}
                 {started && <td>{mark(p.submitted.includes("vote"))}</td>}
                 <td>
                   <span className={`dot ${online ? "on" : "off"}`} /> {online ? "접속" : "끊김"}
@@ -82,7 +80,6 @@ export function GameSummary({ participants, rounds }: { participants: Participan
     ["역할 확인", `${has("role")}/${total}명`],
     ["입장 발표", `${talked("statement")}/${total}명`],
     ["사건 대응·질문·답변", `${talked("event")}/${total}명 · ${turnsSpoken(rounds, "event")}차례`],
-    ["반론", `${talked("rebuttal")}/${total}명 · ${turnsSpoken(rounds, "rebuttal")}차례`],
     ["투표", `${rounds.reveal ? rounds.reveal.ballots.filter((b) => b.voted).length : has("vote")}/${total}명`],
   ];
   return (

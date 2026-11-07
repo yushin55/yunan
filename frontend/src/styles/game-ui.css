@@ -176,48 +176,39 @@
   .game-bar .net.on { display: none; }
 }
 
-/* ── Role selection as a dressing room ───────────────────────────── */
-.wardrobe { display: grid; gap: 14px; margin-top: 6px; }
+/* ── Role selection: flip cards dragged into two slots ───────────────────────────── */
+.role-deck { display: grid; gap: 14px; margin-top: 6px; }
+.role-deck-hint { margin: 0; text-align: center; }
 .wardrobe-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.wardrobe-slot { position: relative; display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 140px; padding: 26px 8px 10px; border-radius: 14px; border: 2px dashed var(--line); background: var(--bg-2); color: var(--muted); text-align: center; }
+.wardrobe-slot { position: relative; display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 140px; padding: 26px 8px 10px; border-radius: 14px; border: 2px dashed var(--line); background: var(--bg-2); color: var(--muted); text-align: center; transition: border-color 0.15s, transform 0.15s; }
 .wardrobe-slot.filled { border-style: solid; border-color: var(--gold); background: var(--gold-soft); color: var(--text); }
+.wardrobe-slot.over { border-color: var(--gold); transform: scale(1.03); }
 .wardrobe-slot .role-avatar { height: 92px; width: auto; }
 .wardrobe-slots.done .wardrobe-slot .role-avatar { height: 120px; }
 .slot-rank { position: absolute; top: 6px; left: 8px; padding: 1px 8px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-weight: 900; font-size: 0.78rem; }
-.slot-view { border: 0; background: none; padding: 0; cursor: pointer; }
 .slot-remove { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; }
 
-.dress-room { position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; padding: 8px; border-radius: 18px; background: radial-gradient(120% 90% at 50% 0%, #2c4a40 0%, #0f1a17 70%); border: 1px solid var(--line); touch-action: pan-y; outline: none; }
-.dress-room:focus-visible { outline: 3px solid var(--gold); }
-.dress-arrow { width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(230, 184, 92, 0.5); background: rgba(0, 0, 0, 0.35); color: var(--gold); display: grid; place-items: center; cursor: pointer; }
-.dress-arrow:hover { background: var(--gold); color: var(--gold-ink); }
-.dress-stage { position: relative; height: clamp(240px, 42vh, 360px); overflow: hidden; }
-.dress-light { position: absolute; top: -10%; left: 50%; width: 70%; height: 110%; transform: translateX(-50%); background: radial-gradient(ellipse at 50% 0%, rgba(255, 236, 190, 0.35), transparent 65%); clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%); }
-.dress-platform { position: absolute; bottom: 4%; left: 50%; width: 62%; height: 14%; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(ellipse, #e6b85c 0%, rgba(230, 184, 92, 0.25) 45%, transparent 70%); }
-.dress-model { position: absolute; z-index: 1; left: 0; right: 0; bottom: 5%; height: 88%; display: flex; justify-content: center; animation: model-idle 3.2s ease-in-out infinite; }
-.dress-model .role-avatar { height: 100%; width: auto; filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.5)); }
-.dress-model.enter-right { animation: model-in-right 420ms cubic-bezier(0.2, 0.8, 0.2, 1), model-idle 3.2s ease-in-out 420ms infinite; }
-.dress-model.enter-left { animation: model-in-left 420ms cubic-bezier(0.2, 0.8, 0.2, 1), model-idle 3.2s ease-in-out 420ms infinite; }
-@keyframes model-in-right { from { opacity: 0.35; transform: translateX(30%) scale(0.94); } to { opacity: 1; transform: none; } }
-@keyframes model-in-left { from { opacity: 0.35; transform: translateX(-30%) scale(0.94); } to { opacity: 1; transform: none; } }
-@keyframes model-idle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
-.dress-rank { position: absolute; z-index: 2; top: 10px; right: 10px; padding: 4px 12px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-weight: 900; }
-.dress-count { position: absolute; z-index: 2; top: 10px; left: 10px; color: var(--muted); font-size: 0.85rem; font-variant-numeric: tabular-nums; }
-.dress-info { display: grid; gap: 6px; padding: 14px 16px; border-radius: 14px; background: var(--bg-2); border: 1px solid var(--line); animation: info-in 320ms ease-out; }
-@keyframes info-in { from { opacity: 0.4; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.dress-info h3 { font-family: var(--serif); font-size: 1.4rem; margin: 0; }
-.dress-info p { margin: 0; }
-.dress-info .label { color: var(--gold); margin-right: 6px; }
-.wardrobe-rack { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
-.rack-item { position: relative; flex: 0 0 86px; display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); cursor: pointer; }
-.rack-item .role-avatar { height: 64px; width: auto; }
-.rack-item span { font-size: 0.72rem; line-height: 1.2; text-align: center; color: var(--muted); }
-.rack-item.active { border-color: var(--text); }
-.rack-item.picked { border-color: var(--gold); background: var(--gold-soft); }
-.rack-item em { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: var(--gold-ink); font-style: normal; font-weight: 900; font-size: 0.75rem; display: grid; place-items: center; }
+.role-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.role-flip { position: relative; aspect-ratio: 3 / 4; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; perspective: 900px; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.role-flip:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 14px; }
+.role-flip.dragging { opacity: 0.4; }
+.role-flip-inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.role-flip.flipped .role-flip-inner { transform: rotateY(180deg); }
+.role-face { position: absolute; inset: 0; display: grid; border-radius: 14px; border: 2px solid var(--line); backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
+.role-face.front { grid-template-rows: 1fr auto; justify-items: center; padding: 10px 8px 12px; background: radial-gradient(120% 90% at 50% 0%, #2c4a40 0%, #0f1a17 75%); }
+.role-face.front .role-avatar { height: 100%; width: auto; min-height: 0; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.5)); }
+.role-face.front strong { font-family: var(--serif); font-size: 1.05rem; word-break: keep-all; text-align: center; }
+.role-face.back { transform: rotateY(180deg); align-content: start; gap: 6px; padding: 12px; background: var(--bg-2); font-size: 0.82rem; line-height: 1.4; overflow-y: auto; }
+.role-face.back strong { font-family: var(--serif); font-size: 1rem; }
+.role-face.back .label { color: var(--gold); margin-right: 4px; }
+.role-flip.picked .role-face { border-color: var(--gold); }
+.role-flip-rank { position: absolute; z-index: 2; top: 8px; right: 8px; padding: 2px 10px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-style: normal; font-weight: 900; font-size: 0.8rem; pointer-events: none; }
+.role-drag-ghost { position: fixed; z-index: 80; display: grid; justify-items: center; gap: 2px; width: 110px; padding: 8px; border-radius: 12px; border: 2px solid var(--gold); background: var(--bg-2); transform: translate(-50%, -60%) rotate(-4deg); box-shadow: 0 16px 30px rgba(0, 0, 0, 0.5); pointer-events: none; font-size: 0.85rem; text-align: center; }
+.role-drag-ghost .role-avatar { height: 80px; width: auto; }
 .role-avatar .avatar-eyes { transform-origin: 120px 66px; transform-box: view-box; animation: blink 4.6s infinite; }
 @media (prefers-reduced-motion: reduce) {
-  .dress-model, .dress-model.enter-right, .dress-model.enter-left, .role-avatar .avatar-eyes { animation: none; }
+  .role-avatar .avatar-eyes { animation: none; }
+  .role-flip-inner { transition: none; }
 }
 
 /* ── In-game desk: one short instruction, then the work for this phase ───────────────────────────── */

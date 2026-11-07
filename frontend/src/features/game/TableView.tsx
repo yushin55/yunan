@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import type { TablePlayer } from "../../components/scene/TableScene";
+import type { HandCard, TablePlayer } from "../../components/scene/TableScene";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
 import { activeFloor, statementCards } from "../discussion/floor";
 import { roleName } from "../roles/roleName";
@@ -7,7 +7,6 @@ import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
 const COLORS = ["#c98d66", "#aaad83", "#a2b3cf", "#86ad98", "#b09bbf", "#d9b263", "#739dba", "#c790a0"];
-const BUBBLE_MS = 25_000;
 // The hand fills up once statements begin; before that it is just cards, face down.
 const CARD_PHASES = ["statement", "event", "rebuttal", "vote", "reveal", "ended"];
 
@@ -57,6 +56,8 @@ export default function TableView({
   focusUid,
   onSelect,
   offset = 0,
+  hand,
+  pointAt,
 }: {
   room: Room;
   participants: Participant[];
@@ -65,25 +66,24 @@ export default function TableView({
   focusUid?: string;
   onSelect?: (uid: string) => void;
   offset?: number;
+  /** Cards of my own to hold instead of the statements (my picks in the lobby, my role and identity). */
+  hand?: HandCard[];
+  pointAt?: string;
 }) {
   const now = useNow(1000) + offset;
   const floor = activeFloor(room, now);
   const narrow = typeof window !== "undefined" && window.innerWidth < 700;
-  const players: TablePlayer[] = participants.map((p) => {
-    const latest = [...rounds.transcript].reverse().find((m) => m.uid === p.uid && m.phase === room.phase);
-    // Only whoever has the floor gets a bubble, so bubbles never pile up around the table.
-    const speaking = latest && latest.turn === room.phaseVersion && now - latest.at < BUBBLE_MS;
-    return {
-      uid: p.uid,
-      nickname: p.nickname,
-      order: CARD_PHASES.includes(room.phase) ? p.seat + 1 : undefined,
-      color: COLORS[p.seat % COLORS.length],
-      tag: p.roleId ? roleName(room.topic, p.roleId) : undefined,
-      status: status(room, p, rounds, floor),
-      bubble: speaking ? (latest.kind === "statement" ? latest.text : `${KIND_LABEL[latest.kind]}: ${latest.text}`) : undefined,
-    };
-  });
-  const cards = CARD_PHASES.includes(room.phase) ? statementCards(room, participants, rounds, selfUid) : undefined;
+  const players: TablePlayer[] = participants.map((p) => ({
+    uid: p.uid,
+    nickname: p.nickname,
+    order: CARD_PHASES.includes(room.phase) ? p.seat + 1 : undefined,
+    color: COLORS[p.seat % COLORS.length],
+    tag: p.roleId ? roleName(room.topic, p.roleId) : undefined,
+    status: status(room, p, rounds, floor),
+  }));
+  // Once the event happens its card joins the hand, first in the fan.
+  const eventCard: HandCard[] = room.event ? [{ uid: "event", name: "사건 카드", role: room.event.title, text: room.event.description, state: "speaking" }] : [];
+  const cards = hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statementCards(room, participants, rounds, selfUid)] : undefined);
   return (
     <div className="table-view" data-testid="table-view">
       <Suspense
@@ -93,7 +93,7 @@ export default function TableView({
           </div>
         }
       >
-        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} phase={room.phase} quality={narrow ? "low" : "high"} />
+        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
     </div>
   );
