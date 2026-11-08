@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, ClipboardCopy, Download, FileText, MessageSquareQuote, PenLine, RotateCcw, Search } from "lucide-react";
 import Tabs from "../../components/Tabs";
-import type { ModerationEntry, Participant, Topic, TranscriptLine } from "../../types/game";
+import type { ModerationEntry, Participant, Phase, Topic, TranscriptLine } from "../../types/game";
 import TranscriptFeed from "../discussion/TranscriptFeed";
 import { KIND_LABEL, PHASE_ORDER, PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
 import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type CriterionId, type Level, type ReportEdits, type StudentReport } from "./report";
-import { loadEdits, saveEdits, type PhaseNotes } from "./teacherStorage";
+import { MemoList } from "./PhaseMemo";
+import { countNotes, loadEdits, saveEdits, type MemoEntry, type PhaseNotes } from "./teacherStorage";
 
 const LEVELS: Level[] = ["met", "partial", "weak", "none"];
 
@@ -74,7 +75,8 @@ export default function TeacherReport({
   };
   const [tab, setTab] = useState<Tab>("rubric");
   const [selected, setSelected] = useState<{ uid: string; criterion?: CriterionId } | null>(null);
-  const noteCount = PHASE_ORDER.filter((p) => notes[p]).length;
+  const noteCount = countNotes(notes);
+  const memosOf = (uid: string) => PHASE_ORDER.flatMap((p) => (notes[p] ?? []).filter((e) => e.uid === uid).map((e) => ({ phase: p, entry: e })));
   const student = report.students.find((s) => s.uid === selected?.uid);
 
   return (
@@ -142,7 +144,7 @@ export default function TeacherReport({
             selected={selected}
             onSelect={(uid, criterion) => setSelected((cur) => (cur?.uid === uid && cur.criterion === criterion ? null : { uid, criterion }))}
           />
-          {student && <StudentDetail key={`${student.uid}-${selected?.criterion}`} student={student} topic={topic} focus={selected?.criterion} onChange={editing ? change : undefined} />}
+          {student && <StudentDetail key={`${student.uid}-${selected?.criterion}`} student={student} topic={topic} focus={selected?.criterion} onChange={editing ? change : undefined} memos={memosOf(student.uid)} participants={participants} />}
           {!student && report.students.length > 0 && <p className="muted small report-hint">학생 이름이나 칸을 누르면 판단 이유와 근거 발언을 볼 수 있어요.</p>}
           <p className="report-note">발언 기록에서 표현을 찾아 자동으로 고른 참고 자료예요. 점수로 바로 쓰지 말고, 근거 발언과 수업 중 관찰을 함께 보고 판단해 주세요.</p>
         </>
@@ -150,19 +152,7 @@ export default function TeacherReport({
 
       {tab === "log" && <FullLog topic={topic} participants={participants} transcript={transcript} />}
 
-      {tab === "notes" &&
-        (noteCount ? (
-          <ol className="report-notes">
-            {PHASE_ORDER.filter((p) => notes[p]).map((p) => (
-              <li key={p}>
-                <span className="phase-memo-phase">{PHASE_SHORT[p]}</span>
-                <p>{notes[p]}</p>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="muted empty">이 게임에 남긴 메모가 없어요. 진행 화면 오른쪽 메모 칸에 단계마다 적을 수 있어요.</p>
-        ))}
+      {tab === "notes" && <NotesTab notes={notes} participants={participants} />}
     </section>
   );
 }
@@ -270,7 +260,21 @@ function RubricMatrix({
   );
 }
 
-function StudentDetail({ student, topic, focus, onChange }: { student: StudentReport; topic: Topic; focus?: CriterionId; onChange?: (c: Change) => void }) {
+function StudentDetail({
+  student,
+  topic,
+  focus,
+  onChange,
+  memos = [],
+  participants = [],
+}: {
+  student: StudentReport;
+  topic: Topic;
+  focus?: CriterionId;
+  onChange?: (c: Change) => void;
+  memos?: { phase: Phase; entry: MemoEntry }[];
+  participants?: Participant[];
+}) {
   const [copied, setCopied] = useState(false);
   const role = roleName(topic, student.roleId);
   return (
@@ -283,6 +287,14 @@ function StudentDetail({ student, topic, focus, onChange }: { student: StudentRe
           </p>
         </div>
       </header>
+      {memos.length > 0 && (
+        <div className="detail-group">
+          <h5>이 학생에 대한 선생님 메모 {memos.length}개</h5>
+          {memos.map(({ phase, entry }) => (
+            <MemoList key={entry.id} entries={[entry]} participants={participants} phase={phase} />
+          ))}
+        </div>
+      )}
       {GROUPS.map((g) => (
         <div key={g.id} className="detail-group">
           <h5>{g.label}</h5>
@@ -434,6 +446,43 @@ function FullLog({ topic, participants, transcript }: { topic: Topic; participan
       <div className="full-log-feed">
         <TranscriptFeed lines={lines} participants={participants} topic={topic} emptyText={transcript.length ? "조건에 맞는 발언이 없어요." : "기록된 발언이 없어요."} />
       </div>
+    </div>
+  );
+}
+
+/** Every note of the game by phase, narrowed to one student or to the general ones. */
+function NotesTab({ notes, participants }: { notes: PhaseNotes; participants: Participant[] }) {
+  const [who, setWho] = useState<string | null | "all">("all");
+  const total = countNotes(notes);
+  if (!total) return <p className="muted empty">이 게임에 남긴 메모가 없어요. 진행 화면 오른쪽 메모 칸에서 단계마다 학생을 골라 적을 수 있어요.</p>;
+  const count = (uid: string | null) => PHASE_ORDER.reduce((n, p) => n + (notes[p] ?? []).filter((e) => e.uid === uid).length, 0);
+  const pick = (list: MemoEntry[]) => (who === "all" ? list : list.filter((e) => e.uid === who));
+  const phases = PHASE_ORDER.filter((p) => pick(notes[p] ?? []).length);
+  return (
+    <div className="notes-tab">
+      <div className="log-filter" role="group" aria-label="메모 대상">
+        <button className={who === "all" ? "active" : ""} onClick={() => setWho("all")}>
+          전체 <span>{total}</span>
+        </button>
+        {count(null) > 0 && (
+          <button className={who === null ? "active" : ""} onClick={() => setWho(null)}>
+            선택 없음 <span>{count(null)}</span>
+          </button>
+        )}
+        {participants
+          .filter((p) => count(p.uid) > 0)
+          .map((p) => (
+            <button key={p.uid} className={who === p.uid ? "active" : ""} onClick={() => setWho(p.uid)}>
+              {p.nickname} <span>{count(p.uid)}</span>
+            </button>
+          ))}
+      </div>
+      {phases.map((p) => (
+        <section key={p} className="notes-phase">
+          <h5>{PHASE_SHORT[p]}</h5>
+          <MemoList entries={pick(notes[p] ?? [])} participants={participants} />
+        </section>
+      ))}
     </div>
   );
 }

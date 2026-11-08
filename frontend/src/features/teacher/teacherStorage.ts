@@ -2,7 +2,31 @@
 import type { ReportEdits } from "./report";
 import type { DiscussionSummary, GameSettings, ModerationEntry, Participant, Phase, Reveal, Topic, TranscriptLine } from "../../types/game";
 
-export type PhaseNotes = Partial<Record<Phase, string>>;
+/** One note: about a student (`uid`) or the class in general (`uid: null`). */
+export interface MemoEntry {
+  id: string;
+  uid: string | null;
+  text: string;
+  at: number;
+}
+export type PhaseNotes = Partial<Record<Phase, MemoEntry[]>>;
+
+/** Notes saved before students could be picked were one string per phase; they become one general note. */
+export function normalizeNotes(raw: unknown): PhaseNotes {
+  const out: PhaseNotes = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [phase, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value === "string") {
+      if (value.trim()) out[phase as Phase] = [{ id: `legacy-${phase}`, uid: null, text: value, at: 0 }];
+    } else if (Array.isArray(value)) {
+      const list = value.filter((e): e is MemoEntry => !!e && typeof e.text === "string" && e.text.trim() !== "");
+      if (list.length) out[phase as Phase] = list;
+    }
+  }
+  return out;
+}
+
+export const countNotes = (notes: PhaseNotes) => Object.values(notes).reduce((n, list) => n + (list?.length ?? 0), 0);
 
 export interface PastDebate {
   key: string;
@@ -44,13 +68,13 @@ function write(key: string, value: unknown) {
   }
 }
 
-export const loadNotes = (key: string) => read<PhaseNotes>(NOTES + key, {});
+export const loadNotes = (key: string) => normalizeNotes(read<unknown>(NOTES + key, {}));
 export const saveNotes = (key: string, notes: PhaseNotes) => write(NOTES + key, notes);
 
 export const loadEdits = (key: string) => read<ReportEdits>(EDITS + key, {});
 export const saveEdits = (key: string, edits: ReportEdits) => write(EDITS + key, edits);
 
-export const loadHistory = () => read<PastDebate[]>(HISTORY, []);
+export const loadHistory = () => read<PastDebate[]>(HISTORY, []).map((d) => ({ ...d, notes: normalizeNotes(d.notes) }));
 
 export const loadDebate = (key: string) => loadHistory().find((d) => d.key === key) ?? null;
 

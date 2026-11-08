@@ -187,3 +187,78 @@
 .history-roster .pill { margin-left: auto; }
 .history-notes-title { display: flex; align-items: center; gap: 6px; }
 .history-shortcut { float: right; text-decoration: none; }
+
+/* Memo entries with a student */
+.phase-memo-head { cursor: default; }
+.phase-memo-count { margin-left: auto; font-size: 0.75rem; color: var(--muted); font-weight: 700; }
+.phase-memo-form { display: grid; gap: 6px; margin-top: 8px; }
+.phase-memo-form select { padding: 6px 10px; font-size: 0.86rem; }
+.phase-memo-form textarea { min-height: 52px; }
+.phase-memo-form .button { justify-self: end; }
+.memo-list { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 6px; }
+.memo-entry { padding: 8px 10px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
+.memo-entry p { margin: 3px 0 0; font-size: 0.88rem; line-height: 1.55; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.memo-entry-head { display: flex; align-items: center; gap: 6px; }
+.memo-who { padding: 0 8px; border-radius: 99px; background: rgba(147, 182, 234, 0.14); color: var(--blue); font-size: 0.75rem; font-weight: 800; }
+.memo-who.general { background: var(--panel-2); color: var(--muted); }
+.memo-time { font-size: 0.72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.memo-remove { margin-left: auto; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.memo-remove:hover { color: var(--red); background: var(--red-soft); }
+.phase-memo-others .memo-list { margin-top: 8px; }
+.notes-tab .log-filter { margin-bottom: 10px; }
+.notes-phase { margin-top: 12px; }
+.notes-phase h5 { margin: 0 0 4px; font-size: 0.8rem; color: var(--muted); letter-spacing: 0.04em; }
+.detail-group .memo-list { margin: 0 0 6px; }
+
+/* Live participation board (teacher only) */
+.teacher-room.present .live-participation { display: none; }
+.live-participation .panel-head { margin-bottom: 10px; }
+.live-participation .memo-title { display: inline-flex; align-items: center; gap: 8px; }
+.live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 rgba(127, 199, 156, 0.6); animation: live-pulse 1.8s infinite; }
+@keyframes live-pulse { 70% { box-shadow: 0 0 0 8px rgba(127, 199, 156, 0); } 100% { box-shadow: 0 0 0 0 rgba(127, 199, 156, 0); } }
+.live-progress { display: grid; gap: 8px; padding: 10px 12px; margin-bottom: 8px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.live-progress-text { display: flex; align-items: center; gap: 8px; font-size: 0.92rem; }
+.live-bar { height: 6px; margin: 0; }
+.turn-steps { list-style: none; padding: 0; margin: 0; display: flex; gap: 4px; }
+.turn-steps li { flex: 1; height: 6px; border-radius: 99px; background: var(--line); }
+.turn-steps li.done { background: var(--green); }
+.turn-steps li.now { background: var(--gold); animation: step-blink 1.2s ease-in-out infinite alternate; }
+@keyframes step-blink { from { opacity: 1; } to { opacity: 0.45; } }
+.participation.live th.num, .participation.live td.num { width: 3em; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.participation.live tbody th { display: table-cell; }
+.participation.live .who { font-weight: 800; }
+.participation.live .role { display: block; font-size: 0.75rem; color: var(--muted); font-weight: 400; }
+.participation.live .live-text { display: block; max-width: 280px; overflow: hidden; text-overflow: ellipsis; font-size: 0.78rem; color: var(--gold); font-weight: 400; }
+.participation.live th.now, .participation.live td.now { background: var(--gold-soft); }
+.participation.live thead th.now { color: var(--gold); }
+.participation.live td strong { color: var(--text); }
+.participation.live tr.row-speaking > * { background: rgba(230, 184, 92, 0.1); }
+.participation.live tr.row-speaking td.now { background: rgba(230, 184, 92, 0.2); }
+.participation.live tr.row-done { opacity: 0.7; }
+.live-status { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 99px; font-size: 0.76rem; font-weight: 800; background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.live-status.speaking { background: var(--gold); color: var(--gold-ink); animation: step-blink 1s ease-in-out infinite alternate; }
+.live-status.turn { background: var(--gold-soft); color: var(--gold); }
+.live-status.next { background: rgba(147, 182, 234, 0.14); color: var(--blue); }
+.live-status.recent { background: var(--gold-soft); color: var(--gold); }
+.live-status.ready, .live-status.done { background: var(--green-soft); color: var(--green); }
+.live-status.idle { background: var(--amber-soft); color: var(--amber); }
+@media (prefers-reduced-motion: reduce) { .live-dot, .turn-steps li.now, .live-status.speaking { animation: none; } }
+
+/* Result in the teacher's side column: small, for reference */
+.reveal-side { padding: 14px; }
+.reveal-side .memo-title { margin-bottom: 10px; }
+.reveal.compact { gap: 10px; font-size: 0.88rem; }
+.reveal.compact h3 { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.04em; margin: 4px 0 0; }
+.reveal.compact .reveal-hero { padding: 10px 12px; gap: 2px; grid-template-columns: auto 1fr; justify-items: start; text-align: left; align-items: center; column-gap: 10px; }
+.reveal.compact .reveal-hero svg { width: 20px; height: 20px; grid-row: span 3; }
+.reveal.compact .reveal-hero .eyebrow { margin: 0; }
+.reveal.compact .switcher-name strong { display: inline; font-size: 1.1rem; margin-right: 6px; }
+.reveal.compact .switcher-name span { font-size: 0.78rem; }
+.reveal.compact .outcome { padding: 8px 10px; gap: 8px; font-size: 0.84rem; }
+.reveal.compact .outcome svg { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.reveal.compact .tally { gap: 4px; }
+.reveal.compact .tally li { grid-template-columns: minmax(70px, 1fr) 1.4fr auto; gap: 8px; font-size: 0.82rem; }
+.reveal.compact .tally .bar { height: 6px; }
+.reveal.compact .ballots { gap: 4px; margin-top: 6px; }
+.reveal.compact .ballots li { padding: 5px 8px; gap: 6px; font-size: 0.82rem; }
+.ballots-fold summary { cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; }

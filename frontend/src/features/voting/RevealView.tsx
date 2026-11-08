@@ -11,14 +11,15 @@ const OUTCOME: Record<Reveal["outcome"], { title: string; text: string }> = {
 };
 
 /** Shows who the switchers were and how everyone guessed. Preferences are never shown. */
-export default function RevealView({ reveal, participants, topic, myUid }: { reveal: Reveal; participants: Participant[]; topic: Topic; myUid?: string }) {
+/** `compact`: the teacher's side column, where the result is a reference rather than the main event. */
+export default function RevealView({ reveal, participants, topic, myUid, compact = false }: { reveal: Reveal; participants: Participant[]; topic: Topic; myUid?: string; compact?: boolean }) {
   const name = (uid: string) => participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자";
   const max = Math.max(1, ...reveal.tally.map((t) => t.votes));
   const switcherIds = new Set(reveal.switchers.map((s) => s.uid));
   const mine = reveal.ballots.find((b) => b.uid === myUid);
   const outcome = OUTCOME[reveal.outcome];
   return (
-    <div className="reveal" data-testid="reveal">
+    <div className={`reveal${compact ? " compact" : ""}`} data-testid="reveal">
       <div className="reveal-hero">
         <VenetianMask size={30} aria-hidden />
         <span className="eyebrow">역할 전환자는</span>
@@ -68,7 +69,23 @@ export default function RevealView({ reveal, participants, topic, myUid }: { rev
           </li>
         ))}
       </ul>
-      <h3>각자의 추리</h3>
+      {compact ? (
+        <details className="ballots-fold">
+          <summary>각자의 추리</summary>
+          <Ballots reveal={reveal} name={name} />
+        </details>
+      ) : (
+        <>
+          <h3>각자의 추리</h3>
+          <Ballots reveal={reveal} name={name} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function Ballots({ reveal, name }: { reveal: Reveal; name: (uid: string) => string }) {
+  return (
       <ul className="ballots">
         {reveal.ballots.map((b) => (
           <li key={b.uid}>
@@ -78,6 +95,5 @@ export default function RevealView({ reveal, participants, topic, myUid }: { rev
           </li>
         ))}
       </ul>
-    </div>
   );
 }

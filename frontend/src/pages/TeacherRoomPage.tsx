@@ -1,22 +1,18 @@
 import { useEffect, useState } from "react";
-import { BookOpen, FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
+import { FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
 import EventCard from "../components/EventCard";
 import PhaseHeader from "../components/PhaseHeader";
-import { StatementList } from "../features/discussion/DiscussionNotes";
 import { useFloor } from "../features/discussion/floor";
 import SpeakerStage from "../features/discussion/SpeakerStage";
-import SummaryBoard from "../features/discussion/SummaryBoard";
 import TranscriptFeed, { LineInput } from "../features/discussion/TranscriptFeed";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
-import TableView from "../features/game/TableView";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
 import LobbySettings from "../features/teacher/LobbySettings";
 import ModerationPanel from "../features/teacher/ModerationPanel";
 import ParticipationBoard, { GameSummary } from "../features/teacher/ParticipationBoard";
-import PastDebates from "../features/teacher/PastDebates";
 import PhaseMemo, { usePhaseNotes } from "../features/teacher/PhaseMemo";
 import TeacherReport from "../features/teacher/TeacherReport";
 import { gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
@@ -28,7 +24,7 @@ import RevealView from "../features/voting/RevealView";
 function useServerNow(offset: number) {
   const [now, setNow] = useState(Date.now() + offset);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now() + offset), 5000);
+    const t = setInterval(() => setNow(Date.now() + offset), 2000);
     return () => clearInterval(t);
   }, [offset]);
   return now;
@@ -45,11 +41,12 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
   const phase = room.phase;
   const speaking = SPEAKING.includes(phase);
   const turn = room.turn;
-  const { floor } = useFloor(room, offset);
+  const { floor, seconds: floorSeconds } = useFloor(room, offset);
   const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
   const upcoming = turn && turn.index + 1 < turn.order.length ? participants.find((p) => p.uid === turn.order[turn.index + 1]) : undefined;
   const toReview = host.moderation.filter((e) => e.status === "flagged" || e.status === "pending_review").length;
-  const summaryStatus = useAutoSummary(rounds.transcript, () => quiet("summary"));
+  // The summary is no longer shown here, but the teacher's screen still keeps it fresh for the students' statement cards.
+  useAutoSummary(rounds.transcript, () => quiet("summary"));
   const next = PHASE_ORDER[PHASE_ORDER.indexOf(phase) + 1];
   const count = participants.length;
   const waiting = participants.filter((p) => !p.prefsDone).length;
@@ -60,7 +57,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
   ].filter(Boolean) as string[];
   const submittedNow = (key: string) => participants.filter((p) => p.submitted.includes(key)).length;
   const key = gameKey(room.roomId, room.createdAt);
-  const { notes, setNote } = usePhaseNotes(key);
+  const { notes, addNote, removeNote } = usePhaseNotes(key);
   const finished = phase === "reveal" || phase === "ended";
   // Keep the finished game (and later edits or notes) in this browser's debate history.
   useEffect(() => {
@@ -178,11 +175,28 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
           )}
           </div>
 
-          {participants.length > 0 && !speaking && (
-            <div className="teacher-table" aria-label="원탁 보기">
-              <TableView room={room} participants={participants} rounds={rounds} offset={offset} />
+          <section className="panel live-participation" data-testid="participation-panel">
+            <div className="panel-head">
+              <h3 className="memo-title">
+                <span className="live-dot" aria-hidden /> 참여 현황
+              </h3>
+              <span className="muted small">
+                {count}명 · {room.minStudents}~{room.maxStudents}명
+              </span>
             </div>
-          )}
+            <ParticipationBoard
+              room={room}
+              participants={participants}
+              rounds={rounds}
+              serverNow={serverNow}
+              alwaysOnline={practice}
+              floor={floor}
+              floorSeconds={floorSeconds}
+              busy={busy}
+              onKick={phase === "lobby" && !practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
+            />
+          </section>
+
 
           {phase === "lobby" && (
             <>
@@ -232,7 +246,8 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
             </>
           )}
 
-          {(phase === "role" || phase === "vote") && (
+          {/* The live board covers this for the teacher; the big count is for the projected classroom screen. */}
+          {present && (phase === "role" || phase === "vote") && (
             <section className="panel progress-panel">
               <h3>
                 {phase === "role" ? "역할을 확인한 학생" : "투표한 학생"}{" "}
@@ -267,70 +282,35 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
                 />
                 {speaking && speaker && <LineInput speaker={speaker.nickname} disabled={busy} onAdd={(text) => void action("line-add", { text, phaseVersion: room.phaseVersion })} />}
               </section>
-              <div className="discussion-side">
-                <section className="panel">
-                  <h3 className="memo-title">입장 발표 정리</h3>
-                  <StatementList room={room} participants={participants} rounds={rounds} />
-                </section>
-                <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />
-              </div>
             </div>
           )}
 
-          {(phase === "reveal" || phase === "ended") && rounds.reveal && (
+          {/* On the projected classroom screen the result is the main event; otherwise it sits small in the side column. */}
+          {present && finished && rounds.reveal && (
             <section className="panel">
               <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} />
             </section>
           )}
           {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} />}
-          {finished && rounds.transcript.length > 0 && <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />}
           {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
         </div>
 
         <aside className="teacher-side">
-          <PhaseMemo phase={phase} notes={notes} onChange={setNote} />
+          <PhaseMemo phase={phase} notes={notes} participants={participants} onAdd={addNote} onRemove={removeNote} />
+          {!present && finished && rounds.reveal && (
+            <section className="panel reveal-side" data-testid="reveal-side">
+              <h3 className="memo-title">결과 공개</h3>
+              <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} compact />
+            </section>
+          )}
           {phase === "lobby" && (
             <section className="panel">
               <h3>학생 입장</h3>
               {practice ? <p className="muted">연습용 방에는 다른 학생이 입장할 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 표시돼요.</p> : <RoomCode code={room.code} large />}
             </section>
           )}
-          <details className="panel" open={!speaking}>
-            <summary>
-              참여 현황{" "}
-              <span className="muted small">
-                {count}명 · {room.minStudents}~{room.maxStudents}명
-              </span>
-            </summary>
-            <ParticipationBoard
-              room={room}
-              participants={participants}
-              rounds={rounds}
-              serverNow={practice ? room.createdAt : serverNow}
-              busy={busy}
-              onKick={phase === "lobby" && !practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
-            />
-          </details>
-          <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
-          <PastDebates exclude={key} newTab />
-          <details className="panel guide">
-            <summary>
-              <BookOpen size={17} aria-hidden /> 진행 안내
-            </summary>
-            <p>{host.teacherGuide.summary}</p>
-            <ul>
-              {host.teacherGuide.tips.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-            {host.teacherGuide.caution && <p className="banner warn">{host.teacherGuide.caution}</p>}
-            <h4>질문 예시</h4>
-            <ul>
-              {room.topic.questionPrompts.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
-          </details>
+          {/* Only when something is waiting for the teacher: held-back lines stay off the screen until reviewed. */}
+          {toReview > 0 && <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />}
         </aside>
       </div>
     </main>

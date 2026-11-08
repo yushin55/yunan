@@ -1,9 +1,10 @@
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Bot, NotebookPen } from "lucide-react";
 import SummaryBoard from "../features/discussion/SummaryBoard";
-import { PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
+import { PHASE_ORDER } from "../features/game/phases";
 import { roleName } from "../features/roles/roleName";
 import { GameSummary } from "../features/teacher/ParticipationBoard";
+import { MemoList } from "../features/teacher/PhaseMemo";
 import TeacherReport from "../features/teacher/TeacherReport";
 import { loadDebate } from "../features/teacher/teacherStorage";
 import RevealView from "../features/voting/RevealView";
@@ -24,7 +25,7 @@ export default function DebateResultPage() {
     );
   const outcome = d.reveal ? OUTCOME_SHORT[d.reveal.outcome] : null;
   const switchers = new Set(d.reveal?.switchers.map((s) => s.uid));
-  const notes = PHASE_ORDER.filter((p) => d.notes[p]);
+  const notes = PHASE_ORDER.filter((p) => d.notes[p]?.length);
   return (
     <main className="teacher-room history-result" data-testid="history-result">
       <header className="teacher-top">
@@ -90,14 +91,7 @@ export default function DebateResultPage() {
               <NotebookPen size={16} aria-hidden /> 단계별 메모
             </h3>
             {notes.length ? (
-              <ol className="report-notes">
-                {notes.map((p) => (
-                  <li key={p}>
-                    <span className="phase-memo-phase">{PHASE_SHORT[p]}</span>
-                    <p>{d.notes[p]}</p>
-                  </li>
-                ))}
-              </ol>
+              notes.map((p) => <MemoList key={p} entries={d.notes[p]!} participants={d.participants} phase={p} />)
             ) : (
               <p className="muted small">이 토론에 남긴 메모가 없어요.</p>
             )}
