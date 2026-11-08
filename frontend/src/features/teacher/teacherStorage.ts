@@ -28,8 +28,30 @@ export function normalizeNotes(raw: unknown): PhaseNotes {
 
 export const countNotes = (notes: PhaseNotes) => Object.values(notes).reduce((n, list) => n + (list?.length ?? 0), 0);
 
+/** A claim in a student report and the ids of the transcript lines it rests on. */
+export interface EvidencedText {
+  text: string;
+  evidence: string[];
+}
+export interface StudentAiReport {
+  uid: string;
+  overall: string;
+  points: { criterion: string; comment: string; evidence: string[] }[];
+  strengths: EvidencedText[];
+  improvements: EvidencedText[];
+  record: string;
+}
+/** What came back (AI or the offline stand-in) and the teacher's working copy of it. */
+export interface StoredAiReports {
+  source: "ai" | "local";
+  at: number;
+  original: StudentAiReport[];
+  current: StudentAiReport[];
+}
+
 export interface PastDebate {
   key: string;
+  roomId?: string;
   roomCode: string;
   topic: Topic;
   createdAt: number;
@@ -46,6 +68,7 @@ export interface PastDebate {
 
 const NOTES = "bridge.teacherNotes.";
 const EDITS = "bridge.reportEdits.";
+const AI = "bridge.aiReports.";
 const HISTORY = "bridge.debateHistory";
 const KEEP = 30;
 
@@ -74,6 +97,9 @@ export const saveNotes = (key: string, notes: PhaseNotes) => write(NOTES + key, 
 export const loadEdits = (key: string) => read<ReportEdits>(EDITS + key, {});
 export const saveEdits = (key: string, edits: ReportEdits) => write(EDITS + key, edits);
 
+export const loadAiReports = (key: string) => read<StoredAiReports | null>(AI + key, null);
+export const saveAiReports = (key: string, value: StoredAiReports) => write(AI + key, value);
+
 export const loadHistory = () => read<PastDebate[]>(HISTORY, []).map((d) => ({ ...d, notes: normalizeNotes(d.notes) }));
 
 export const loadDebate = (key: string) => loadHistory().find((d) => d.key === key) ?? null;
@@ -88,6 +114,7 @@ export function deleteDebate(key: string) {
   try {
     localStorage.removeItem(NOTES + key);
     localStorage.removeItem(EDITS + key);
+    localStorage.removeItem(AI + key);
   } catch {
     /* ignore */
   }

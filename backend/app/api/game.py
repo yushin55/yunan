@@ -34,3 +34,5 @@ for name, schema in [("preferences", Preferences), ("confirm-role", Empty), ("en
 register("speech", Speech, lambda service, room_id, uid, data: service.speech(room_id, uid, data))
 register("line-add", LineAdd, lambda service, room_id, uid, data: service.add_line(room_id, uid, data))
 register("summary", Empty, lambda service, room_id, uid, data: service.summarize(room_id, uid))
+# Teacher only, after the reveal: AI drafts of each student's evaluation report.
+register("student-report", Empty, lambda service, room_id, uid, data: service.student_reports(room_id, uid))

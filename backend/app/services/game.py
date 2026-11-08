@@ -8,6 +8,7 @@ from fastapi import HTTPException
 from app.repositories.topics import find_topic, load_game_config, load_topics, public_topic
 from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
+from app.services.student_report import build_student_reports
 from app.services.moderation import Moderator, check_rate, validate_text_fields
 from app.services.phase_engine import MAX_TURNS, MIC_KINDS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
@@ -32,13 +33,14 @@ def _private():
 
 
 class GameService:
-    def __init__(self, repository, clock=now_ms, moderator=None, rng=None, transcriber=transcribe, summarizer=build_summary):
+    def __init__(self, repository, clock=now_ms, moderator=None, rng=None, transcriber=transcribe, summarizer=build_summary, reporter=build_student_reports):
         self.repository = repository
         self.clock = clock
         self.moderator = moderator or Moderator()
         self.rng = rng or random.SystemRandom()
         self.transcriber = transcriber
         self.summarizer = summarizer
+        self.reporter = reporter
 
     # ── Rooms ────────────────────────────────────────────────────────────────
     def create(self, uid, data):
@@ -210,6 +212,43 @@ class GameService:
                 fresh["rounds"]["summary"] = {**summary, "revision": revision, "at": self.clock()}
 
         return snapshot(self.repository.mutate(room_id, update), uid)
+
+    def student_reports(self, room_id, uid):
+        """AI drafts of each student's evaluation, for the teacher only, once the result is out.
+        Not stored: the teacher's screen keeps (and edits) its own copy."""
+        state = self.repository.read(room_id)
+        if viewer(state, uid) != "host":
+            raise HTTPException(403, "선생님 화면에서만 만들 수 있어요.")
+        if state["room"]["phase"] not in ("reveal", "ended"):
+            raise HTTPException(409, "학생별 리포트는 결과 공개 뒤에 만들 수 있어요.")
+        lines = state["rounds"].get("transcript", [])
+        if not lines:
+            raise HTTPException(409, "기록된 발언이 없어 리포트를 만들 수 없어요.")
+        people = state["participants"]
+        try:
+            # Seat numbers and role names only; nicknames and switcher status never reach the AI.
+            reports = self.reporter(state["room"]["topic"], [{"speaker": people[l["uid"]]["seat"] + 1, "roleId": people[l["uid"]].get("roleId"), "phase": l["phase"], "kind": l["kind"], "text": l["text"]} for l in lines])
+        except AIUnavailable as exc:
+            raise HTTPException(503, "AI가 학생별 리포트를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.") from exc
+        seats = {p["seat"] + 1: p["uid"] for p in people.values()}
+        ids = [l["id"] for l in lines]
+
+        def line_ids(numbers):
+            return [ids[n - 1] for n in numbers]
+
+        out = []
+        for r in reports:
+            if r["speaker"] not in seats:
+                continue
+            out.append({
+                "uid": seats[r["speaker"]],
+                "overall": r["overall"],
+                "points": [{**p, "evidence": line_ids(p["evidence"])} for p in r["points"]],
+                "strengths": [{**i, "evidence": line_ids(i["evidence"])} for i in r["strengths"]],
+                "improvements": [{**i, "evidence": line_ids(i["evidence"])} for i in r["improvements"]],
+                "record": r["record"],
+            })
+        return {"reports": out, "source": "ai", "at": self.clock()}
 
     # ── Teacher controls ─────────────────────────────────────────────────────
     def _host_settings(self, state, data, now):

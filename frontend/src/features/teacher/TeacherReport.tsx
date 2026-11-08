@@ -6,6 +6,7 @@ import TranscriptFeed from "../discussion/TranscriptFeed";
 import { KIND_LABEL, PHASE_ORDER, PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
 import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type CriterionId, type Level, type ReportEdits, type StudentReport } from "./report";
+import AiStudentReport from "./AiStudentReport";
 import { MemoList } from "./PhaseMemo";
 import { countNotes, loadEdits, saveEdits, type MemoEntry, type PhaseNotes } from "./teacherStorage";
 
@@ -14,7 +15,7 @@ const LEVELS: Level[] = ["met", "partial", "weak", "none"];
 /** A correction to one student's rubric: a level, a comment or the record draft. `null` puts the automatic value back. */
 type Change = { uid: string } & ({ criterion: CriterionId; level?: Level | null; comment?: string } | { record: string | null });
 
-type Tab = "rubric" | "log" | "notes";
+type Tab = "rubric" | "students" | "log" | "notes";
 
 const fmtDate = (t: number) => new Date(t).toLocaleString("ko-KR", { month: "long", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
 
@@ -30,6 +31,7 @@ export default function TeacherReport({
   notes = {},
   at,
   editKey,
+  roomId,
 }: {
   topic: Topic;
   participants: Participant[];
@@ -39,6 +41,8 @@ export default function TeacherReport({
   at?: number;
   /** The game's key: when given, the rubric can be corrected and the corrections are kept for that game. */
   editKey?: string;
+  /** A real room: the per-student reports can be drafted by the server's AI. */
+  roomId?: string;
 }) {
   const [edits, setEdits] = useState<ReportEdits>(() => (editKey ? loadEdits(editKey) : {}));
   useEffect(() => setEdits(editKey ? loadEdits(editKey) : {}), [editKey]);
@@ -116,6 +120,7 @@ export default function TeacherReport({
         onChange={setTab}
         items={[
           { id: "rubric", label: "평가 기준표" },
+          { id: "students", label: "학생별 리포트" },
           { id: "log", label: "전체 발언 기록" },
           { id: "notes", label: `단계별 메모${noteCount ? ` ${noteCount}` : ""}` },
         ]}
@@ -149,6 +154,8 @@ export default function TeacherReport({
           <p className="report-note">발언 기록에서 표현을 찾아 자동으로 고른 참고 자료예요. 점수로 바로 쓰지 말고, 근거 발언과 수업 중 관찰을 함께 보고 판단해 주세요.</p>
         </>
       )}
+
+      {tab === "students" && <AiStudentReport storageKey={editKey} roomId={roomId} topic={topic} participants={participants} transcript={transcript} moderation={moderation} />}
 
       {tab === "log" && <FullLog topic={topic} participants={participants} transcript={transcript} />}
 

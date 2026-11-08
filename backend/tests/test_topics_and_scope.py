@@ -55,7 +55,11 @@ def test_phases_end_at_reveal_without_real_opinion_steps():
     assert set(load_game_config()["phaseSeconds"]) == {"role", "statement", "event", "rebuttal", "vote"}
 
 
+# The one deliberate exception: teacher-only AI drafts of each student's 수행평가 report after the reveal.
+ALLOWED = {"/api/rooms/{room_id}/student-report"}
+
+
 def test_removed_features_have_no_api():
-    paths = " ".join(app.openapi()["paths"])
+    paths = " ".join(p for p in app.openapi()["paths"] if p not in ALLOWED)
     for removed in ("initial-position", "reflection", "rating", "guess", "react", "review-done", "report", "assist", "coach", "tone", "hint", "score", "claim", "scenario", "statement", "messages"):
         assert removed not in paths, removed

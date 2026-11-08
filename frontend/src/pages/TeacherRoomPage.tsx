@@ -64,6 +64,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
     if (!finished) return;
     saveDebate({
       key,
+      roomId: room.roomId,
       roomCode: room.code,
       topic: room.topic,
       createdAt: room.createdAt,
@@ -291,7 +292,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} />
             </section>
           )}
-          {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} />}
+          {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />}
           {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
         </div>
 

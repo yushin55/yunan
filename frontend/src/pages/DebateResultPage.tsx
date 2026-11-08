@@ -68,7 +68,7 @@ export default function DebateResultPage() {
             <p className="banner">투표 결과가 저장되지 않은 토론이에요.</p>
           )}
 
-          <TeacherReport topic={d.topic} participants={d.participants} transcript={d.transcript} moderation={d.moderation} notes={d.notes} at={d.endedAt} editKey={d.key} />
+          <TeacherReport topic={d.topic} participants={d.participants} transcript={d.transcript} moderation={d.moderation} notes={d.notes} at={d.endedAt} editKey={d.key} roomId={d.practice ? undefined : (d.roomId ?? d.key.split("-")[0])} />
           {d.summary && <SummaryBoard summary={d.summary} topic={d.topic} />}
         </div>
 
