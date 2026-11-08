@@ -1,14 +1,15 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import type { HandCard, TablePlayer } from "../../components/scene/TableScene";
+import type { TablePlayer } from "../../components/scene/TableScene";
 import { SEAT_COLORS } from "../../components/scene/palette";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
 import { activeFloor, statementCards } from "../discussion/floor";
 import { roleName } from "../roles/roleName";
+import CardStrip, { type TableCard } from "./CardStrip";
 import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
-// The hand fills up once statements begin; before that it is just cards, face down.
-const CARD_PHASES = ["statement", "event", "rebuttal", "vote", "reveal", "ended"];
+// Cards float over the table from the statements to the vote; the result stage shows the result alone.
+const CARD_PHASES = ["statement", "event", "vote"];
 
 function useNow(every: number) {
   const [now, setNow] = useState(Date.now());
@@ -67,10 +68,10 @@ export default function TableView({
   focusUid?: string;
   onSelect?: (uid: string) => void;
   offset?: number;
-  /** Cards of my own to hold instead of the statements (my picks in the lobby, my role and identity). */
-  hand?: HandCard[];
+  /** Cards of my own to show instead of the statements (my picks in the lobby, my role and identity). */
+  hand?: TableCard[];
   pointAt?: string;
-  /** The classroom screen: the whole table from above, no seat and no hand. */
+  /** The classroom screen: the whole table from above, no seat and no cards. */
   overview?: boolean;
 }) {
   const now = useNow(1000) + offset;
@@ -79,16 +80,35 @@ export default function TableView({
   const players: TablePlayer[] = participants.map((p) => ({
     uid: p.uid,
     nickname: p.nickname,
-    order: CARD_PHASES.includes(room.phase) ? p.seat + 1 : undefined,
+    order: room.phase !== "lobby" && room.phase !== "role" ? p.seat + 1 : undefined,
     color: SEAT_COLORS[p.seat % SEAT_COLORS.length],
     tag: p.roleId ? roleName(room.topic, p.roleId) : undefined,
     status: status(room, p, rounds, floor),
   }));
-  // Once the event happens its card joins the hand, first in the fan.
-  const eventCard: HandCard[] = room.event ? [{ uid: "event", name: room.event.title, role: "사건 발생", text: room.event.description, state: "done", tone: "event" }] : [];
-  const cards = overview ? undefined : hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statementCards(room, participants, rounds, selfUid)] : undefined);
+  // Once the event happens its card comes first.
+  const eventCard: TableCard[] = room.event ? [{ uid: "event", name: room.event.title, role: "사건 발생", text: room.event.description, state: "done", tone: "event" }] : [];
+  const record = (uid: string) => {
+    const rows: NonNullable<TableCard["record"]> = [];
+    for (const line of rounds.transcript) {
+      if (line.uid !== uid) continue;
+      const last = rows.at(-1);
+      if (last?.key === line.turn) last.text += ` ${line.text}`;
+      else rows.push({ key: line.turn, kind: KIND_LABEL[line.kind], text: line.text });
+    }
+    return rows;
+  };
+  const seatColor = (uid: string) => SEAT_COLORS[(participants.find((p) => p.uid === uid)?.seat ?? 0) % SEAT_COLORS.length];
+  // The card holds only the AI's one-line summary; every word is one press away.
+  const summaryOf = (uid: string) => rounds.summary?.statements?.find((s) => s.uid === uid)?.text ?? "";
+  const statements = () =>
+    statementCards(room, participants, rounds, selfUid).map((c) => {
+      const lines = record(c.uid);
+      return { ...c, text: summaryOf(c.uid), record: lines, summarizing: lines.some((l) => l.kind === KIND_LABEL.statement), color: seatColor(c.uid) };
+    });
+  const cards = overview ? undefined : hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statements()] : undefined);
   return (
-    <div className="table-view" data-testid="table-view">
+    <div className={`table-view${cards?.length ? " with-cards" : ""}`} data-testid="table-view">
+      <div className="table-view-scene">
       <Suspense
         fallback={
           <div className="page-loading">
@@ -96,8 +116,10 @@ export default function TableView({
           </div>
         }
       >
-        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} overview={overview} phase={room.phase} quality={narrow ? "low" : "high"} />
+        <TableScene players={players} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} overview={overview} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
+      </div>
+      {cards?.length ? <CardStrip cards={cards} /> : null}
     </div>
   );
 }

@@ -8,7 +8,7 @@ export function togglePick(current: string[], uid: string, count: number) {
 }
 
 /**
- * Pick who the switcher is; the pick can change until time runs out, then it becomes the vote.
+ * Pick who the switcher is. Each full pick is my vote, and it can change until time runs out.
  * At the 3D table people are picked by pointing at them there; without it, by the buttons here.
  */
 export default function VotePanel({
@@ -29,12 +29,7 @@ export default function VotePanel({
   atTable?: boolean;
 }) {
   const name = (uid: string) => candidates.find((c) => c.uid === uid)?.nickname;
-  if (myVote)
-    return (
-      <div className="vote-done" data-testid="vote-done">
-        <Check size={20} aria-hidden /> <strong>{myVote.map(name).join(", ")}</strong>에게 투표했어요.
-      </div>
-    );
+  const saved = !!myVote && myVote.length === picked.length && picked.every((uid) => myVote.includes(uid));
   const left = count - picked.length;
   return (
     <div className="vote-panel">
@@ -43,6 +38,7 @@ export default function VotePanel({
           <>
             투표: <strong>{picked.map(name).join(", ")}</strong>
             {left > 0 && ` · ${left}명 더`}
+            {saved && <Check size={18} aria-label="반영됨" className="vote-saved" data-testid="vote-done" />}
           </>
         ) : (
           "역할 전환자는 누구일까요?"

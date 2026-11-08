@@ -2,7 +2,7 @@
 // Mirrors the server's phases, turns and rules; the real game never uses this code.
 import topicData from "../../data/practiceTopics.json";
 import type { DiscussionSummary, EventCard, HostState, ModerationEntry, Participant, Phase, Room, Snapshot, SpeakingPhase, SpeechKind, Topic, TranscriptLine } from "../../types/game";
-import { answerLine, responseLine, statementLine } from "./lines";
+import { answerLine, responseLine, statementGist, statementLine } from "./lines";
 import { assignRoles, buildReveal, pick, practiceCheck, shuffle, type Assigned } from "./rules";
 
 interface FullTopic extends Topic {
@@ -179,7 +179,7 @@ function allDone(s: PracticeState) {
   const phase = s.snapshot.room.phase;
   const ps = s.snapshot.participants;
   if (phase === "role") return ps.every((p) => p.submitted.includes("role"));
-  if (phase === "vote") return ps.every((p) => p.uid in s.votes);
+  // Votes can change until the timer ends, as on the server.
   return false;
 }
 
@@ -267,8 +267,10 @@ function localSummary(s: PracticeState): DiscussionSummary {
     if (roleId) roles.set(roleId, [...(roles.get(roleId) ?? []), short(line.text)].slice(-2));
   }
   const questions = lines.filter((l) => l.kind === "question").map((l) => short(l.text));
-  // No AI here to sum statements up, so the cards keep every word instead of a cut-off line.
-  return { positions: [...roles].map(([roleId, points]) => ({ roleId, points: [...new Set(points)] })), clashes: [], questions: [...new Set(questions)].slice(-3), source: "local", revision: s.revision, at: Date.now() };
+  const said = new Map<string, string>();
+  for (const line of lines) if (line.kind === "statement") said.set(line.uid, `${said.get(line.uid) ?? ""} ${line.text}`.trim());
+  const statements = [...said].map(([uid, text]) => ({ uid, text: statementGist(uid === ME ? undefined : roleOf(s, uid), s.assigned[uid]?.isSwitcher ?? false, text) }));
+  return { positions: [...roles].map(([roleId, points]) => ({ roleId, points: [...new Set(points)] })), clashes: [], questions: [...new Set(questions)].slice(-3), statements, source: "local", revision: s.revision, at: Date.now() };
 }
 
 /** Advance time: run partner actions that are due, then check the phase deadline. */

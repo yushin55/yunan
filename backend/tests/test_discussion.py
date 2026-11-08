@@ -60,6 +60,10 @@ def test_statements_go_in_seat_order_then_the_floor_opens(game):
         service.action(rid, TEACHER, "next", {})
     assert spoken == uids
     room = service.repository.read(rid)["room"]
+    assert room["phase"] == "statement" and room["turn"]["stage"] == "qa" and room["turn"]["uid"] is None
+    assert room["phaseEndsAt"] == clock[0] + 90_000
+    service.action(rid, TEACHER, "next", {})
+    room = service.repository.read(rid)["room"]
     assert room["phase"] == "event" and room["event"]["title"]
     assert room["turn"] is None and room["floor"] is None  # Nobody's turn now: whoever has a question goes first.
 
@@ -133,7 +137,7 @@ def test_the_microphone_never_outlasts_the_phase(game):
     assert service.action(rid, uids[0], "mic-on", {"kind": "question"})["room"]["floor"]["endsAt"] == ends
     clock[0] = ends
     state = service.action(rid, TEACHER, "sync", {})
-    assert state["room"]["phase"] == "rebuttal" and state["room"]["floor"] is None
+    assert state["room"]["phase"] == "vote" and state["room"]["floor"] is None
 
 
 def test_each_phase_has_its_own_buttons(game):
@@ -141,9 +145,6 @@ def test_each_phase_has_its_own_buttons(game):
     rid, uids = in_open_floor(service)
     assert refused(service, rid, uids[0], "rebuttal").status_code == 409
     assert refused(service, rid, uids[0], "statement").status_code == 409
-    to_phase(service, rid, "rebuttal")
-    assert refused(service, rid, uids[0], "question").status_code == 409
-    assert service.action(rid, uids[0], "mic-on", {"kind": "rebuttal"})["room"]["floor"]["kind"] == "rebuttal"
     to_phase(service, rid, "vote")
     assert refused(service, rid, uids[1], "answer").status_code == 409
 
@@ -512,3 +513,75 @@ def test_transcribe_returns_clean_text_or_nothing():
     assert transcribe(AUDIO, "audio/wav", ai_call=lambda p, a, m: {"text": " 안녕하세요\x01 "}) == "안녕하세요"
     assert transcribe(AUDIO, "audio/wav", ai_call=lambda p, a, m: {"text": None}) == ""
     assert transcribe(AUDIO, "audio/wav", ai_call=lambda p, a, m: {}) == ""
+
+
+def test_after_the_statements_anyone_can_ask_about_them(game):
+    service, clock = game
+    rid, uids = in_statement(service)
+    for _ in uids:
+        service.action(rid, TEACHER, "next", {})
+    assert "차례" in str(pytest.raises(HTTPException, service.action, rid, TEACHER, "speaker", {"targetUid": uids[0]}).value.detail)
+    assert refused(service, rid, uids[0], "statement").status_code == 409
+    room = service.action(rid, uids[3], "mic-on", {"kind": "question"})["room"]
+    assert room["phase"] == "statement" and room["floor"]["uid"] == uids[3]
+    assert room["floor"]["endsAt"] == clock[0] + room["settings"]["micSeconds"] * 1000
+    assert clip(service, rid, uids[3], "왜 그렇게 생각해요?", room["phaseVersion"])["speech"] == "published"
+    service.action(rid, uids[3], "mic-off", {})
+    assert service.action(rid, uids[0], "mic-on", {"kind": "answer"})["room"]["floor"]["uid"] == uids[0]
+    line = service.repository.read(rid)["rounds"]["transcript"][-1]
+    assert (line["uid"], line["phase"], line["kind"]) == (uids[3], "statement", "question")
+    clock[0] = service.repository.read(rid)["room"]["phaseEndsAt"]
+    assert service.action(rid, TEACHER, "sync", {})["room"]["phase"] == "event"
+
+
+def card_summary(topic, lines):
+    """Stand-in AI: one line per speaker, from their first words."""
+    statements = [{"speaker": l["speaker"], "text": f"요약: {l['text'][:6]}"} for l in lines if l["kind"] == "statement"]
+    return {"positions": [{"roleId": topic["roles"][0]["id"], "points": ["요점"]}], "clashes": [], "questions": [], "statements": statements, "source": "ai"}
+
+
+def test_the_server_sums_up_a_statement_as_soon_as_the_turn_ends(game):
+    service, _ = game
+    rid, uids = in_statement(service)
+    service.summarizer = card_summary
+    speak(service, rid, "안전이 먼저입니다")
+    assert "summary" not in service.repository.read(rid)["rounds"]  # Not while still talking.
+    room = service.action(rid, uids[0], "end-turn", {})  # No teacher screen involved.
+    assert room["rounds"]["summary"]["statements"] == [{"uid": uids[0], "text": "요약: 안전이 먼저"}]
+    speak(service, rid, "사생활도 중요합니다")
+    clock_state = service.repository.read(rid)["room"]
+    service.action(rid, TEACHER, "sync", {"phaseVersion": clock_state["phaseVersion"]})  # Not over yet: nothing.
+    assert len(service.repository.read(rid)["rounds"]["summary"]["statements"]) == 1
+
+
+def test_a_turn_that_runs_out_of_time_is_summed_up_too(game):
+    service, clock = game
+    rid, uids = in_statement(service)
+    service.summarizer = card_summary
+    speak(service, rid, "시간이 다 됐어요")
+    room = service.repository.read(rid)["room"]
+    clock[0] = room["phaseEndsAt"] + 1
+    state = service.action(rid, uids[3], "sync", {"phaseVersion": room["phaseVersion"]})
+    assert state["room"]["turn"]["uid"] == uids[1]
+    assert state["rounds"]["summary"]["statements"][0]["uid"] == uids[0]
+
+
+def test_words_that_arrive_after_the_turn_still_reach_the_card(game):
+    service, _ = game
+    rid, uids = in_statement(service)
+    service.summarizer = card_summary
+    version = service.action(rid, uids[0], "mic-on", {"kind": "statement"})["room"]["phaseVersion"]
+    service.action(rid, uids[0], "end-turn", {})  # Nothing written down yet: no summary.
+    assert "summary" not in service.repository.read(rid)["rounds"]
+    clip(service, rid, uids[0], "늦게 도착한 말", version)
+    assert service.repository.read(rid)["rounds"]["summary"]["statements"] == [{"uid": uids[0], "text": "요약: 늦게 도착한"}]
+
+
+def test_the_game_goes_on_when_the_ai_is_down(game):
+    service, _ = game
+    rid, uids = in_statement(service)  # The test service has no AI.
+    speak(service, rid, "안전이 먼저입니다")
+    room = service.action(rid, uids[0], "end-turn", {})["room"]
+    assert room["turn"]["uid"] == uids[1]
+    assert "summary" not in service.repository.read(rid)["rounds"]
+

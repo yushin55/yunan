@@ -58,10 +58,6 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
     count > room.maxStudents && `학생은 최대 ${room.maxStudents}명이에요`,
     waiting > 0 && `${waiting}명이 아직 선호 역할을 고르는 중이에요`,
   ].filter(Boolean) as string[];
-  // The game has no rebuttal any more, but the server still steps into it: move straight on to the vote.
-  useEffect(() => {
-    if (phase === "rebuttal" && !practice) void quiet("skip-phase", { phaseVersion: room.phaseVersion }).catch(() => {});
-  }, [phase, practice, quiet, room.phaseVersion]);
   const autoLeft = useAutoStart(!practice && allReady(room, participants), () => void action("start"));
   const countdown = practice ? (startIn ?? null) : autoLeft;
   // The classroom screen is the game alone, full screen. Leaving full screen (Esc) closes it too.

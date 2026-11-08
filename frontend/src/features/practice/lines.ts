@@ -23,6 +23,19 @@ export function statementLine(role: Role, switcher: boolean, rng: Rng) {
   );
 }
 
+/**
+ * Practice has no AI: the one-line summary of a partner's statement comes from the same card the
+ * line was made from. The player's own words are cut at a pause instead.
+ * ponytail: stand-in for the server's AI summary (backend discussion.py, `statements`).
+ */
+export function statementGist(role: Role | undefined, switcher: boolean, said: string) {
+  if (role) return switcher ? "한쪽으로 정하기보다 여러 의견을 듣고 신중히 정하자" : strip(role.goal);
+  const first = said.split(/(?<=[.!?])\s+/)[0].trim();
+  if (first.length <= 45) return first;
+  const pause = first.slice(0, 45).lastIndexOf(",");
+  return (pause > 10 ? first.slice(0, pause) : first.slice(0, 45).replace(/\s+\S*$/, "")).trim();
+}
+
 export function responseLine(role: Role, event: EventCard, switcher: boolean, rng: Rng) {
   if (switcher)
     return pick(["저도 다른 분들이랑 비슷하게 생각해요. 신중하게 정하면 좋겠어요.", `‘${event.title}’ 같은 일은 상황마다 달라서… 일단 더 들어 볼게요.`], rng);

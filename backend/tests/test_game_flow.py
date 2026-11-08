@@ -22,14 +22,13 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
         version = service.action(rid, uid, "mic-on", {"kind": "statement"})["room"]["phaseVersion"]
         assert service.speech(rid, uid, {"audio": "QUJD", "mimeType": "audio/wav", "phaseVersion": version})["speech"] == "published"
         service.action(rid, uid, "end-turn", {})
+    assert service.repository.read(rid)["room"]["turn"]["stage"] == "qa"
+    service.action(rid, TEACHER, "next", {})
     state = service.repository.read(rid)
     assert state["room"]["phase"] == "event"
     seen.append("event")
     assert state["room"]["event"]["title"]
     assert [line["uid"] for line in state["rounds"]["transcript"]] == uids  # Seat order.
-    service.action(rid, TEACHER, "next", {})
-    seen.append("rebuttal")
-    assert service.repository.read(rid)["room"]["phase"] == "rebuttal"
     service.action(rid, TEACHER, "next", {})
     seen.append("vote")
     state = service.repository.read(rid)
@@ -37,6 +36,8 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
     for uid in uids:
         target = switcher if uid != switcher else next(u for u in uids if u != switcher)
         service.action(rid, uid, "vote", {"targets": [target]})
+    assert service.repository.read(rid)["room"]["phase"] == "vote"  # Votes can still change.
+    service.action(rid, TEACHER, "next", {})
     state = service.repository.read(rid)
     assert state["room"]["phase"] == "reveal"
     seen.append("reveal")
@@ -183,8 +184,13 @@ def test_vote_rules(game):
         service.action(rid, uids[0], "vote", {"targets": [TEACHER]})
     service.action(rid, uids[0], "vote", {"targets": [uids[1]]})
     service.action(rid, uids[0], "vote", {"targets": [uids[1]]})  # Idempotent retry.
+    service.action(rid, uids[0], "vote", {"targets": [uids[2]]})  # Changed mind.
+    state = service.repository.read(rid)
+    assert state["votes"][uids[0]] == [uids[2]] and state["participants"][uids[0]]["submitted"].count("vote") == 1
+    service.action(rid, TEACHER, "next", {})
+    service.action(rid, uids[0], "vote", {"targets": [uids[2]]})  # A late retry is harmless.
     with pytest.raises(HTTPException):
-        service.action(rid, uids[0], "vote", {"targets": [uids[2]]})
+        service.action(rid, uids[0], "vote", {"targets": [uids[3]]})  # But the vote is closed.
 
 
 def test_two_switchers_two_distinct_votes(game):
@@ -200,6 +206,7 @@ def test_two_switchers_two_distinct_votes(game):
     for uid in uids:
         others = [u for u in switchers if u != uid] + [u for u in uids if u != uid and u not in switchers]
         service.action(rid, uid, "vote", {"targets": others[:2]})
+    service.action(rid, TEACHER, "next", {})
     reveal = service.repository.read(rid)["rounds"]["reveal"]
     assert sorted(s["uid"] for s in reveal["switchers"]) == switchers
     assert reveal["switcherCount"] == 2
@@ -213,6 +220,7 @@ def test_vote_tie_is_reported_without_inventing_a_winner(game):
     plan = {uids[0]: uids[1], uids[1]: uids[0], uids[2]: uids[0], uids[3]: uids[1], uids[4]: uids[0], uids[5]: uids[1]}
     for voter, target in plan.items():
         service.action(rid, voter, "vote", {"targets": [target]})
+    service.action(rid, TEACHER, "next", {})
     reveal = service.repository.read(rid)["rounds"]["reveal"]
     assert reveal["tie"] is True and reveal["outcome"] == "tie"
     assert reveal["topVoted"] == [] and sorted(reveal["tiedUids"]) == sorted(uids[:2])
@@ -226,3 +234,31 @@ def test_no_hidden_opinion_step_after_the_reveal(game):
     assert state["room"]["phase"] == "ended"
     for forbidden in ("reflection", "results", "initialPosition", "finalOpinion", "ratings", "score"):
         assert forbidden not in str(service.repository.read(rid))
+
+
+def test_starts_by_itself_3_seconds_after_everyone_picked(game):
+    service, clock = game
+    rid, uids = open_room(service)
+    choose(service, rid, {uid: (0, 1) for uid in uids[:-1]})
+    assert service.repository.read(rid)["room"]["phaseEndsAt"] is None
+    choose(service, rid, {uids[-1]: (0, 1)})
+    ends = service.repository.read(rid)["room"]["phaseEndsAt"]
+    assert ends == clock[0] + 3000
+    clock[0] = ends - 1
+    assert service.action(rid, uids[0], "sync", {})["room"]["phase"] == "lobby"  # Not yet.
+    clock[0] = ends
+    assert service.action(rid, uids[0], "sync", {})["room"]["phase"] == "role"  # Teacher's screen not needed.
+
+
+def test_auto_start_is_called_off_when_the_table_changes(game):
+    service, clock = game
+    rid, uids = open_room(service, count=7)
+    choose(service, rid, {uid: (0, 1) for uid in uids})
+    assert service.repository.read(rid)["room"]["phaseEndsAt"]
+    service.action(rid, TEACHER, "settings", {"randomTopic": True})  # New topic clears every pick.
+    assert service.repository.read(rid)["room"]["phaseEndsAt"] is None
+    choose(service, rid, {uid: (0, 1) for uid in uids})
+    service.action(rid, TEACHER, "kick", {"targetUid": uids[0]})  # Still six, all picked: still on.
+    assert service.repository.read(rid)["room"]["phaseEndsAt"]
+    service.join(STUDENTS[7], {"nickname": "새학생", "code": service.repository.read(rid)["room"]["code"]})
+    assert service.repository.read(rid)["room"]["phaseEndsAt"] is None  # The newcomer has not picked.

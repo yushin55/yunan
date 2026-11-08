@@ -250,7 +250,7 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .candidate span { color: var(--muted); font-size: 0.85rem; }
 .candidate.picked { border-color: var(--red); background: var(--red-soft); }
 .candidate svg { position: absolute; top: 12px; right: 12px; color: var(--red); }
-.vote-done { display: flex; gap: 8px; align-items: center; color: var(--green); }
+.vote-saved { margin-left: 6px; vertical-align: -3px; color: var(--green); }
 
 .reveal { display: grid; gap: 14px; }
 .reveal h3 { margin-top: 6px; }

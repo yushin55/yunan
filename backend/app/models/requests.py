@@ -15,7 +15,7 @@ class PhaseSeconds(Input):
     role: Seconds | None = None
     statement: Seconds | None = None
     event: Seconds | None = None
-    rebuttal: Seconds | None = None
+    rebuttal: Seconds | None = None  # No longer a phase; accepted and ignored so older screens still save.
     vote: Seconds | None = None
 
 

@@ -1,7 +1,6 @@
 import type { Phase, Room, SpeechKind } from "../../types/game";
 
-// No rebuttal: questions and answers run longer instead. The server still has the phase, so the
-// teacher's screen skips it the moment it starts (see TeacherRoomPage).
+// No rebuttal: questions and answers run longer instead. "rebuttal" stays in `Phase` only for old records.
 export const PHASE_ORDER: Phase[] = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"];
 
 export const PHASE_LABELS: Record<Phase, string> = {
@@ -44,7 +43,7 @@ export const TEACHER_TODO: Record<Phase, string> = {
   statement: "학생이 차례대로 자기 기기의 마이크를 켜고 말해요. 시간이 끝나면 자동으로 넘어가고, 이름을 누르면 바로 차례를 줄 수 있어요.",
   event: "사건 카드를 읽어 주세요. 이제 차례 없이, 학생이 마이크를 켜서 질문하고 답해요. 한 번에 한 명만 켤 수 있어요.",
   rebuttal: "반론 단계는 쓰지 않아요. 바로 투표로 넘어가요.",
-  vote: "학생들이 역할 전환자를 추리해 투표하고 있어요. 모두 투표하면 자동으로 공개돼요.",
+  vote: "학생들이 역할 전환자를 추리해 투표하고 있어요. 시간이 끝나면 공개돼요.",
   reveal: "역할 전환자의 정체와 투표 결과가 공개됐어요. 결과를 함께 보고 게임을 마치세요.",
   ended: "게임이 끝났어요. 참여 인원과 단계별 제출 현황을 확인하세요.",
 };

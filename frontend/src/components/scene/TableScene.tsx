@@ -15,27 +15,8 @@ export interface TablePlayer {
   status?: { label: string; tone: "done" | "waiting" | "alert" };
 }
 
-/** A card in the viewer's hand: one person's statement boiled down, or a card of my own (roles, identity). */
-export interface HandCard {
-  uid: string;
-  /** The big number in the corner; cards of my own may have none. */
-  order?: number;
-  name: string;
-  role: string;
-  text: string;
-  /** Everything said, shown in full (scrolling) when the card is held up to read. */
-  full?: string;
-  state: "waiting" | "speaking" | "done";
-  /** The event card is printed in red so it stands out in the fan. */
-  tone?: "event";
-}
-
-const emptyText = (card: HandCard) => (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요");
-
 interface TableSceneProps {
   players: TablePlayer[];
-  /** The hand, once there are statements to hold. Without it the cards stay face down. */
-  cards?: HandCard[];
   /** The viewer's own seat (a student). The teacher has no seat and watches the whole table. */
   selfUid?: string;
   focusPlayerUid?: string;
@@ -49,11 +30,13 @@ interface TableSceneProps {
   attract?: boolean;
   /** The person my own right hand points at (voting). */
   pointAt?: string;
-  /** The classroom screen: the whole table from above, nobody's seat, no hand of cards. */
+  /** The classroom screen: the whole table from above, nobody's seat. */
   overview?: boolean;
 }
 
 type LoungePlayer = TablePlayer;
+
+const LEVEL_PITCH = -0.1;
 
 type Avatar = {
   uid: string;
@@ -76,105 +59,6 @@ const DEMO_PLAYERS: LoungePlayer[] = [
 
 const COATS = ["#a56b53", "#7e987c", "#b88f6e", "#667f9c", "#a78297"];
 
-type HeldCard = {
-  group: THREE.Group;
-  home: THREE.Vector3;
-  homeTurn: THREE.Quaternion;
-  /** 0 in the hand, 1 held up in front of the camera to read. */
-  lift: number;
-  /** 0 or 1: the pointer is on it, so it rises a little out of the fan. */
-  rise: number;
-  face?: { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; drawn: string };
-};
-
-const CARD_W = 0.31;
-const CARD_H = 0.43;
-const CARD_FONT = '"Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif';
-
-/** Wraps between words where it can (Korean reads badly split inside a word), inside one only if it must. */
-function wrapText(paint: CanvasRenderingContext2D, text: string, width: number, maxLines: number) {
-  const lines: string[] = [];
-  let line = "";
-  const push = () => {
-    lines.push(line);
-    line = "";
-  };
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    const joined = line ? `${line} ${word}` : word;
-    if (paint.measureText(joined).width <= width) {
-      line = joined;
-      continue;
-    }
-    if (line) push();
-    for (const char of word) {
-      if (paint.measureText(line + char).width > width) push();
-      line += char;
-    }
-  }
-  if (line) push();
-  if (lines.length > maxLines) {
-    lines.length = maxLines;
-    lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, -1)}…`;
-  }
-  return lines;
-}
-
-function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
-  const paint = canvas.getContext("2d");
-  if (!paint) return;
-  const { width: W, height: H } = canvas;
-  const margin = 44;
-  const event = card.tone === "event";
-  const ink = event
-    ? { paper: "#8e2b23", edge: "#f0cf8a", main: "#fff1dc", soft: "#f6cf8c", rule: "#f0cf8a", more: "#f6cf8c" }
-    : card.state === "speaking"
-      ? { paper: "#f6dca2", edge: "#b5852c", main: "#2a2218", soft: "#6e5f49", rule: "#c9b48d", more: "#a0742a" }
-      : { paper: "#f5eedd", edge: "#c9b48d", main: "#2a2218", soft: "#6e5f49", rule: "#c9b48d", more: "#a0742a" };
-  paint.fillStyle = ink.paper;
-  paint.fillRect(0, 0, W, H);
-  paint.strokeStyle = ink.edge;
-  paint.lineWidth = event ? 12 : 6;
-  paint.strokeRect(16, 16, W - 32, H - 32);
-  paint.textBaseline = "top";
-  let left = margin;
-  if (event) {
-    // A gold "사건" stamp where statement cards have their number.
-    paint.font = `900 54px ${CARD_FONT}`;
-    const stamp = paint.measureText("사건").width + 36;
-    paint.fillStyle = ink.edge;
-    paint.fillRect(margin, 46, stamp, 92);
-    paint.fillStyle = ink.paper;
-    paint.fillText("사건", margin + 18, 64);
-    left = margin + stamp + 20;
-  } else if (card.order !== undefined) {
-    paint.fillStyle = ink.main;
-    paint.font = `800 104px ${CARD_FONT}`;
-    paint.fillText(String(card.order), margin, 40);
-    left = margin + paint.measureText(String(card.order)).width + 20;
-  }
-  paint.fillStyle = ink.main;
-  paint.font = `800 50px ${CARD_FONT}`;
-  paint.fillText(wrapText(paint, card.name, W - left - margin, 1)[0] ?? "", left, 50);
-  paint.fillStyle = ink.soft;
-  paint.font = `500 34px ${CARD_FONT}`;
-  paint.fillText(wrapText(paint, card.role, W - left - margin, 1)[0] ?? "", left, 108);
-  paint.fillStyle = ink.rule;
-  paint.fillRect(margin, 168, W - margin * 2, 3);
-  const body = card.text || emptyText(card);
-  paint.fillStyle = card.text ? ink.main : "#8a7a60";
-  paint.font = `500 46px ${CARD_FONT}`;
-  const lines = wrapText(paint, body, W - margin * 2, 99);
-  const more = lines.length > 8 || Boolean(card.full && card.full !== card.text);
-  // Whatever does not fit stays readable: pressing the card opens all of it.
-  const shown = more ? lines.slice(0, 7) : lines;
-  shown.forEach((line, i) => paint.fillText(line, margin, 194 + i * 62));
-  if (more) {
-    paint.fillStyle = ink.more;
-    paint.font = `700 40px ${CARD_FONT}`;
-    paint.fillText(lines.length > 7 ? "… 눌러서 전체 보기" : "눌러서 전체 발언 보기", margin, 194 + shown.length * 62);
-  }
-}
-
 /**
  * Everyone sits the same distance apart around the round table. In first person the viewer's own
  * chair is one of the places (at the near edge, angle π); left to right from the viewer's left.
@@ -190,7 +74,6 @@ function seatAngles(count: number, viewerSeat: boolean) {
 /** Everyone sits evenly around the table facing its middle; the viewer is in one of the seats (or above it all, in overview). Up to eight people. */
 export default function TableScene({
   players,
-  cards,
   selfUid,
   activePlayer,
   focusPlayerUid,
@@ -203,7 +86,7 @@ export default function TableScene({
   pointAt,
   overview = false,
 }: TableSceneProps) {
-  // No own seat, arms or cards: the title screen and the classroom overview.
+  // No own seat or arms: the title screen and the classroom overview.
   const noSeat = attract || overview;
   const pointRef = useRef(pointAt);
   pointRef.current = pointAt;
@@ -217,15 +100,7 @@ export default function TableScene({
   const cameraModeRef = useRef(cameraMode);
   cameraModeRef.current = cameraMode;
   const resetRef = useRef<() => void>(() => {});
-  const cardsRef = useRef(cards);
-  cardsRef.current = cards;
-  const dealRef = useRef<(hand?: HandCard[]) => void>(() => {});
-  const cardsKey = JSON.stringify(cards ?? null);
   const [failed, setFailed] = useState(false);
-  // The card held up to read (-1: none). Its words are shown as page text so they can scroll.
-  const [readIndex, setReadIndex] = useState(-1);
-  const reading = readIndex >= 0;
-  const closeRef = useRef<() => void>(() => {});
   const [hovered, setHovered] = useState<string | null>(null);
   const people = (players?.length ? players : DEMO_PLAYERS)
     .filter((person) => person.uid !== selfUid)
@@ -233,6 +108,9 @@ export default function TableScene({
   // Larger tables seat everyone a little smaller and farther out so chairs do not overlap.
   const seatScale = people.length >= 7 ? 0.8 : people.length === 6 ? 0.88 : 1;
   const seatRadius = 2.3;
+  // My eyes are as high as everyone else's (their eyes sit at 2.116 before the seat scale),
+  // looking only slightly down so the table stays in view.
+  const eyeHeight = 2.116 * seatScale;
   const peopleKey = people
     .map((person) => `${person.uid}:${person.nickname}:${person.color ?? ""}`)
     .join("|");
@@ -793,7 +671,7 @@ export default function TableScene({
       });
     });
 
-    // The unseen local avatar's sleeves and cards remain in the foreground.
+    // The unseen local avatar's sleeves remain in the foreground.
     const ownCoat = material(
       /^#[0-9a-fA-F]{3,8}$/.test(selfColor ?? "") ? selfColor! : "#617885",
     );
@@ -804,9 +682,13 @@ export default function TableScene({
     const armRest = new THREE.Vector3(0.47 - 0.83, 1.18 - 1.145, 2.05 - 3.14).normalize();
     let rightArm: THREE.Group | null = null;
     let finger: THREE.Mesh | null = null;
+    // The cards are the focus, not my own body: the arms only show while pointing (voting).
+    const ownArms: THREE.Group[] = [];
     for (const side of noSeat ? [] : [-1, 1]) {
       const pivot = new THREE.Group();
       pivot.position.set(side * shoulder.x, shoulder.y, shoulder.z);
+      pivot.visible = false;
+      ownArms.push(pivot);
       world.add(pivot);
       const at = (x: number, y: number, z: number) => [x - side * shoulder.x, y - shoulder.y, z - shoulder.z] as const;
       const arm = box(pivot, 0.34, 0.27, 1.15, ownCoat, ...at(side * 0.68, 1.145, 2.59), 0.095);
@@ -826,106 +708,6 @@ export default function TableScene({
     const restTurn = new THREE.Quaternion();
     const headSpot = new THREE.Vector3();
     const plates: { label: HTMLDivElement; x: number; y: number; ahead: boolean }[] = [];
-    // A fan of cards faces the camera. Face down until there are statements, then one per person.
-    const cardBack = material("#733f42", 0.6);
-    const cardFan = new THREE.Group();
-    cardFan.visible = !noSeat;
-    world.add(cardFan);
-    const cardFaceShape = geometry("card-face", () => new THREE.PlaneGeometry(CARD_W - 0.018, CARD_H - 0.018));
-    const anisotropy = rich ? renderer.capabilities.getMaxAnisotropy() : 1;
-    let held: HeldCard[] = [];
-    const heldFaces: THREE.Object3D[] = [];
-    let openCard = -1;
-    let hoverCard = -1;
-    const openCardAt = (index: number) => {
-      openCard = index;
-      setReadIndex(index);
-      needsRender = true;
-    };
-    const clearHand = () => {
-      for (const card of held) {
-        cardFan.remove(card.group);
-        card.face?.texture.dispose();
-        card.face?.material.dispose();
-      }
-      held = [];
-      heldFaces.length = 0;
-      hoverCard = -1;
-    };
-    const placeCard = (i: number, count: number, group: THREE.Group) => {
-      // Wider apart when there are few; the numbers and names stay visible when there are many.
-      const middle = (count - 1) / 2;
-      const gap = count <= 1 ? 0 : Math.min(0.2, 1.05 / (count - 1));
-      const off = i - middle;
-      group.position.set(off * gap, 1.39 - off * off * 0.0032, 2.11 + i * 0.0085);
-      group.rotation.set(-0.23, 0, off * (count > 3 ? -0.05 : -0.16));
-    };
-    const dealBacks = () => {
-      clearHand();
-      for (let i = 0; i < 3; i += 1) {
-        const group = new THREE.Group();
-        placeCard(i, 3, group);
-        cardFan.add(group);
-        box(group, CARD_W, CARD_H, 0.006, cream, 0, 0, 0, 0.004);
-        box(group, 0.275, 0.395, 0.004, cardBack, 0, 0, 0.005, 0.002);
-        box(group, 0.215, 0.335, 0.004, mutedBrass, 0, 0, 0.0085, 0.002);
-        box(group, 0.197, 0.316, 0.004, cardBack, 0, 0, 0.012, 0.002);
-        sphere(group, 0.048, brass, 0, 0, 0.018, 8, 6).scale.z = 0.12;
-        held.push({ group, home: group.position.clone(), homeTurn: group.quaternion.clone(), lift: 0, rise: 0 });
-      }
-    };
-    const deal = (hand?: HandCard[]) => {
-      needsRender = true;
-      if (!hand?.length) {
-        if (openCard >= 0) openCardAt(-1);
-        if (!held.length || held[0].face) dealBacks();
-        return;
-      }
-      if (held.length !== hand.length || !held[0].face) {
-        clearHand();
-        if (openCard >= 0) openCardAt(-1);
-        hand.forEach((_, i) => {
-          const group = new THREE.Group();
-          placeCard(i, hand.length, group);
-          cardFan.add(group);
-          box(group, CARD_W, CARD_H, 0.006, cream, 0, 0, 0, 0.004);
-          const canvas = document.createElement("canvas");
-          canvas.width = 640;
-          canvas.height = 888;
-          const texture = new THREE.CanvasTexture(canvas);
-          texture.colorSpace = THREE.SRGBColorSpace;
-          texture.anisotropy = anisotropy;
-          // Read as printed paper: unlit, so the words keep their contrast under the room's lights.
-          const faceMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, fog: false });
-          const face = new THREE.Mesh(cardFaceShape, faceMaterial);
-          face.position.z = 0.0035;
-          face.userData.cardIndex = i;
-          group.add(face);
-          heldFaces.push(face);
-          held.push({ group, home: group.position.clone(), homeTurn: group.quaternion.clone(), lift: 0, rise: 0, face: { canvas, texture, material: faceMaterial, drawn: "" } });
-        });
-      }
-      hand.forEach((card, i) => {
-        const face = held[i].face!;
-        const drawn = JSON.stringify(card);
-        if (face.drawn === drawn) return;
-        face.drawn = drawn;
-        paintCard(face.canvas, card);
-        face.texture.needsUpdate = true;
-      });
-    };
-    dealRef.current = deal;
-    // needsRender and friends are declared just below; this runs once they exist.
-    queueMicrotask(() => {
-      if (dealRef.current === deal) deal(cardsRef.current);
-    });
-    // Canvas text falls back to a system font if the web font is not ready yet.
-    void document.fonts?.ready.then(() => {
-      if (dealRef.current !== deal) return;
-      for (const card of held) if (card.face) card.face.drawn = "";
-      deal(cardsRef.current);
-    });
-
     let width = 1;
     let height = 1;
     let frame = 0;
@@ -943,20 +725,16 @@ export default function TableScene({
     let lastX = 0;
     let lastY = 0;
     let yawTarget = 0;
-    let pitchTarget = -0.025;
+    let pitchTarget = LEVEL_PITCH;
     let yaw = 0;
-    let pitch = -0.025;
+    let pitch = LEVEL_PITCH;
     let baseFov = 64;
     let fov = 64;
     let fovTarget = 64;
     let aimedFocus: string | undefined;
     let aimedMode: string | undefined;
-    const READ_DISTANCE = 0.62;
     // Neighbours sit at the sides now, so the seat turns further to see them.
     const YAW_MAX = overview ? 0.6 : 1.0;
-    const readForward = new THREE.Vector3();
-    const readSpot = new THREE.Vector3();
-    const cardHome = new THREE.Vector3();
     const pointer = new THREE.Vector2();
     const raycaster = new THREE.Raycaster();
     const screen = new THREE.Vector3();
@@ -977,8 +755,6 @@ export default function TableScene({
       camera.updateProjectionMatrix();
       pendant.visible = width >= 620;
       host.classList.toggle("is-narrow", width < 620);
-      cardFan.scale.setScalar(width < 620 ? 0.82 : 1);
-      cardFan.position.set(0, width < 620 ? 0.18 : 0, width < 620 ? 0.38 : 0);
       needsRender = true;
     };
     const resizeObserver = new ResizeObserver(resize);
@@ -1008,11 +784,6 @@ export default function TableScene({
       return raycaster.intersectObjects(selectable, false)[0]?.object.userData
         .playerUid as string | undefined;
     };
-    const pickCard = (event: PointerEvent) => {
-      aim(event);
-      const index = raycaster.intersectObjects(heldFaces, false)[0]?.object.userData.cardIndex as number | undefined;
-      return index ?? -1;
-    };
     const onPointerMove = (event: PointerEvent) => {
       needsRender = true;
       if (down) {
@@ -1032,15 +803,12 @@ export default function TableScene({
           dragging = true;
         return;
       }
-      // Cards are nearer than people, and a card held up to read covers the whole view.
-      const card = pickCard(event);
-      hoverCard = card;
-      const next = card >= 0 || openCard >= 0 ? null : (pick(event) ?? null);
+      const next = pick(event) ?? null;
       if (next !== hoverUid) {
         hoverUid = next;
         setHovered(next);
       }
-      renderer.domElement.style.cursor = next || card >= 0 ? "pointer" : "grab";
+      renderer.domElement.style.cursor = next ? "pointer" : "grab";
     };
     const onPointerDown = (event: PointerEvent) => {
       down = true;
@@ -1052,13 +820,8 @@ export default function TableScene({
     };
     const onPointerUp = (event: PointerEvent) => {
       if (!dragging) {
-        const card = pickCard(event);
-        if (openCard >= 0) openCardAt(card === openCard || card < 0 ? -1 : card);
-        else if (card >= 0) openCardAt(card);
-        else {
-          const selected = pick(event);
-          if (selected) selectRef.current?.(selected);
-        }
+        const selected = pick(event);
+        if (selected) selectRef.current?.(selected);
       }
       down = false;
       if (renderer.domElement.hasPointerCapture(event.pointerId))
@@ -1067,14 +830,9 @@ export default function TableScene({
     };
     const onPointerLeave = () => {
       hoverUid = null;
-      hoverCard = -1;
       setHovered(null);
       needsRender = true;
     };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && openCard >= 0) openCardAt(-1);
-    };
-    window.addEventListener("keydown", onKeyDown);
     const onPointerCancel = () => {
       down = false;
       dragging = false;
@@ -1084,14 +842,12 @@ export default function TableScene({
     renderer.domElement.addEventListener("pointerup", onPointerUp);
     renderer.domElement.addEventListener("pointerleave", onPointerLeave);
     renderer.domElement.addEventListener("pointercancel", onPointerCancel);
-    closeRef.current = () => openCardAt(-1);
     resetRef.current = () => {
       yawTarget = 0;
-      pitchTarget = -0.025;
+      pitchTarget = LEVEL_PITCH;
       fovTarget = baseFov;
       hoverUid = null;
       setHovered(null);
-      openCardAt(-1);
       needsRender = true;
     };
 
@@ -1130,12 +886,16 @@ export default function TableScene({
           // In review the panel covers the lower screen, so look lower to lift the face into view.
           const lift = aimedMode === "review" ? (width < 620 ? 0.13 : 0.07) : 0;
           yawTarget = THREE.MathUtils.clamp(Math.atan2(dx, dz), -YAW_MAX, YAW_MAX);
-          pitchTarget = THREE.MathUtils.clamp(Math.atan2(1.96 - 1.68, Math.hypot(dx, dz)) - lift, -0.3, 0.19);
           // Zoom in on people across the table, not on a neighbour who is already close.
           fovTarget = Math.hypot(dx, dz) < 3 ? baseFov : baseFov * (width < 620 ? 0.66 : 0.72);
+          // The cards float over the bottom of the view (`--deck-h`, set by the deck): look down just
+          // enough that the face sits in the middle of the space above them.
+          const cover = Math.min(0.6, (parseFloat(getComputedStyle(host).getPropertyValue("--deck-h")) || 0) / height);
+          const overCards = Math.atan(cover * Math.tan(THREE.MathUtils.degToRad(fovTarget / 2)));
+          pitchTarget = THREE.MathUtils.clamp(Math.atan2(2.05 * seatScale - eyeHeight, Math.hypot(dx, dz)) - lift - overCards, -0.5, 0.19);
         } else {
           yawTarget = 0;
-          pitchTarget = aimedMode === "mission" ? -0.06 : -0.025;
+          pitchTarget = aimedMode === "mission" ? LEVEL_PITCH - 0.035 : LEVEL_PITCH;
           fovTarget = baseFov;
         }
       }
@@ -1158,7 +918,7 @@ export default function TableScene({
         camera.position.set(Math.sin(yaw) * 5.2, 6.4 + pitch * 4, Math.cos(yaw) * 5.2);
         camera.lookAt(0, 0.8, -0.3);
       } else {
-        camera.position.set(0, 1.68 + (stopMotion ? 0 : Math.sin(t * 1.3) * 0.008), 3.25);
+        camera.position.set(0, eyeHeight + (stopMotion ? 0 : Math.sin(t * 1.3) * 0.008), 3.25);
         camera.lookAt(
           camera.position.x + Math.sin(yaw) * 5,
           camera.position.y + Math.sin(pitch) * 5,
@@ -1166,27 +926,8 @@ export default function TableScene({
         );
       }
       camera.updateMatrixWorld();
-      // Hover lifts a card out of the fan; a press brings it up in front of the camera to read.
-      const cardSpeed = stopMotion ? 1 : 1 - Math.exp(-delta * 11);
-      const viewHeight = 2 * READ_DISTANCE * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-      const readScale = Math.min((viewHeight * 0.8) / CARD_H, (viewHeight * camera.aspect * 0.86) / CARD_W) / cardFan.scale.x;
-      camera.getWorldDirection(readForward);
-      readSpot.copy(camera.position).addScaledVector(readForward, READ_DISTANCE).sub(cardFan.position).divideScalar(cardFan.scale.x);
-      held.forEach((card, i) => {
-        const liftGoal = i === openCard ? 1 : 0;
-        const riseGoal = i === hoverCard && openCard < 0 ? 1 : 0;
-        card.lift += (liftGoal - card.lift) * cardSpeed;
-        card.rise += (riseGoal - card.rise) * cardSpeed;
-        if (Math.abs(liftGoal - card.lift) < 0.001) card.lift = liftGoal;
-        if (Math.abs(riseGoal - card.rise) < 0.001) card.rise = riseGoal;
-        if (card.lift !== liftGoal || card.rise !== riseGoal) needsRender = true;
-        cardHome.copy(card.home);
-        cardHome.y += card.rise * 0.075;
-        card.group.position.lerpVectors(cardHome, readSpot, card.lift);
-        card.group.quaternion.slerpQuaternions(card.homeTurn, camera.quaternion, card.lift);
-        card.group.scale.setScalar(1 + (readScale - 1) * card.lift);
-      });
-      // Voting: the right arm swings up from the hand of cards and points at the chosen person.
+      const armSpeed = stopMotion ? 1 : 1 - Math.exp(-delta * 11);
+      // Voting: the right arm swings up and points at the chosen person.
       if (rightArm && finger) {
         const target = avatars.find((avatar) => avatar.uid === pointRef.current);
         if (target) {
@@ -1194,13 +935,12 @@ export default function TableScene({
           aimTurn.setFromUnitVectors(armRest, headSpot.sub(rightArm.position).normalize());
         }
         const goal = target ? 1 : 0;
-        point += (goal - point) * cardSpeed;
+        point += (goal - point) * armSpeed;
         if (Math.abs(goal - point) < 0.001) point = goal;
         else needsRender = true;
         rightArm.quaternion.slerpQuaternions(restTurn, aimTurn, point);
         finger.visible = point > 0.5;
-        // The hand of cards dips out of the way while pointing.
-        cardFan.position.y = (width < 620 ? 0.18 : 0) - point * 0.32;
+        for (const arm of ownArms) arm.visible = arm === rightArm && point > 0.01;
       }
       for (const avatar of avatars) {
         avatar.head.rotation.y = stopMotion
@@ -1262,9 +1002,6 @@ export default function TableScene({
 
     return () => {
       cancelAnimationFrame(frame);
-      clearHand();
-      dealRef.current = () => {};
-      window.removeEventListener("keydown", onKeyDown);
       resizeObserver.disconnect();
       visibilityObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibility);
@@ -1285,16 +1022,11 @@ export default function TableScene({
       renderer.domElement.remove();
       scene.clear();
       resetRef.current = () => {};
-      closeRef.current = () => {};
     };
   }, [peopleKey, selfColor, quality, reducedMotion, overview]);
 
-  useEffect(() => {
-    dealRef.current(cardsRef.current);
-  }, [cardsKey]);
-
   return (
-    <div className={`immersive-scene${attract ? " attract" : ""}${reading ? " reading" : ""}`} ref={hostRef} data-reading={reading}>
+    <div className={`immersive-scene${attract ? " attract" : ""}`} ref={hostRef}>
       <div className="immersive-scene__vignette" aria-hidden="true" />
       {failed ? (
         <div className="immersive-scene__fallback" role="img" aria-label="원탁에 앉아 다른 플레이어와 마주 보는 게임 장면">
@@ -1336,10 +1068,9 @@ export default function TableScene({
           })}
         </div>
       )}
-      {reading && cards?.[readIndex] && <CardReader card={cards[readIndex]} onClose={() => closeRef.current()} />}
       {!attract && (
       <div className="immersive-scene__controls">
-        <span className="immersive-scene__hint">{reading ? "다시 누르면 내려놓아요" : phase === "vote" ? "사람을 눌러 가리키면 투표할 사람으로 골라요" : cards?.length ? "카드를 누르면 크게 읽어요 · 드래그해서 둘러보기" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
+        <span className="immersive-scene__hint">{phase === "vote" ? "사람을 눌러 가리키면 투표할 사람으로 골라요" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
         <button
           className="immersive-scene__reset"
           type="button"
@@ -1353,34 +1084,6 @@ export default function TableScene({
         </button>
       </div>
       )}
-    </div>
-  );
-}
-
-/** A card held up to read: all of its words, scrolling when they are long. */
-function CardReader({ card, onClose }: { card: HandCard; onClose: () => void }) {
-  const extra = card.full && card.full !== card.text ? card.full : "";
-  return (
-    <div className={`card-reader${card.tone === "event" ? " event" : ""}`} role="dialog" aria-label={`${card.name} 카드`} data-testid="card-reader">
-      <header>
-        {card.order !== undefined && <span className="card-reader-no">{card.order}</span>}
-        <div>
-          <strong>{card.name}</strong>
-          <small>{card.role}</small>
-        </div>
-        <button type="button" onClick={onClose}>
-          내려놓기
-        </button>
-      </header>
-      <div className="card-reader-body" tabIndex={0}>
-        <p className={card.text ? undefined : "muted"}>{card.text || emptyText(card)}</p>
-        {extra && (
-          <>
-            <h4>전체 발언</h4>
-            <p>{extra}</p>
-          </>
-        )}
-      </div>
     </div>
   );
 }

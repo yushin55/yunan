@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import RoleAvatar from "../features/roles/RoleAvatar";
-import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import { ArrowRight, BookOpen, Check, EyeOff, Maximize2, Minimize2, Pause, Search, VenetianMask, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
@@ -15,7 +15,7 @@ import type { SpeechEngine } from "../features/discussion/useSpeechCapture";
 import { RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
-import type { HandCard } from "../components/scene/TableScene";
+import type { TableCard } from "../features/game/CardStrip";
 import PreferencePicker from "../features/roles/PreferencePicker";
 import { IdentityBanner } from "../features/roles/SecretRole";
 import type { RoomApi } from "../features/room/useRoom";
@@ -34,19 +34,14 @@ function stored(key: string, fallback: boolean) {
 }
 
 /** Cards in my own hand before the statements: my two picks in the lobby, then my role and who I am. */
-function ownHand(room: Room, me: Me, myRole?: Role): HandCard[] | undefined {
+function ownHand(room: Room, me: Me): TableCard[] | undefined {
   if (room.phase === "lobby" && me.preferences)
     return [me.preferences.first, me.preferences.second].map((id, i) => {
       const role = room.topic.roles.find((r) => r.id === id);
       return { uid: `pick${i}`, order: i + 1, name: role?.name ?? "", role: `${i + 1}순위`, text: role?.goal ?? "", state: "done" };
     });
-  if (room.phase === "role" && myRole)
-    return [
-      { uid: "my-role", name: myRole.name, role: "나의 역할", text: myRole.goal, state: "done" },
-      me.isSwitcher
-        ? { uid: "identity", name: "역할 전환자", role: "나만 아는 정체", text: "고르지 않은 역할을 맡았어요. 들키지 않게 자연스럽게 말해요.", state: "speaking" }
-        : { uid: "identity", name: "일반 참가자", role: "나만 아는 정체", text: "누가 역할 전환자인지 찾아보세요.", state: "done" },
-    ];
+  // While roles are checked the role card pop-up already shows both cards; none under the table.
+  if (room.phase === "role") return [];
   return undefined;
 }
 
@@ -72,32 +67,25 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const discussing = SPEAKING.includes(phase) || phase === "vote";
   // At the 3D table the table fills the screen and everything else floats over it.
   const fullStage = show3d;
-  const timer = usePhaseTimer(room, offset);
-  // In a real room the teacher's screen starts the game; this only shows the same countdown.
+  // In a real room the server starts the game; this only shows the same countdown.
   const ownCount = useAutoStart(startIn === undefined && allReady(room, participants));
   const countdown = startIn === undefined ? ownCount : startIn;
   const count = room.settings.switcherCount;
-  const pointAt = phase === "vote" ? (votePicked.at(-1) ?? me.vote?.at(-1)) : undefined;
+  // After a reload my pick comes back from the vote the server has.
+  const picked = votePicked.length ? votePicked : (me.vote ?? []);
+  const pointAt = phase === "vote" ? picked.at(-1) : undefined;
   // The camera follows each speaker during the statements; during questions it stays put.
   const talking = phase === "statement" && room.turn?.stage !== "qa" ? room.turn?.uid : undefined;
   const autoFocus = talking !== me.uid ? talking : undefined;
 
-  // Pointing at someone picks them; pointing at someone else changes the pick until time runs
-  // out. The pick goes in as the vote just before the end.
-  // ponytail: the server takes one vote only, so it is sent at the last moment; send it on every
-  // change once the server lets a vote be changed (백엔드수정요청.md 4).
+  // Pointing at someone picks them, and every full pick goes in as my vote right away. The server
+  // keeps the latest one until time runs out.
   const pick = (uid: string) => {
-    if (me.vote || room.paused) return;
-    setVotePicked((current) => togglePick(current, uid, count));
+    if (room.paused) return;
+    const next = togglePick(picked, uid, count);
+    setVotePicked(next);
+    if (next.length === count) void action("vote", { targets: next });
   };
-  const sent = useRef(-1);
-  useEffect(() => {
-    if (phase !== "vote" || me.vote || room.paused || votePicked.length !== count || sent.current === room.phaseVersion) return;
-    if (timer.remaining !== null && timer.remaining <= 2) {
-      sent.current = room.phaseVersion;
-      void action("vote", { targets: votePicked });
-    }
-  }, [phase, me.vote, room.paused, votePicked, count, room.phaseVersion, timer.remaining, action]);
   const selectAtTable = (uid: string) => {
     if (phase === "vote") return pick(uid);
     setFocus((current) => (current === uid ? "" : uid));
@@ -144,7 +132,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
       )}
       {phase === "vote" && (
         <section className="panel float-pop vote-pop">
-          <VotePanel atTable={show3d} candidates={others} count={count} myVote={me.vote} picked={votePicked} onPick={pick} disabled={room.paused} />
+          <VotePanel atTable={show3d} candidates={others} count={count} myVote={me.vote} picked={picked} onPick={pick} disabled={room.paused} />
         </section>
       )}
       {discussing && (
@@ -184,7 +172,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
               focusUid={autoFocus ?? (focus || undefined)}
               onSelect={selectAtTable}
               offset={offset}
-              hand={ownHand(room, me, myRole)}
+              hand={ownHand(room, me)}
               pointAt={pointAt}
             />
             {fullStage && (
@@ -448,7 +436,7 @@ function RoleZoom({ me, role, roles, confirmed, disabled, onConfirm }: { me: Me;
             </p>
           </div>
         </article>
-        <article className={`game-card identity${switcher ? " switcher" : ""}`} data-testid="identity" aria-label={switcher ? "역할 전환자" : "일반 참가자"}>
+        <article className={`game-card id-card${switcher ? " switcher" : ""}`} data-testid="identity" aria-label={switcher ? "역할 전환자" : "일반 참가자"}>
           <header className="game-card-top">
             <span>나만 아는 정체</span>
           </header>
@@ -532,23 +520,18 @@ function QuestionsPopup({ rounds, participants, me, room, offset }: { rounds: Ro
 }
 
 /** The result as a popup over the table. Its header holds the close button; closed, a small button brings it back. */
+/** The result stage shows this alone: no cards, no closing it; only leaving the game. */
 function ResultPopup({ reveal, participants, room, me }: { reveal: Reveal; participants: Participant[]; room: Room; me: Me }) {
-  const [open, setOpen] = useState(true);
-  if (!open)
-    return (
-      <button className="button primary result-reopen" data-testid="result-reopen" onClick={() => setOpen(true)}>
-        결과 보기
-      </button>
-    );
   return (
     <section className="panel result-popup" role="dialog" aria-label="게임 결과" data-testid="result-popup">
       <header className="result-head">
         <strong>{room.phase === "ended" ? "게임이 끝났어요" : "결과"}</strong>
-        <button className="icon-button" aria-label="결과 닫기" onClick={() => setOpen(false)}>
-          <X size={18} />
-        </button>
       </header>
       <RevealView reveal={reveal} participants={participants} topic={room.topic} myUid={me.uid} />
+      {/* ponytail: leaves to the home screen; a practice game stays saved until "처음부터 다시". */}
+      <Link to="/" className="button primary large result-exit" data-testid="game-exit">
+        게임 종료
+      </Link>
     </section>
   );
 }

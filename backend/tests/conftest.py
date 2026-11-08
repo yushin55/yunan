@@ -7,17 +7,23 @@ from app.api.dependencies import game_service
 from app.core.auth import current_uid
 from app.main import app
 from app.repositories.rooms import MemoryRoomRepository
+from app.services.ai import AIUnavailable
 from app.services.game import GameService
 from app.services.moderation import Moderator
 
 TEACHER = "teacher"
+
+
+def no_ai(topic, lines):
+    """Tests never reach the real AI; a test that needs a summary sets its own summarizer."""
+    raise AIUnavailable("no AI in tests")
 STUDENTS = [f"s{i}" for i in range(8)]
 
 
 @pytest.fixture
 def game():
     clock = [1_800_000_000_000]
-    service = GameService(MemoryRoomRepository(), lambda: clock[0], moderator=Moderator(mode="rules"), rng=random.Random(7))
+    service = GameService(MemoryRoomRepository(), lambda: clock[0], moderator=Moderator(mode="rules"), rng=random.Random(7), summarizer=no_ai)
     return service, clock
 
 

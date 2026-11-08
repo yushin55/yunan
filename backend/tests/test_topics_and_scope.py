@@ -51,8 +51,8 @@ def test_public_topic_hides_event_cards_and_teacher_guide(client):
 
 
 def test_phases_end_at_reveal_without_real_opinion_steps():
-    assert PHASES == ["lobby", "role", "statement", "event", "rebuttal", "vote", "reveal", "ended"]
-    assert set(load_game_config()["phaseSeconds"]) == {"role", "statement", "event", "rebuttal", "vote"}
+    assert PHASES == ["lobby", "role", "statement", "event", "vote", "reveal", "ended"]
+    assert set(load_game_config()["phaseSeconds"]) == {"role", "statement", "event", "vote"}
 
 
 def test_removed_features_have_no_api():

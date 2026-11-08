@@ -1,12 +1,13 @@
 """Phase order, deadlines and per-viewer snapshots.
 
-lobby (topic, rules, role preferences) → role (secret role) → statement → event (event card,
-questions and answers) → rebuttal → vote → reveal → ended. Nothing after the reveal asks for
+lobby (topic, rules, role preferences) → role (secret role) → statement (then questions about the
+statements) → event (event card, questions and answers) → vote → reveal → ended. Nothing after the reveal asks for
 a student's real opinion.
 
 Students talk out loud, each into their own device, and only one microphone in the room can be on
 (`room.floor`). Statements go in seat order: `room.turn` says whose turn it is and `phaseEndsAt` is
-the deadline of that turn. After that the floor is open: anyone can take the microphone to ask or
+the deadline of that turn. After the last statement `turn.stage` becomes "qa" for `qaSeconds`, and in
+the event phase the floor is open from the start. On an open floor anyone can take the microphone to ask or
 answer, for at most `micSeconds`, until `phaseEndsAt` ends the phase.
 
 Every turn, and every time someone takes the open floor, gets its own `phaseVersion`. That is how a
@@ -20,11 +21,12 @@ from fastapi import HTTPException
 from app.repositories.topics import load_game_config
 from app.services.voting import build_reveal
 
-PHASES = ["lobby", "role", "statement", "event", "rebuttal", "vote", "reveal", "ended"]
-TIMED_PHASES = ("role", "statement", "event", "rebuttal", "vote")
-SPEAKING_PHASES = ("statement", "event", "rebuttal")
+PHASES = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"]
+TIMED_PHASES = ("role", "statement", "event", "vote")
+SPEAKING_PHASES = ("statement", "event")
 # What the two microphone buttons say in each speaking phase. The first is Z, the second X.
-MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer"), "rebuttal": ("rebuttal", "answer")}
+MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer")}
+OPEN_KINDS = ("question", "answer")  # Statement Q&A uses the event phase's buttons.
 MAX_TURNS = 40
 
 
@@ -60,17 +62,33 @@ def start_phase(state: dict, phase: str, now: int) -> None:
                 paused=False, pausedRemainingMs=None, updatedAt=now, turn=None, floor=None)
     if phase == "statement" and state["participants"]:
         order = seated(state)
-        room["turn"] = {"order": order, "index": 0, "uid": order[0]}
+        room["turn"] = {"order": order, "index": 0, "uid": order[0], "stage": "speech"}
         _log_turn(state)
     if phase == "ended":
         room["endedAt"] = now
+
+
+def in_qa(room: dict) -> bool:
+    return (room.get("turn") or {}).get("stage") == "qa"
+
+
+def mic_kinds(room: dict) -> tuple:
+    return OPEN_KINDS if in_qa(room) else MIC_KINDS.get(room["phase"], ())
+
+
+def start_qa(state: dict, now: int) -> None:
+    """Everyone has made their statement: anyone can now ask about them."""
+    room = state["room"]
+    room["turn"].update(stage="qa", uid=None)
+    room.update(phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + load_game_config()["qaSeconds"] * 1000,
+                paused=False, pausedRemainingMs=None, updatedAt=now, floor=None)
 
 
 def next_turn(state: dict, now: int) -> bool:
     """Hand the floor to the next speaker. False when everyone in this phase has had their turn."""
     room = state["room"]
     turn = room.get("turn")
-    if not turn or turn["index"] + 1 >= len(turn["order"]):
+    if not turn or in_qa(room) or turn["index"] + 1 >= len(turn["order"]):
         return False
     turn["index"] += 1
     turn["uid"] = turn["order"][turn["index"]]
@@ -97,8 +115,13 @@ def finish_phase(state: dict, now: int) -> None:
 
 
 def transition(state: dict, now: int) -> None:
-    """The next step of the game: the next speaker if there is one, otherwise the next phase."""
-    if not next_turn(state, now):
+    """The next step of the game: the next speaker, then statement Q&A, then the next phase."""
+    room = state["room"]
+    if next_turn(state, now):
+        return
+    if room.get("turn") and not in_qa(room):
+        start_qa(state, now)
+    else:
         finish_phase(state, now)
 
 
@@ -106,9 +129,7 @@ def all_submitted(state: dict) -> bool:
     phase = state["room"]["phase"]
     if phase == "role":
         return all("role" in p["submitted"] for p in state["participants"].values())
-    if phase == "vote":
-        return set(state["participants"]) <= state["votes"].keys()
-    # Speaking ends on the timer, when the speaker finishes or when the teacher moves on.
+    # Votes can change until the timer ends. Speaking ends on the timer, when the speaker finishes or when the teacher moves on.
     return False
 
 

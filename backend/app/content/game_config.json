@@ -6,10 +6,10 @@
   "phaseSeconds": {
     "role": 45,
     "statement": 30,
-    "event": 240,
-    "rebuttal": 180,
+    "event": 420,
     "vote": 90
   },
+  "qaSeconds": 90,
   "micSeconds": 30,
   "phaseSecondsRange": { "min": 20, "max": 900 },
   "textLimits": { "line": 400, "nickname": 12 }

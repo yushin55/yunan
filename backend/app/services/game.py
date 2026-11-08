@@ -9,7 +9,7 @@ from app.repositories.topics import find_topic, load_game_config, load_topics, p
 from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
 from app.services.moderation import Moderator, check_rate, validate_text_fields
-from app.services.phase_engine import MAX_TURNS, MIC_KINDS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.phase_engine import MAX_TURNS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
 HOST_ACTIONS = {"settings", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete"}
@@ -20,6 +20,7 @@ MAX_FLOORS = 300  # The log of who spoke lives in the room document, which has a
 LINE_LIMIT = 400
 LATEST = 10 ** 9  # Typed lines have no clip number; they follow what the microphone caught in that turn.
 LATE_AUDIO_MS = 90_000  # Audio said in time can still be on its way, with one retry, after the floor moved on.
+AUTO_START_MS = 3000  # Same 3, 2, 1 the screens show once everyone has picked their roles.
 
 
 def _student(uid, nickname, seat, now):
@@ -85,6 +86,7 @@ class GameService:
             state["privatePlayers"][uid] = _private()
             room["participantCount"] = len(state["participants"])
             room["updatedAt"] = now
+            self._arm_start(state, now)
 
         return snapshot(self.repository.mutate(room_id, update), uid)
 
@@ -95,37 +97,52 @@ class GameService:
     def action(self, room_id, uid, action, data):
         validate_text_fields(data)
         deferred_error = []
+        spoke = []
 
         def update(state):
             deferred_error.clear()  # Firestore may retry this transaction callback.
+            spoke.clear()
             now = self.clock()
             role = viewer(state, uid)
             room = state["room"]
-            if action == "sync":
-                if data.get("phaseVersion") is not None and data["phaseVersion"] != room["phaseVersion"]:
-                    return  # Another client already moved this phase on; stay read-only.
-                if role == "student":
-                    state["participants"][uid]["connectedAt"] = now
-                advance_if_needed(state, now, data.get("phaseVersion"))
-                return
-            if action in HOST_ACTIONS and role != "host":
-                raise HTTPException(403, "선생님만 할 수 있는 진행 기능이에요.")
-            if action in STUDENT_ACTIONS and role != "student":
-                raise HTTPException(403, "학생 참가자만 할 수 있어요.")
-            check_rate(state["rate"].setdefault(uid, {}), now)
-            if action in HOST_ACTIONS:
-                getattr(self, "_host_" + action.replace("-", "_"))(state, data, now)
-                return
-            # Deadlines are enforced at submission time even if no client has synced yet.
-            advance_if_needed(state, now)
-            error = self._student_action(state, uid, action, data, now)
-            if error:
-                deferred_error.append(error)
+            before = (room["phase"], (room.get("turn") or {}).get("uid"))
+            self._apply(state, uid, role, action, data, now, deferred_error)
+            # A statement turn just ended: its card needs a summary.
+            if before[0] == "statement" and before[1] and before != (room["phase"], (room.get("turn") or {}).get("uid")):
+                spoke.append(before[1])
 
         state = self.repository.mutate(room_id, update)
+        if spoke:
+            state = self._refresh_summary(room_id, state, quiet=True)
         if deferred_error:
             raise HTTPException(409, deferred_error[0])
         return snapshot(state, uid)
+
+    def _apply(self, state, uid, role, action, data, now, deferred_error):
+        room = state["room"]
+        if action == "sync":
+            if data.get("phaseVersion") is not None and data["phaseVersion"] != room["phaseVersion"]:
+                return  # Another client already moved this phase on; stay read-only.
+            if role == "student":
+                state["participants"][uid]["connectedAt"] = now
+            if room["phase"] == "lobby" and room.get("phaseEndsAt") and now >= room["phaseEndsAt"]:
+                self._auto_start(state, now)
+                return
+            advance_if_needed(state, now, data.get("phaseVersion"))
+            return
+        if action in HOST_ACTIONS and role != "host":
+            raise HTTPException(403, "선생님만 할 수 있는 진행 기능이에요.")
+        if action in STUDENT_ACTIONS and role != "student":
+            raise HTTPException(403, "학생 참가자만 할 수 있어요.")
+        check_rate(state["rate"].setdefault(uid, {}), now)
+        if action in HOST_ACTIONS:
+            getattr(self, "_host_" + action.replace("-", "_"))(state, data, now)
+            return
+        # Deadlines are enforced at submission time even if no client has synced yet.
+        advance_if_needed(state, now)
+        error = self._student_action(state, uid, action, data, now)
+        if error:
+            deferred_error.append(error)
 
     # ── Discussion record ────────────────────────────────────────────────────
     def speech(self, room_id, uid, data):
@@ -178,28 +195,39 @@ class GameService:
             if verdict.status == "ok":
                 self._publish(state, entry)
                 outcome["speech"] = "published"
+                outcome["late_statement"] = turn["kind"] == "statement" and version != state["room"]["phaseVersion"]
             else:
                 self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
                 outcome["speech"] = "held"
             advance_if_needed(state, now)
 
         state = self.repository.mutate(room_id, update)
+        if outcome["speech"] == "published" and outcome.get("late_statement"):
+            state = self._refresh_summary(room_id, state, quiet=True)  # Words that arrived after the turn ended.
         return {**snapshot(state, uid), **outcome}
 
     def summarize(self, room_id, uid):
         state = self.repository.read(room_id)
         if viewer(state, uid) != "host":
             raise HTTPException(403, "선생님 화면에서만 정리할 수 있어요.")
+        return snapshot(self._refresh_summary(room_id, state), uid)
+
+    def _refresh_summary(self, room_id, state, quiet=False):
+        """The AI summary of the record so far. Called by the teacher's screen and, `quiet`, by the
+        server itself whenever a statement turn ends, so the cards fill even with no teacher screen.
+        The AI call runs outside the transaction; a failure leaves the old summary (quiet) or is a 503."""
         revision = state.get("transcriptRev", 0)
         current = state["rounds"].get("summary")
         lines = state["rounds"].get("transcript", [])
         if not lines or (current and current["revision"] >= revision):
-            return snapshot(state, uid)  # Nothing new: no AI call.
+            return state  # Nothing new: no AI call.
         people = state["participants"]
         try:
             # The AI sees a seat number, never who that is; the number is mapped back to a person here.
             summary = self.summarizer(state["room"]["topic"], [{"roleId": people[l["uid"]].get("roleId"), "speaker": people[l["uid"]]["seat"] + 1, "phase": l["phase"], "kind": l["kind"], "text": l["text"]} for l in lines])
         except AIUnavailable as exc:
+            if quiet:
+                return state
             raise HTTPException(503, "토론 정리를 만들지 못했어요. 발언 기록은 그대로 남아 있어요.") from exc
         seats = {p["seat"] + 1: p["uid"] for p in people.values()}
         summary["statements"] = [{"uid": seats[row["speaker"]], "text": row["text"]} for row in summary.get("statements", []) if row["speaker"] in seats]
@@ -209,7 +237,7 @@ class GameService:
             if not existing or existing["revision"] <= revision:
                 fresh["rounds"]["summary"] = {**summary, "revision": revision, "at": self.clock()}
 
-        return snapshot(self.repository.mutate(room_id, update), uid)
+        return self.repository.mutate(room_id, update)
 
     # ── Teacher controls ─────────────────────────────────────────────────────
     def _host_settings(self, state, data, now):
@@ -227,6 +255,7 @@ class GameService:
                     state["privatePlayers"][uid]["preferences"] = None
         room["settings"] = self._settings(data, room["settings"])
         room["updatedAt"] = now
+        self._arm_start(state, now)
 
     def _host_kick(self, state, data, now):
         room = state["room"]
@@ -241,6 +270,21 @@ class GameService:
             state["participants"][uid]["seat"] = seat
         room["participantCount"] = len(state["participants"])
         room["updatedAt"] = now
+        self._arm_start(state, now)
+
+    def _arm_start(self, state, now):
+        """Everyone has picked their roles: start by itself in 3 seconds, even with the teacher's screen closed.
+        The countdown is the lobby's `phaseEndsAt`, so the screens' deadline sync is what starts it."""
+        room = state["room"]
+        people = state["participants"].values()
+        ready = room["minStudents"] <= len(people) <= room["maxStudents"] and all(p["prefsDone"] for p in people)
+        room["phaseEndsAt"] = (room.get("phaseEndsAt") or now + AUTO_START_MS) if ready else None
+
+    def _auto_start(self, state, now):
+        try:
+            self._host_start(state, {}, now)
+        except HTTPException:
+            state["room"]["phaseEndsAt"] = None  # Left for the teacher, who sees why it cannot start.
 
     def _host_start(self, state, data, now):
         room = state["room"]
@@ -303,7 +347,7 @@ class GameService:
         room = state["room"]
         turn = room.get("turn")
         target = data["targetUid"]
-        if not turn:
+        if not turn or in_qa(room):
             raise HTTPException(409, "차례대로 말하는 단계에서만 차례를 줄 수 있어요.")
         if target not in state["participants"]:
             raise HTTPException(404, "이 방의 참가자가 아니에요.")
@@ -323,7 +367,7 @@ class GameService:
             room["pausedRemainingMs"] += data["seconds"] * 1000
         else:
             room["phaseEndsAt"] = max(room["phaseEndsAt"], now) + data["seconds"] * 1000
-            if room.get("turn") and room.get("floor"):
+            if room.get("turn") and room.get("floor") and not in_qa(room):
                 # A turn's microphone stays on for the whole turn, however long it gets.
                 room["floor"]["endsAt"] = room["phaseEndsAt"]
                 state["turnLog"][str(room["floor"]["version"])]["until"] = room["phaseEndsAt"]
@@ -371,6 +415,7 @@ class GameService:
                 raise HTTPException(422, "이 주제에 있는 역할만 고를 수 있어요.")
             private["preferences"] = {"first": data["first"], "second": data["second"]}
             participant["prefsDone"] = True
+            self._arm_start(state, now)
             return None
         if action == "mic-off":
             floor = room.get("floor")
@@ -395,11 +440,9 @@ class GameService:
             return self._mic_on(state, uid, data["kind"], now)
         if action == "vote":
             targets = data["targets"]
-            if private["vote"] is not None:
-                if sorted(private["vote"]) == sorted(targets):
-                    return None  # Idempotent retry.
-                raise HTTPException(409, "이미 투표했어요. 투표는 바꿀 수 없어요.")
             if room["phase"] != "vote":
+                if private["vote"] is not None and sorted(private["vote"]) == sorted(targets):
+                    return None  # A retry that arrives after the vote closed.
                 return "투표 시간이 아니에요."
             needed = room["settings"]["switcherCount"]
             if len(targets) != needed or len(set(targets)) != needed:
@@ -408,17 +451,18 @@ class GameService:
                 raise HTTPException(422, "자기 자신에게는 투표할 수 없어요.")
             if not set(targets) <= state["participants"].keys():
                 raise HTTPException(422, "이 방의 참가자에게만 투표할 수 있어요.")
+            # A new vote replaces the old one until the timer ends.
             state["votes"][uid] = list(targets)
             private["vote"] = list(targets)
-            participant["submitted"].append("vote")
-            advance_if_needed(state, now)
+            if "vote" not in participant["submitted"]:
+                participant["submitted"].append("vote")
             return None
         raise HTTPException(404, "알 수 없는 행동이에요.")
 
     def _mic_on(self, state, uid, kind, now):
         """One microphone in the room. This check is what stops two people talking into the record."""
         room = state["room"]
-        if kind not in MIC_KINDS.get(room["phase"], ()):
+        if kind not in mic_kinds(room):
             return "지금은 이 버튼으로 마이크를 켤 수 없어요."
         floor = room.get("floor")
         if floor and floor["endsAt"] > now:
@@ -426,7 +470,7 @@ class GameService:
                 return None  # Idempotent retry.
             return f"{state['participants'][floor['uid']]['nickname']}님이 말하고 있어요. 끝나면 마이크를 켤 수 있어요."
         turn = room.get("turn")
-        if turn:
+        if turn and not in_qa(room):
             if turn["uid"] != uid:
                 return "내 차례가 오면 마이크를 켤 수 있어요."
             ends = room["phaseEndsAt"]
@@ -502,7 +546,7 @@ class GameService:
             result["switcherCount"] = data["switcherCount"]
         bounds = config["phaseSecondsRange"]
         for phase, seconds in (data.get("phaseSeconds") or {}).items():
-            if seconds is None:
+            if seconds is None or phase == "rebuttal":
                 continue
             if phase not in TIMED_PHASES or not bounds["min"] <= seconds <= bounds["max"]:
                 raise HTTPException(422, f"단계 시간은 {bounds['min']}~{bounds['max']}초 사이로 정해 주세요.")

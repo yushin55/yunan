@@ -26,7 +26,7 @@ def keys_in(value):
 def test_no_preferences_or_switcher_status_in_shared_documents_before_reveal(game):
     service, _ = game
     rid, uids = started_room(service)
-    for phase in ("role", "statement", "event", "rebuttal", "vote"):
+    for phase in ("role", "statement", "event", "vote"):
         to_phase(service, rid, phase)
         state = service.repository.read(rid)
         for path, doc in public_documents(state).items():

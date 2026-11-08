@@ -233,48 +233,5 @@
 .is-narrow .table-status.waiting { background: #6f7a74; }
 .is-narrow .table-status.alert { background: #e7735f; }
 
-/* A card held up to read: the name plates must not sit on top of its words. */
-.immersive-scene.reading .immersive-scene__labels { visibility: hidden; }
-
 /* Title screen: the table is scenery only. */
 .immersive-scene.attract .immersive-scene__canvas { pointer-events: none; cursor: default; }
-
-/* The card held up to read, as page text so long statements can scroll. It lines up with the
-   3D card lifted behind it (80% of the height, card proportions). */
-.card-reader {
-  position: absolute;
-  z-index: 4;
-  left: 50%;
-  top: 50%;
-  height: 80%;
-  aspect-ratio: 31 / 43;
-  max-width: 86%;
-  transform: translate(-50%, -50%);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  padding: 14px 16px;
-  border: 3px solid #c9b48d;
-  border-radius: 6px;
-  background: #f5eedd;
-  color: #2a2218;
-  box-shadow: 0 18px 40px #000a;
-  animation: reader-in 220ms ease-out 180ms both;
-}
-.card-reader header { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 2px solid #c9b48d; }
-.card-reader-no { font-size: 2.2rem; font-weight: 800; line-height: 1; }
-.card-reader header div { display: grid; flex: 1; min-width: 0; }
-.card-reader header strong { font-size: 1.1rem; }
-.card-reader header small { color: #6e5f49; }
-.card-reader header button { padding: 6px 10px; border: 1px solid #c9b48d; border-radius: 8px; background: #fffaf0; color: #2a2218; font: inherit; font-size: 0.85rem; cursor: pointer; }
-.card-reader-body { overflow-y: auto; overscroll-behavior: contain; padding-top: 10px; line-height: 1.65; word-break: keep-all; overflow-wrap: anywhere; scrollbar-width: thin; }
-.card-reader-body p { margin: 0 0 10px; }
-.card-reader-body .muted { color: #8a7a60; }
-.card-reader-body h4 { margin: 6px 0 4px; color: #a0742a; font-size: 0.85rem; }
-@keyframes reader-in { from { opacity: 0; } to { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .card-reader { animation: none; }
-}
-.card-reader.event { border-color: #f0cf8a; background: #8e2b23; color: #fff1dc; }
-.card-reader.event header { border-color: #f0cf8a; }
-.card-reader.event header small { color: #f6cf8c; }
-.card-reader.event header button { border-color: #f0cf8a; background: #6f1f19; color: #fff1dc; }
