@@ -1,4 +1,4 @@
-"""Server-only Gemini client. The API key never leaves the server environment."""
+"""Server-only Gemini / Vertex AI client. The API key never leaves the server environment."""
 import json
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -10,17 +10,28 @@ class AIUnavailable(RuntimeError):
     pass
 
 
-def _generate(parts: list[dict], timeout: float, max_tokens: int) -> dict:
+def _endpoint() -> tuple[str, str]:
+    if settings.ai_provider == "vertex":
+        if not settings.vertex_api_key:
+            raise AIUnavailable("VERTEX_API_KEY is not configured")
+        url = f"https://aiplatform.googleapis.com/v1/publishers/google/models/{settings.vertex_model}:generateContent"
+        return url, settings.vertex_api_key
     if not settings.gemini_api_key:
         raise AIUnavailable("GEMINI_API_KEY is not configured")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent"
+    return url, settings.gemini_api_key
+
+
+def _generate(parts: list[dict], timeout: float, max_tokens: int) -> dict:
+    url, key = _endpoint()
     payload = {
-        "contents": [{"parts": parts}],
+        "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {"temperature": 0, "maxOutputTokens": max_tokens, "responseMimeType": "application/json"},
     }
     request = Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent",
+        url,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json", "x-goog-api-key": settings.gemini_api_key},
+        headers={"Content-Type": "application/json", "x-goog-api-key": key},
         method="POST",
     )
     try:

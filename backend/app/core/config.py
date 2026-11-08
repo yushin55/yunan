@@ -14,6 +14,10 @@ class Settings:
     environment: str = os.getenv("ENVIRONMENT", "production")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite")
+    # "gemini": Gemini API key. "vertex": Vertex AI Express Mode API key.
+    ai_provider: str = os.getenv("AI_PROVIDER", "gemini")
+    vertex_api_key: str = os.getenv("VERTEX_API_KEY", "")
+    vertex_model: str = os.getenv("VERTEX_MODEL", "gemini-3.1-pro-preview")
     # "ai": rules + AI; when AI cannot answer, the teacher reviews. "rules": rules only (local development).
     moderation_mode: str = os.getenv("MODERATION_MODE", "ai")
     allowed_origins: tuple[str, ...] = tuple(
@@ -29,5 +33,7 @@ settings = Settings()
 
 if settings.moderation_mode not in ("ai", "rules"):
     raise RuntimeError("MODERATION_MODE must be 'ai' or 'rules'")
+if settings.ai_provider not in ("gemini", "vertex"):
+    raise RuntimeError("AI_PROVIDER must be 'gemini' or 'vertex'")
 if settings.moderation_mode == "rules" and settings.environment == "production":
     raise RuntimeError("MODERATION_MODE=rules is for local development only")

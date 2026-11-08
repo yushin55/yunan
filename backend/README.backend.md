@@ -72,9 +72,13 @@ userLimits/{uid}                  방 생성 횟수 제한
 | `FIRESTORE_EMULATOR_HOST` | `127.0.0.1:8080` | 설정하지 않음 |
 | `FIREBASE_AUTH_EMULATOR_HOST` | `127.0.0.1:9099` | 설정하지 않음 |
 | `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` | 비워 둠 | 서비스 계정 JSON의 Base64 |
+| `GOOGLE_APPLICATION_CREDENTIALS` | 실제 Firebase에 접속할 때 서비스 계정 JSON의 절대 경로 | 파일 기반 인증을 쓸 때 JSON의 절대 경로 |
 | `ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | 프런트엔드 HTTPS 주소 |
 | `GEMINI_API_KEY` | 선택 | 받아쓰기·표현 점검·토론 정리 키 (없으면 교사 직접 입력으로 진행) |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | 선택 |
+| `AI_PROVIDER` | `gemini`(기본) 또는 `vertex` | 선택한 AI 제공자 |
+| `VERTEX_API_KEY` | Vertex AI를 사용할 때 설정 | `AI_PROVIDER=vertex`이면 필요 |
+| `VERTEX_MODEL` | `gemini-3.1-pro-preview` | Vertex AI 모델 ID |
 | `MODERATION_MODE` | `rules` 또는 `ai` | `ai` |
 
 Base64는 암호화가 아닙니다. 서비스 계정과 AI 키는 서버 환경변수로만 관리합니다.

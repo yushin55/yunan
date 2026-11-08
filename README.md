@@ -171,6 +171,15 @@ python scripts/generate-briefing-audio.py   # backend/.env 의 GEMINI_API_KEY �
 
 필요 환경: Node.js 22.12+, Python 3.11–3.13, Java 21+ (Firebase Emulator).
 
+팀의 공유 브랜치는 `main`입니다. 기존 저장소에서 최신 코드를 받으려면 다음을 실행하세요.
+
+```powershell
+git switch main
+git pull --ff-only origin main
+```
+
+각자의 `backend/.env`와 `frontend/.env`는 Git에 포함되지 않습니다. 처음에는 아래 예시 파일을 복사하고, 이미 있는 `.env`는 유지하세요. AI 키와 Firebase 서비스 계정은 각자 설정합니다.
+
 처음 한 번:
 
 ```powershell
@@ -196,6 +205,10 @@ VS Code에서는 "전체 실행 (에뮬레이터 + 백엔드 + 프론트)" 구�
 
 `GEMINI_API_KEY` 없이 로컬에서 시험하려면 `backend/.env`에 `MODERATION_MODE=rules`를 두세요(규칙 검사만 사용, 운영 환경에서는 서버가 거부). 키가 있으면 기본값 `ai`로 둡니다. `ai` 모드인데 키가 없거나 AI가 응답하지 않으면 발언은 교사 확인 뒤에만 공개됩니다. 받아쓰기와 토론 정리에는 키가 필요하며, 키가 없으면 교사가 직접 입력해 진행할 수 있습니다.
 
+Gemini를 사용하려면 `AI_PROVIDER=gemini`와 `GEMINI_API_KEY`를 설정하고 `MODERATION_MODE=ai`로 바꾸세요. Vertex AI를 사용하려면 `AI_PROVIDER=vertex`, `VERTEX_API_KEY`, `VERTEX_MODEL`을 설정합니다. 음성 받아쓰기·표현 점검·토론 정리·학생별 AI 리포트는 선택한 제공자를 사용하며, 브리핑 음성 생성 스크립트는 별도로 `GEMINI_API_KEY`를 사용합니다. 설정 변경 후에는 백엔드를 재시작하세요.
+
+실제 Firebase에 연결할 때는 프런트엔드와 백엔드의 프로젝트 ID를 맞추고 `VITE_USE_FIREBASE_EMULATORS=false`로 설정합니다. 백엔드의 에뮬레이터 호스트 두 항목은 비우거나 삭제하고, 관리자 인증은 `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` 또는 `GOOGLE_APPLICATION_CREDENTIALS`에 서비스 계정 JSON의 절대 경로를 지정해 설정하세요. 키 파일은 Git에 올리지 않습니다.
+
 ## 테스트
 
 ```powershell
@@ -204,6 +217,7 @@ $env:RUN_EMULATOR_TESTS='1'; .venv/Scripts/python.exe -m pytest -q tests/test_em
 cd ..; npm run test:rules                                  # Firestore 보안 규칙 (Emulator 필요)
 npx playwright install chromium; npm run test:e2e          # 교사 1 + 학생 6 브라우저 전체 플레이 (Emulator·API·웹 필요)
 npm run test:practice                                      # 연습 모드 한 판 (웹 서버만 필요)
+node tests/ui-teacher-merge.mjs                             # 교사 단계 미리보기·메모·투표·리포트·지난 토론 (웹 서버만 필요)
 npm run test:voice                                         # 실제 음성 → 받아쓰기 → 정리 (Emulator·웹·GEMINI_API_KEY 있는 API 필요, 유료 호출)
 npm run build                                              # 타입 검사 + 프로덕션 빌드
 ```
@@ -248,9 +262,12 @@ npm run build                                              # 타입 검사 + 프
 | `ENVIRONMENT` | `production` |
 | `FIREBASE_PROJECT_ID` | Firebase 프로젝트 ID |
 | `FIREBASE_SERVICE_ACCOUNT_JSON_BASE64` | 서비스 계정 JSON 전체를 Base64로 인코딩한 값 |
+| `GOOGLE_APPLICATION_CREDENTIALS` | 파일 기반 인증을 쓸 때 서비스 계정 JSON의 절대 경로 |
 | `ALLOWED_ORIGINS` | 프런트엔드 주소 (쉼표로 여러 개) |
 | `GEMINI_API_KEY` | 받아쓰기·표현 점검·토론 정리용 키 |
 | `GEMINI_MODEL` | 선택, 기본 `gemini-3.5-flash-lite` |
+| `AI_PROVIDER` | `gemini`(기본) 또는 `vertex` |
+| `VERTEX_API_KEY`, `VERTEX_MODEL` | `AI_PROVIDER=vertex`일 때 서버용 키와 모델 ID |
 | `MODERATION_MODE` | `ai` (기본값, 운영에서는 `rules` 불가) |
 
 운영에는 `FIRESTORE_EMULATOR_HOST`·`FIREBASE_AUTH_EMULATOR_HOST`를 **넣지 않습니다**(있으면 서버가 시작을 거부).
