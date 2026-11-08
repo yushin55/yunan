@@ -33,8 +33,10 @@ const BOTS = ["하늘", "도윤", "서연", "지우", "민준"];
 const ORDER: Phase[] = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"];
 const TIMED = ["role", "statement", "event", "vote"];
 const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"] };
-const SECONDS = { role: 20, statement: 30, event: 210, rebuttal: 20, vote: 20 };
+const SECONDS = { role: 20, statement: 40, event: 210, rebuttal: 20, vote: 20 };
 const MIC_SECONDS = 30;
+// After all the statements, this long for anyone to ask about them and answer.
+const QA_SECONDS = 90;
 // Partners leave room to get a word in, then go quiet so the player is never crowded out.
 const BOT_FLOORS = 9;
 const rng = Math.random;
@@ -87,13 +89,16 @@ function mark(s: PracticeState, uid: string, key: string) {
 }
 
 /** The one microphone. On the open floor each speaker gets their own phaseVersion, as on the server. */
+const isOpen = (room: Room) => !room.turn || room.turn.stage === "qa";
+const kindsNow = (room: Room) => (room.phase === "statement" && room.turn?.stage === "qa" ? (["question", "answer"] as SpeechKind[]) : (MIC_KINDS[room.phase] ?? []));
+
 function takeFloor(s: PracticeState, uid: string, kind: SpeechKind, now: number) {
   const room = s.snapshot.room;
-  if (!room.turn) {
+  if (isOpen(room)) {
     room.phaseVersion += 1;
     s.turnLog[room.phaseVersion] = { uid, phase: room.phase as SpeakingPhase, kind };
   }
-  const endsAt = room.turn ? room.phaseEndsAt! : Math.min(now + room.settings.micSeconds * 1000, room.phaseEndsAt ?? Infinity);
+  const endsAt = !isOpen(room) ? room.phaseEndsAt! : Math.min(now + room.settings.micSeconds * 1000, room.phaseEndsAt ?? Infinity);
   room.floor = { uid, kind, version: room.phaseVersion, endsAt };
 }
 
@@ -133,11 +138,20 @@ function startPhase(s: PracticeState, phase: Phase, now: number) {
   if (phase === "event") planFloor(s, now + between(3, 5), BOT_FLOORS);
 }
 
+/** Everyone has spoken: open the floor for questions about the statements. */
+function startQa(s: PracticeState, now: number) {
+  const room = s.snapshot.room;
+  room.turn!.stage = "qa";
+  Object.assign(room, { phaseVersion: room.phaseVersion + 1, phaseEndsAt: now + QA_SECONDS * 1000, floor: null });
+  s.schedule.push({ uid: "", action: "floor", at: now + between(3, 5), phaseVersion: room.phaseVersion, phase: room.phase, left: 5 });
+}
+
 function nextTurn(s: PracticeState, now: number) {
   const room = s.snapshot.room;
   const turn = room.turn;
   if (!turn || turn.index + 1 >= turn.order.length) return false;
   turn.index += 1;
+  turn.stage = "speech";
   turn.uid = turn.order[turn.index];
   Object.assign(room, { phaseVersion: room.phaseVersion + 1, phaseEndsAt: now + room.settings.phaseSeconds[room.phase as keyof typeof SECONDS] * 1000, paused: false, pausedRemainingMs: null, floor: null });
   planTurn(s, now);
@@ -153,7 +167,12 @@ function finishPhase(s: PracticeState, now: number) {
 }
 
 function transition(s: PracticeState, now: number) {
-  if (!nextTurn(s, now)) finishPhase(s, now);
+  const turn = s.snapshot.room.turn;
+  if (turn && turn.stage !== "qa") {
+    if (!nextTurn(s, now)) startQa(s, now);
+    return;
+  }
+  finishPhase(s, now);
 }
 
 function allDone(s: PracticeState) {
@@ -205,9 +224,11 @@ function runFloor(s: PracticeState, job: PracticeState["schedule"][number], now:
     planFloor(s, now + 1500, job.left!);
     return;
   }
+  // Statements themselves go in turn; partners only take the open floor.
+  if (room.turn && room.turn.stage !== "qa") return;
   const previous = s.turnLog[room.phaseVersion];
-  const answering = previous?.phase === room.phase && previous.kind !== "answer";
-  const kind = answering ? "answer" : MIC_KINDS[room.phase]![0];
+  const answering = previous?.phase === room.phase && previous.kind !== "answer" && previous.kind !== "statement";
+  const kind = answering ? "answer" : kindsNow(room)[0];
   const uid = pick(bots(s).filter((u) => u !== previous?.uid), rng);
   takeFloor(s, uid, kind, now);
   s.schedule.push({ uid, action: "speak", kind, at: now + between(1, 2), phaseVersion: room.phaseVersion });
@@ -378,12 +399,12 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
   if (room.paused) fail("선생님이 진행을 잠시 멈췄어요.");
   if (name === "mic-on") {
     const kind = body.kind as SpeechKind;
-    if (!MIC_KINDS[room.phase]?.includes(kind)) fail("지금은 이 버튼으로 마이크를 켤 수 없어요.");
+    if (!kindsNow(room).includes(kind)) fail("지금은 이 버튼으로 마이크를 켤 수 없어요.");
     if (room.floor && room.floor.endsAt > now) {
       if (room.floor.uid === ME && room.floor.kind === kind) return { state: s };
       fail(`${person(s, room.floor.uid).nickname}님이 말하고 있어요. 끝나면 마이크를 켤 수 있어요.`);
     }
-    if (room.turn && room.turn.uid !== ME) fail("내 차례가 오면 마이크를 켤 수 있어요.");
+    if (!isOpen(room) && room.turn!.uid !== ME) fail("내 차례가 오면 마이크를 켤 수 있어요.");
     takeFloor(s, ME, kind, now);
     return { state: s };
   }
@@ -393,7 +414,7 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     return { state: s };
   }
   if (name === "end-turn") {
-    if (room.turn?.uid === ME && !stale) transition(s, now);
+    if (room.turn?.uid === ME && room.turn.stage !== "qa" && !stale) transition(s, now);
     return { state: s };
   }
   if (name === "vote") {

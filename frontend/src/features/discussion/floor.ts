@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Floor, Participant, Room, Rounds, SpeechKind, TranscriptLine } from "../../types/game";
+import type { Floor, Participant, Phase, Room, Rounds, SpeechKind, TranscriptLine } from "../../types/game";
 import { roleName } from "../roles/roleName";
 
 /** The microphone, unless its time ran out. A speaker whose device died still frees it for everyone. */
@@ -64,17 +64,19 @@ export interface ExchangeRow {
   text: string;
   /** Said by the person holding the microphone now, and not written down yet. */
   pending?: boolean;
+  /** Asked about the statements (statement phase) or about the event. */
+  phase: Phase;
 }
 
 /** Questions, answers and rebuttals in the order they were said, one row per time someone spoke. */
-export function exchangeRows(lines: TranscriptLine[], floor: Floor | null): ExchangeRow[] {
+export function exchangeRows(lines: TranscriptLine[], floor: Floor | null, phaseNow: Phase): ExchangeRow[] {
   const rows: ExchangeRow[] = [];
   for (const line of lines) {
     if (line.kind === "statement") continue;
     const last = rows.at(-1);
     if (last?.key === line.turn) last.text += ` ${line.text}`;
-    else rows.push({ key: line.turn, uid: line.uid, kind: line.kind, text: line.text });
+    else rows.push({ key: line.turn, uid: line.uid, kind: line.kind, text: line.text, phase: line.phase });
   }
-  if (floor && floor.kind !== "statement" && !rows.some((row) => row.key === floor.version)) rows.push({ key: floor.version, uid: floor.uid, kind: floor.kind, text: "", pending: true });
+  if (floor && floor.kind !== "statement" && !rows.some((row) => row.key === floor.version)) rows.push({ key: floor.version, uid: floor.uid, kind: floor.kind, text: "", pending: true, phase: phaseNow });
   return rows;
 }

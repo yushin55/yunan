@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import "./TableScene.css";
+import { HAIR, SKIN } from "./palette";
 
 export interface TablePlayer {
   uid: string;
@@ -25,6 +26,8 @@ export interface HandCard {
   /** Everything said, shown in full (scrolling) when the card is held up to read. */
   full?: string;
   state: "waiting" | "speaking" | "done";
+  /** The event card is printed in red so it stands out in the fan. */
+  tone?: "event";
 }
 
 const emptyText = (card: HandCard) => (card.state === "waiting" ? "아직 발표 전이에요" : card.state === "speaking" ? "말하는 중이에요" : "기록된 말이 없어요");
@@ -46,6 +49,8 @@ interface TableSceneProps {
   attract?: boolean;
   /** The person my own right hand points at (voting). */
   pointAt?: string;
+  /** The classroom screen: the whole table from above, nobody's seat, no hand of cards. */
+  overview?: boolean;
 }
 
 type LoungePlayer = TablePlayer;
@@ -69,8 +74,6 @@ const DEMO_PLAYERS: LoungePlayer[] = [
   { uid: "demo-5", nickname: "초록", color: "#a78297" },
 ];
 
-const SKIN = ["#e0ae8a", "#b98060", "#f0c6a0", "#cb9476", "#a66c52"];
-const HAIR = ["#35271f", "#6d4330", "#23282a", "#9a6941", "#402e32"];
 const COATS = ["#a56b53", "#7e987c", "#b88f6e", "#667f9c", "#a78297"];
 
 type HeldCard = {
@@ -121,26 +124,44 @@ function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
   if (!paint) return;
   const { width: W, height: H } = canvas;
   const margin = 44;
-  paint.fillStyle = card.state === "speaking" ? "#f6dca2" : "#f5eedd";
+  const event = card.tone === "event";
+  const ink = event
+    ? { paper: "#8e2b23", edge: "#f0cf8a", main: "#fff1dc", soft: "#f6cf8c", rule: "#f0cf8a", more: "#f6cf8c" }
+    : card.state === "speaking"
+      ? { paper: "#f6dca2", edge: "#b5852c", main: "#2a2218", soft: "#6e5f49", rule: "#c9b48d", more: "#a0742a" }
+      : { paper: "#f5eedd", edge: "#c9b48d", main: "#2a2218", soft: "#6e5f49", rule: "#c9b48d", more: "#a0742a" };
+  paint.fillStyle = ink.paper;
   paint.fillRect(0, 0, W, H);
-  paint.strokeStyle = card.state === "speaking" ? "#b5852c" : "#c9b48d";
-  paint.lineWidth = 6;
+  paint.strokeStyle = ink.edge;
+  paint.lineWidth = event ? 12 : 6;
   paint.strokeRect(16, 16, W - 32, H - 32);
   paint.textBaseline = "top";
-  paint.fillStyle = "#2a2218";
-  paint.font = `800 104px ${CARD_FONT}`;
-  const number = card.order === undefined ? "" : String(card.order);
-  paint.fillText(number, margin, 40);
-  const left = number ? margin + paint.measureText(number).width + 20 : margin;
+  let left = margin;
+  if (event) {
+    // A gold "사건" stamp where statement cards have their number.
+    paint.font = `900 54px ${CARD_FONT}`;
+    const stamp = paint.measureText("사건").width + 36;
+    paint.fillStyle = ink.edge;
+    paint.fillRect(margin, 46, stamp, 92);
+    paint.fillStyle = ink.paper;
+    paint.fillText("사건", margin + 18, 64);
+    left = margin + stamp + 20;
+  } else if (card.order !== undefined) {
+    paint.fillStyle = ink.main;
+    paint.font = `800 104px ${CARD_FONT}`;
+    paint.fillText(String(card.order), margin, 40);
+    left = margin + paint.measureText(String(card.order)).width + 20;
+  }
+  paint.fillStyle = ink.main;
   paint.font = `800 50px ${CARD_FONT}`;
   paint.fillText(wrapText(paint, card.name, W - left - margin, 1)[0] ?? "", left, 50);
-  paint.fillStyle = "#6e5f49";
+  paint.fillStyle = ink.soft;
   paint.font = `500 34px ${CARD_FONT}`;
   paint.fillText(wrapText(paint, card.role, W - left - margin, 1)[0] ?? "", left, 108);
-  paint.fillStyle = "#c9b48d";
+  paint.fillStyle = ink.rule;
   paint.fillRect(margin, 168, W - margin * 2, 3);
   const body = card.text || emptyText(card);
-  paint.fillStyle = card.text ? "#2a2218" : "#8a7a60";
+  paint.fillStyle = card.text ? ink.main : "#8a7a60";
   paint.font = `500 46px ${CARD_FONT}`;
   const lines = wrapText(paint, body, W - margin * 2, 99);
   const more = lines.length > 8 || Boolean(card.full && card.full !== card.text);
@@ -148,22 +169,25 @@ function paintCard(canvas: HTMLCanvasElement, card: HandCard) {
   const shown = more ? lines.slice(0, 7) : lines;
   shown.forEach((line, i) => paint.fillText(line, margin, 194 + i * 62));
   if (more) {
-    paint.fillStyle = "#a0742a";
+    paint.fillStyle = ink.more;
     paint.font = `700 40px ${CARD_FONT}`;
     paint.fillText(lines.length > 7 ? "… 눌러서 전체 보기" : "눌러서 전체 발언 보기", margin, 194 + shown.length * 62);
   }
 }
 
-function seatAngles(count: number) {
-  if (count <= 1) return [0];
-  // Spread out around the far side of the table, with room between neighbours.
-  const span = Math.min(3.2, 1.12 * (count >= 8 ? 3.0 : count === 7 ? 2.82 : count === 6 ? 2.6 : count === 5 ? 2.28 : count === 4 ? 1.98 : count === 3 ? 1.55 : 1.05));
-  return Array.from({ length: count }, (_, index) =>
-    -span / 2 + (span * index) / (count - 1),
-  );
+/**
+ * Everyone sits the same distance apart around the round table. In first person the viewer's own
+ * chair is one of the places (at the near edge, angle π); left to right from the viewer's left.
+ */
+function seatAngles(count: number, viewerSeat: boolean) {
+  const total = count + (viewerSeat ? 1 : 0);
+  return Array.from({ length: count }, (_, index) => {
+    const angle = (viewerSeat ? Math.PI : -Math.PI / 2) + ((index + 1) * Math.PI * 2) / total;
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+  });
 }
 
-/** The viewer sits at the near edge of the table; everyone else faces the middle of the table. Up to eight people. */
+/** Everyone sits evenly around the table facing its middle; the viewer is in one of the seats (or above it all, in overview). Up to eight people. */
 export default function TableScene({
   players,
   cards,
@@ -177,7 +201,10 @@ export default function TableScene({
   quality = "high",
   attract = false,
   pointAt,
+  overview = false,
 }: TableSceneProps) {
+  // No own seat, arms or cards: the title screen and the classroom overview.
+  const noSeat = attract || overview;
   const pointRef = useRef(pointAt);
   pointRef.current = pointAt;
   const attractRef = useRef(attract);
@@ -205,7 +232,7 @@ export default function TableScene({
     .slice(0, 8);
   // Larger tables seat everyone a little smaller and farther out so chairs do not overlap.
   const seatScale = people.length >= 7 ? 0.8 : people.length === 6 ? 0.88 : 1;
-  const seatRadius = people.length >= 7 ? 2.34 : 2.22;
+  const seatRadius = 2.3;
   const peopleKey = people
     .map((person) => `${person.uid}:${person.nickname}:${person.color ?? ""}`)
     .join("|");
@@ -645,7 +672,7 @@ export default function TableScene({
       cylinder(world, 0.11, 0.11, 0.007, cream, 1.03 - i * 0.13, 1.39, -0.17 + i * 0.22, 16);
     }
 
-    const angles = seatAngles(people.length);
+    const angles = seatAngles(people.length, !overview);
     people.forEach((person, index) => {
       const angle = angles[index];
       const x = Math.sin(angle) * seatRadius;
@@ -777,7 +804,7 @@ export default function TableScene({
     const armRest = new THREE.Vector3(0.47 - 0.83, 1.18 - 1.145, 2.05 - 3.14).normalize();
     let rightArm: THREE.Group | null = null;
     let finger: THREE.Mesh | null = null;
-    for (const side of attractRef.current ? [] : [-1, 1]) {
+    for (const side of noSeat ? [] : [-1, 1]) {
       const pivot = new THREE.Group();
       pivot.position.set(side * shoulder.x, shoulder.y, shoulder.z);
       world.add(pivot);
@@ -798,10 +825,11 @@ export default function TableScene({
     const aimTurn = new THREE.Quaternion();
     const restTurn = new THREE.Quaternion();
     const headSpot = new THREE.Vector3();
+    const plates: { label: HTMLDivElement; x: number; y: number; ahead: boolean }[] = [];
     // A fan of cards faces the camera. Face down until there are statements, then one per person.
     const cardBack = material("#733f42", 0.6);
     const cardFan = new THREE.Group();
-    cardFan.visible = !attractRef.current;
+    cardFan.visible = !noSeat;
     world.add(cardFan);
     const cardFaceShape = geometry("card-face", () => new THREE.PlaneGeometry(CARD_W - 0.018, CARD_H - 0.018));
     const anisotropy = rich ? renderer.capabilities.getMaxAnisotropy() : 1;
@@ -924,6 +952,8 @@ export default function TableScene({
     let aimedFocus: string | undefined;
     let aimedMode: string | undefined;
     const READ_DISTANCE = 0.62;
+    // Neighbours sit at the sides now, so the seat turns further to see them.
+    const YAW_MAX = overview ? 0.6 : 1.0;
     const readForward = new THREE.Vector3();
     const readSpot = new THREE.Vector3();
     const cardHome = new THREE.Vector3();
@@ -942,7 +972,7 @@ export default function TableScene({
       height = Math.max(host.clientHeight, 1);
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
-      baseFov = width < 620 ? 86 : width < 900 ? 72 : 64;
+      baseFov = overview ? 52 : width < 620 ? 86 : width < 900 ? 74 : 70;
       aimedMode = undefined;
       camera.updateProjectionMatrix();
       pendant.visible = width >= 620;
@@ -988,8 +1018,8 @@ export default function TableScene({
       if (down) {
         yawTarget = THREE.MathUtils.clamp(
           yawTarget - (event.clientX - lastX) * 0.0046,
-          -0.65,
-          0.65,
+          -YAW_MAX,
+          YAW_MAX,
         );
         pitchTarget = THREE.MathUtils.clamp(
           pitchTarget + (event.clientY - lastY) * 0.003,
@@ -1094,14 +1124,15 @@ export default function TableScene({
         aimedFocus = focusRef.current;
         aimedMode = cameraModeRef.current;
         const target = avatars.find((avatar) => avatar.uid === aimedFocus);
-        if (target && (aimedMode === "table" || aimedMode === "review")) {
+        if (target && !overview && (aimedMode === "table" || aimedMode === "review")) {
           const dx = target.root.position.x;
           const dz = 3.25 - target.root.position.z;
           // In review the panel covers the lower screen, so look lower to lift the face into view.
           const lift = aimedMode === "review" ? (width < 620 ? 0.13 : 0.07) : 0;
-          yawTarget = THREE.MathUtils.clamp(Math.atan2(dx, dz), -0.65, 0.65);
+          yawTarget = THREE.MathUtils.clamp(Math.atan2(dx, dz), -YAW_MAX, YAW_MAX);
           pitchTarget = THREE.MathUtils.clamp(Math.atan2(1.96 - 1.68, Math.hypot(dx, dz)) - lift, -0.3, 0.19);
-          fovTarget = baseFov * (width < 620 ? 0.66 : 0.72);
+          // Zoom in on people across the table, not on a neighbour who is already close.
+          fovTarget = Math.hypot(dx, dz) < 3 ? baseFov : baseFov * (width < 620 ? 0.66 : 0.72);
         } else {
           yawTarget = 0;
           pitchTarget = aimedMode === "mission" ? -0.06 : -0.025;
@@ -1122,12 +1153,18 @@ export default function TableScene({
         camera.fov = fov;
         camera.updateProjectionMatrix();
       }
-      camera.position.set(0, 1.68 + (stopMotion ? 0 : Math.sin(t * 1.3) * 0.008), 3.25);
-      camera.lookAt(
-        camera.position.x + Math.sin(yaw) * 5,
-        camera.position.y + Math.sin(pitch) * 5,
-        camera.position.z - Math.cos(yaw) * 5,
-      );
+      if (overview) {
+        // From above and behind the empty near edge, circling the table when dragged.
+        camera.position.set(Math.sin(yaw) * 5.2, 6.4 + pitch * 4, Math.cos(yaw) * 5.2);
+        camera.lookAt(0, 0.8, -0.3);
+      } else {
+        camera.position.set(0, 1.68 + (stopMotion ? 0 : Math.sin(t * 1.3) * 0.008), 3.25);
+        camera.lookAt(
+          camera.position.x + Math.sin(yaw) * 5,
+          camera.position.y + Math.sin(pitch) * 5,
+          camera.position.z - Math.cos(yaw) * 5,
+        );
+      }
       camera.updateMatrixWorld();
       // Hover lifts a card out of the fan; a press brings it up in front of the camera to read.
       const cardSpeed = stopMotion ? 1 : 1 - Math.exp(-delta * 11);
@@ -1185,19 +1222,30 @@ export default function TableScene({
         const label = labelRefs.current.get(avatar.uid);
         if (label) {
           screen.copy(avatar.label).project(camera);
-          const x = (screen.x * 0.5 + 0.5) * width;
-          const y = (-screen.y * 0.5 + 0.5) * height;
-          // Whole pixels keep plates steady while the camera breathes; on narrow screens every
-          // other plate sits higher so neighbours do not cover each other.
-          const lift = width < 620 && avatar.index % 2 ? 30 : 0;
-          label.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - lift)}px) translate(-50%, -100%)`;
-          label.style.opacity =
-            screen.z < 1 && x > 24 && x < width - 24 && y > 24 && y < height - 30
-              ? "1"
-              : "0";
-          label.style.pointerEvents = label.style.opacity === "1" ? "auto" : "none";
+          plates.push({ label, x: (screen.x * 0.5 + 0.5) * width, y: (-screen.y * 0.5 + 0.5) * height, ahead: screen.z < 1 });
         }
       }
+      // Name plates never cover each other: going left to right, a plate that would overlap one
+      // already placed moves up above it.
+      plates.sort((a, b) => a.x - b.x);
+      const placed: [number, number, number, number][] = [];
+      for (const plate of plates) {
+        const w = plate.label.offsetWidth;
+        const h = plate.label.offsetHeight;
+        let y = plate.y;
+        for (let tries = 0; tries < 6; tries += 1) {
+          const hit = placed.find(([l, r, top, bottom]) => plate.x - w / 2 < r && plate.x + w / 2 > l && y - h < bottom && y > top);
+          if (!hit) break;
+          y = hit[2] - 4;
+        }
+        const shown = plate.ahead && plate.x > 24 && plate.x < width - 24 && y - h > -4 && plate.y < height - 30;
+        if (shown) placed.push([plate.x - w / 2 - 3, plate.x + w / 2 + 3, y - h, y]);
+        // Whole pixels keep plates steady while the camera breathes.
+        plate.label.style.transform = `translate(${Math.round(plate.x)}px, ${Math.round(y)}px) translate(-50%, -100%)`;
+        plate.label.style.opacity = shown ? "1" : "0";
+        plate.label.style.pointerEvents = shown ? "auto" : "none";
+      }
+      plates.length = 0;
       renderer.render(scene, camera);
     };
     animate();
@@ -1239,7 +1287,7 @@ export default function TableScene({
       resetRef.current = () => {};
       closeRef.current = () => {};
     };
-  }, [peopleKey, selfColor, quality, reducedMotion]);
+  }, [peopleKey, selfColor, quality, reducedMotion, overview]);
 
   useEffect(() => {
     dealRef.current(cardsRef.current);
@@ -1313,7 +1361,7 @@ export default function TableScene({
 function CardReader({ card, onClose }: { card: HandCard; onClose: () => void }) {
   const extra = card.full && card.full !== card.text ? card.full : "";
   return (
-    <div className="card-reader" role="dialog" aria-label={`${card.name} 카드`} data-testid="card-reader">
+    <div className={`card-reader${card.tone === "event" ? " event" : ""}`} role="dialog" aria-label={`${card.name} 카드`} data-testid="card-reader">
       <header>
         {card.order !== undefined && <span className="card-reader-no">{card.order}</span>}
         <div>

@@ -274,3 +274,7 @@
 @media (prefers-reduced-motion: reduce) {
   .card-reader { animation: none; }
 }
+.card-reader.event { border-color: #f0cf8a; background: #8e2b23; color: #fff1dc; }
+.card-reader.event header { border-color: #f0cf8a; }
+.card-reader.event header small { color: #f6cf8c; }
+.card-reader.event header button { border-color: #f0cf8a; background: #6f1f19; color: #fff1dc; }

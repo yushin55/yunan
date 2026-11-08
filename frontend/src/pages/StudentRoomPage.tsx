@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Check, Maximize2, Minimize2, Pause, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import RoleAvatar from "../features/roles/RoleAvatar";
+import { usePhaseTimer } from "../features/game/usePhaseTimer";
+import { ArrowRight, BookOpen, Check, EyeOff, Maximize2, Minimize2, Pause, Search, VenetianMask, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
 import RoleCard from "../components/RoleCard";
@@ -10,17 +12,17 @@ import { MemoPad, QuestionList, StatementList } from "../features/discussion/Dis
 import { useFloor } from "../features/discussion/floor";
 import MicControls from "../features/discussion/MicControls";
 import type { SpeechEngine } from "../features/discussion/useSpeechCapture";
-import { KIND_LABEL, RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
+import { RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import type { HandCard } from "../components/scene/TableScene";
 import PreferencePicker from "../features/roles/PreferencePicker";
-import SecretRole, { IdentityBanner } from "../features/roles/SecretRole";
+import { IdentityBanner } from "../features/roles/SecretRole";
 import type { RoomApi } from "../features/room/useRoom";
 import RevealView from "../features/voting/RevealView";
 import VotePanel, { togglePick } from "../features/voting/VotePanel";
 import { roleName } from "../features/roles/roleName";
-import type { Me, Participant, Role, Room, Rounds } from "../types/game";
+import type { Me, Participant, Reveal, Role, Room, Rounds } from "../types/game";
 
 function stored(key: string, fallback: boolean) {
   try {
@@ -43,7 +45,7 @@ function ownHand(room: Room, me: Me, myRole?: Role): HandCard[] | undefined {
       { uid: "my-role", name: myRole.name, role: "나의 역할", text: myRole.goal, state: "done" },
       me.isSwitcher
         ? { uid: "identity", name: "역할 전환자", role: "나만 아는 정체", text: "고르지 않은 역할을 맡았어요. 들키지 않게 자연스럽게 말해요.", state: "speaking" }
-        : { uid: "identity", name: "일반 참가자", role: "나만 아는 정체", text: "내가 고른 역할을 맡았어요. 누가 역할 전환자인지 찾아보세요.", state: "done" },
+        : { uid: "identity", name: "일반 참가자", role: "나만 아는 정체", text: "누가 역할 전환자인지 찾아보세요.", state: "done" },
     ];
   return undefined;
 }
@@ -58,7 +60,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const { room, participants, rounds } = state!;
   const me = state!.me!;
   const [roleOpen, setRoleOpen] = useState(false);
-  // The person picked at the table: while voting, a candidate.
+  // The person picked at the table, to turn and look at them.
   const [focus, setFocus] = useState("");
   const [votePicked, setVotePicked] = useState<string[]>([]);
   const [show3d, setShow3d] = useState(() => stored("bridge.table3d", true));
@@ -68,17 +70,36 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const phase = room.phase;
   const secretStillHidden = phase !== "reveal" && phase !== "ended";
   const discussing = SPEAKING.includes(phase) || phase === "vote";
+  // At the 3D table the table fills the screen and everything else floats over it.
+  const fullStage = show3d;
+  const timer = usePhaseTimer(room, offset);
   // In a real room the teacher's screen starts the game; this only shows the same countdown.
   const ownCount = useAutoStart(startIn === undefined && allReady(room, participants));
   const countdown = startIn === undefined ? ownCount : startIn;
-  const pointAt = phase === "vote" ? (me.vote ?? votePicked).at(-1) : undefined;
+  const count = room.settings.switcherCount;
+  const pointAt = phase === "vote" ? (votePicked.at(-1) ?? me.vote?.at(-1)) : undefined;
+  // The camera follows each speaker during the statements; during questions it stays put.
+  const talking = phase === "statement" && room.turn?.stage !== "qa" ? room.turn?.uid : undefined;
+  const autoFocus = talking !== me.uid ? talking : undefined;
 
-  const selectAtTable = (uid: string) => {
-    // Voting points at people instead of turning to look, so my arm and the table stay in view.
-    if (phase === "vote") {
-      if (!me.vote) setVotePicked((current) => togglePick(current, uid, room.settings.switcherCount));
-      return;
+  // Pointing at someone picks them; pointing at someone else changes the pick until time runs
+  // out. The pick goes in as the vote just before the end.
+  // ponytail: the server takes one vote only, so it is sent at the last moment; send it on every
+  // change once the server lets a vote be changed (백엔드수정요청.md 4).
+  const pick = (uid: string) => {
+    if (me.vote || room.paused) return;
+    setVotePicked((current) => togglePick(current, uid, count));
+  };
+  const sent = useRef(-1);
+  useEffect(() => {
+    if (phase !== "vote" || me.vote || room.paused || votePicked.length !== count || sent.current === room.phaseVersion) return;
+    if (timer.remaining !== null && timer.remaining <= 2) {
+      sent.current = room.phaseVersion;
+      void action("vote", { targets: votePicked });
     }
+  }, [phase, me.vote, room.paused, votePicked, count, room.phaseVersion, timer.remaining, action]);
+  const selectAtTable = (uid: string) => {
+    if (phase === "vote") return pick(uid);
     setFocus((current) => (current === uid ? "" : uid));
   };
   const toggle3d = () =>
@@ -91,8 +112,52 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
       return !value;
     });
 
+  // Big things in the middle of the table: my role, the result.
+  const center = (
+    <>
+      {phase === "role" && myRole && <RoleZoom me={me} role={myRole} roles={room.topic.roles} confirmed={Boolean(self?.submitted.includes("role"))} disabled={busy || room.paused} onConfirm={() => void action("confirm-role")} />}
+      {(phase === "reveal" || phase === "ended") && rounds.reveal && <ResultPopup key={phase} reveal={rounds.reveal} participants={participants} room={room} me={me} />}
+      {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} bare onPrefs={(first, second) => void action("preferences", { first, second })} />}
+    </>
+  );
+  // Small things at the side: the microphone, the questions, my memo, the vote.
+  const side = (
+    <>
+      {room.paused && (
+        <p className="todo-callout paused">
+          <Pause size={18} aria-hidden /> 선생님이 진행을 잠시 멈췄어요.
+        </p>
+      )}
+      {fullStage && error && (
+        <p className="error-box" role="alert">
+          {error}
+        </p>
+      )}
+      {SPEAKING.includes(phase) && <MicPopup room={room} me={me} api={api} micEngine={micEngine} allowTyping={allowTyping} />}
+      {!show3d && room.event && SPEAKING.includes(phase) && <EventCard key={phase} event={room.event} collapsible defaultOpen={phase === "event"} />}
+      {(phase === "event" || (phase === "statement" && room.turn?.stage === "qa")) && <QuestionsPopup rounds={rounds} participants={participants} me={me} room={room} offset={offset} />}
+      {!show3d && SPEAKING.includes(phase) && (
+        <details className="panel float-pop" open={phase === "statement"}>
+          <summary>입장 발표 정리</summary>
+          <StatementList room={room} participants={participants} rounds={rounds} myUid={me.uid} />
+        </details>
+      )}
+      {phase === "vote" && (
+        <section className="panel float-pop vote-pop">
+          <VotePanel atTable={show3d} candidates={others} count={count} myVote={me.vote} picked={votePicked} onPick={pick} disabled={room.paused} />
+        </section>
+      )}
+      {discussing && (
+        <details className="panel float-pop memo-pop">
+          <summary>내 메모</summary>
+          <MemoPad key={room.roomId} room={room} />
+        </details>
+      )}
+    </>
+  );
+
   return (
-    <main className="student-room">
+    <main className={`student-room${fullStage ? " full-stage" : ""}`}>
       <GameBar
         room={room}
         offset={offset}
@@ -108,83 +173,56 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
       {!online && <p className="banner warn">연결이 끊겼어요. 다시 연결되면 지금 단계와 내 역할로 자동으로 돌아와요.</p>}
 
       <StartCountdown left={countdown} />
-      <div className={`room-layout${show3d ? " with-table" : ""}`}>
+      <div className={`room-layout${show3d ? " with-table" : ""}${fullStage ? " full-stage" : ""}`}>
         {show3d && (
           <div className="stage">
-            <TableView room={room} participants={participants} rounds={rounds} selfUid={me.uid} focusUid={focus || undefined} onSelect={selectAtTable} offset={offset} hand={ownHand(room, me, myRole)} pointAt={pointAt} />
+            <TableView
+              room={room}
+              participants={participants}
+              rounds={rounds}
+              selfUid={me.uid}
+              focusUid={autoFocus ?? (focus || undefined)}
+              onSelect={selectAtTable}
+              offset={offset}
+              hand={ownHand(room, me, myRole)}
+              pointAt={pointAt}
+            />
+            {fullStage && (
+              <>
+                <div className="stage-center">{center}</div>
+                <aside className="stage-panels" aria-label="게임 도구">
+                  {side}
+                </aside>
+              </>
+            )}
           </div>
         )}
-        <div className="desk">
-          {room.paused ? (
-            <p className="todo-callout paused">
-              <Pause size={18} aria-hidden /> 선생님이 진행을 잠시 멈췄어요. 다시 시작하면 이어서 할 수 있어요.
-            </p>
-          ) : (
-            <p className="todo-callout" data-testid="todo">
-              <span>지금 할 일</span>
-              {STUDENT_TODO[phase]}
-            </p>
-          )}
-          {error && (
-            <p className="error-box" role="alert">
-              {error}
-            </p>
-          )}
-
-          {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} onPrefs={(first, second) => void action("preferences", { first, second })} />}
-
-          {phase === "role" && myRole && (
-            <section className="panel">
-              <SecretRole me={me} role={myRole} />
-              {self?.submitted.includes("role") ? (
-                <p className="success-line">
-                  <Check size={18} aria-hidden /> 확인했어요. 다른 친구들이 역할을 확인하고 있어요.
-                </p>
-              ) : (
-                <button className="button primary full large" disabled={busy || room.paused} onClick={() => void action("confirm-role")}>
-                  역할을 확인했어요
-                </button>
-              )}
-            </section>
-          )}
-
-          {SPEAKING.includes(phase) && (
-            <SpeakingStage room={room} rounds={rounds} participants={participants} me={me} api={api} micEngine={micEngine} allowTyping={allowTyping} withTable={show3d} />
-          )}
-
-          {phase === "vote" && (
-            <div className="speaking-side">
-              <section className="panel mic-popup">
-                <VotePanel
-                  atTable={show3d}
-                  candidates={others}
-                  topic={room.topic}
-                  count={room.settings.switcherCount}
-                  myVote={me.vote}
-                  picked={votePicked}
-                  onPick={setVotePicked}
-                  busy={busy}
-                  disabled={room.paused}
-                  onVote={(targets) => void action("vote", { targets })}
-                />
-              </section>
-              <Questions rounds={rounds} participants={participants} me={me} floor={null} />
-            </div>
-          )}
-
-          {(phase === "reveal" || phase === "ended") && rounds.reveal && (
-            <section className="panel">
-              {phase === "ended" && <p className="banner ok">게임이 끝났어요. 참여해 줘서 고마워요!</p>}
-              <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} myUid={me.uid} />
-            </section>
-          )}
-
-          {!show3d && phase !== "lobby" && <Roster participants={participants} room={room} />}
-          {discussing && <MemoPad key={room.roomId} room={room} />}
-        </div>
+        {!fullStage && (
+          <div className="desk">
+            {!room.paused && (
+              <p className="todo-callout" data-testid="todo">
+                <span>지금 할 일</span>
+                {STUDENT_TODO[phase]}
+              </p>
+            )}
+            {error && (
+              <p className="error-box" role="alert">
+                {error}
+              </p>
+            )}
+            {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} onPrefs={(first, second) => void action("preferences", { first, second })} />}
+            {phase !== "lobby" && (
+              <>
+                {center}
+                {side}
+                <Roster participants={participants} room={room} />
+              </>
+            )}
+          </div>
+        )}
       </div>
 
-      {phase === "event" && room.event && <EventPopup room={room} inHand={show3d} />}
+      {phase === "event" && room.event && <EventPopup room={room} />}
       {roleOpen && myRole && (
         <Sheet title="나의 역할" onClose={() => setRoleOpen(false)}>
           <p className="privacy-line">이 화면은 나에게만 보여요.</p>
@@ -200,7 +238,8 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
  * Before the game: watch the issue briefing, watch the rules, then pick roles. These steps fill
  * the whole screen; once roles are chosen the student is back in the lobby around the table.
  */
-function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: Me; participants: Participant[]; busy: boolean; onPrefs: (first: string, second: string) => void }) {
+/** `bare`: at the 3D table the lobby shows nothing but the characters, so the summaries step aside. */
+function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room; me: Me; participants: Participant[]; busy: boolean; onPrefs: (first: string, second: string) => void; bare?: boolean }) {
   const key = `bridge.briefed.${room.roomId}.${room.createdAt}.${room.topicId}`;
   const [briefed, setBriefed] = useState(() => {
     try {
@@ -225,6 +264,7 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
     }
   };
 
+  if (step === 2 && me.preferences && !rechoosing && bare) return null;
   if (step === 2 && me.preferences && !rechoosing)
     return (
       <>
@@ -237,6 +277,12 @@ function LobbyFlow({ room, me, participants, busy, onPrefs }: { room: Room; me: 
 
   // Until a video ends the bar only explains how to move on; at the end the video itself
   // offers "다시 보기" or the next step.
+  if (away && bare)
+    return (
+      <button className="button primary large lobby-resume" data-testid="flow-resume" onClick={() => setAway(false)}>
+        준비 이어서 하기 <ArrowRight size={18} />
+      </button>
+    );
   if (away)
     return (
       <>
@@ -375,46 +421,71 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
   );
 }
 
-/**
- * Discussion on a student's device. The table is the main view; this side panel holds the
- * microphone, the event card, the questions asked so far and my memo.
- */
-function SpeakingStage({ room, rounds, participants, me, api, micEngine, allowTyping, withTable }: { room: Room; rounds: Rounds; participants: Participant[]; me: Me; api: RoomApi; micEngine: SpeechEngine; allowTyping?: boolean; withTable: boolean }) {
-  const { floor } = useFloor(room, api.offset);
-  const turn = room.turn;
-  const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
-  const mine = speaker?.uid === me.uid;
-  const waitingAhead = turn ? turn.order.slice(turn.index + 1).indexOf(me.uid) : -1;
-  const eyebrow = turn ? (mine ? "내 차례예요" : "지금 말하는 사람") : !floor ? "마이크가 비어 있어요" : `${mine ? "내가 말하는 중" : "지금 말하는 사람"} · ${KIND_LABEL[floor.kind]}`;
-  const headline = mine ? (floor ? "말해 주세요. 끝나면 다시 눌러 주세요." : "마이크를 켜고 말해 주세요.") : (speaker?.nickname ?? "먼저 누르는 사람이 말해요");
-  const hint = mine ? "" : turn ? (waitingAhead === -1 ? "이번 단계에서 내 차례는 끝났어요. 잘 듣고 누가 역할 전환자일지 생각해 보세요." : waitingAhead === 0 ? "다음이 내 차례예요. 준비해 주세요." : `내 차례까지 ${waitingAhead}명 남았어요.`) : floor ? "끝나면 마이크를 켤 수 있어요." : "";
+/** My role and who I am: the two cards in my hand, held up close. Only on my own screen. */
+function RoleZoom({ me, role, roles, confirmed, disabled, onConfirm }: { me: Me; role: Role; roles: Role[]; confirmed: boolean; disabled: boolean; onConfirm: () => void }) {
+  const switcher = Boolean(me.isSwitcher);
   return (
-    <section className="speaking-side">
-      <div className={`panel floor-card mic-popup${mine ? " mine" : ""}`} data-testid="floor-card" aria-live="polite">
-        <span className="eyebrow">{eyebrow}</span>
-        <p className="floor-name" data-testid="floor-name">
-          {headline}
-        </p>
-        {!mine && speaker?.roleId && <p className="muted">{roleName(room.topic, speaker.roleId)}</p>}
-        {hint && <p className="muted small">{hint}</p>}
-        <MicControls room={room} me={me} api={api} engine={micEngine} allowTyping={allowTyping} />
+    <section className="panel role-zoom" role="dialog" aria-label="나의 역할 카드" data-testid="role-zoom">
+      <p className="privacy-line">
+        <EyeOff size={15} aria-hidden /> 나에게만 보이는 카드예요
+      </p>
+      <div className="zoom-cards">
+        <article className="game-card role" aria-label={`나의 역할: ${role.name}`}>
+          <header className="game-card-top">
+            <span>나의 역할</span>
+          </header>
+          <div className="game-card-art">
+            <RoleAvatar name={role.name} index={roles.findIndex((r) => r.id === role.id)} />
+          </div>
+          <h3 className="game-card-name">{role.name}</h3>
+          <div className="game-card-text">
+            <p className="game-card-intro">{role.intro}</p>
+            <p>
+              <b>목표</b> {role.goal}
+            </p>
+            <p>
+              <b>걱정</b> {role.concerns.join(" ")}
+            </p>
+          </div>
+        </article>
+        <article className={`game-card identity${switcher ? " switcher" : ""}`} data-testid="identity" aria-label={switcher ? "역할 전환자" : "일반 참가자"}>
+          <header className="game-card-top">
+            <span>나만 아는 정체</span>
+          </header>
+          <div className="game-card-art">{switcher ? <VenetianMask size={96} strokeWidth={1.4} aria-hidden /> : <Search size={96} strokeWidth={1.4} aria-hidden />}</div>
+          <h3 className="game-card-name">{switcher ? "역할 전환자" : "일반 참가자"}</h3>
+          <div className="game-card-text">
+            <p>{switcher ? "내가 고르지 않은 역할이에요. 들키지 않게 자연스럽게 말해요." : "누가 역할 전환자인지 찾아보세요."}</p>
+          </div>
+        </article>
       </div>
-      {/* With the table on, the event is a card in my hand instead. */}
-      {!withTable && room.event && <EventCard key={room.phase} event={room.event} collapsible defaultOpen={room.phase === "event"} />}
-      {room.phase !== "statement" && <Questions rounds={rounds} participants={participants} me={me} floor={floor} />}
-      {/* With the table on, everyone's statement is already a card in my hand. */}
-      {!withTable && (
-        <details className="panel" open={room.phase === "statement"}>
-          <summary>입장 발표 정리</summary>
-          <StatementList room={room} participants={participants} rounds={rounds} myUid={me.uid} />
-        </details>
+      {confirmed ? (
+        <p className="success-line role-zoom-done">
+          <Check size={18} aria-hidden /> 확인했어요
+        </p>
+      ) : (
+        <button className="button primary large" disabled={disabled} onClick={onConfirm}>
+          역할을 확인했어요
+        </button>
       )}
     </section>
   );
 }
 
-/** The event, shown once when it happens. Closing it keeps it from coming back on this device. */
-function EventPopup({ room, inHand }: { room: Room; inHand: boolean }) {
+/** The microphone, small in the corner: just the buttons, which stay off until the microphone is free. */
+function MicPopup({ room, me, api, micEngine, allowTyping }: { room: Room; me: Me; api: RoomApi; micEngine: SpeechEngine; allowTyping?: boolean }) {
+  const mine = room.turn?.uid === me.uid && room.turn.stage !== "qa";
+  const note = mine ? "내 차례예요" : "";
+  return (
+    <div className={`panel float-pop mic-popup${mine ? " mine" : ""}`} data-testid="floor-card" aria-live="polite">
+      {note && <p className="mic-note">{note}</p>}
+      <MicControls room={room} me={me} api={api} engine={micEngine} allowTyping={allowTyping} />
+    </div>
+  );
+}
+
+/** Just the event card, once, when it happens. Only its × (or Esc) closes it, so a stray click does not. */
+function EventPopup({ room }: { room: Room }) {
   const key = `bridge.eventSeen.${room.roomId}.${room.createdAt}`;
   const [open, setOpen] = useState(() => {
     try {
@@ -423,31 +494,61 @@ function EventPopup({ room, inHand }: { room: Room; inHand: boolean }) {
       return true;
     }
   });
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
   if (!open || !room.event) return null;
-  const close = () => {
+  function close() {
     setOpen(false);
     try {
       sessionStorage.setItem(key, "1");
     } catch {
       /* It may show once more after a reload. */
     }
-  };
+  }
   return (
-    <Sheet title="사건이 일어났어요!" onClose={close}>
-      <EventCard event={room.event} />
-      {inHand && <p className="muted small">이 사건 카드는 내 손에 들려 있어요. 언제든 눌러서 다시 볼 수 있어요.</p>}
-      <button className="button primary full large" data-testid="event-popup-close" onClick={close}>
-        확인했어요
-      </button>
-    </Sheet>
+    <div className="event-pop" role="dialog" aria-modal="true" aria-label={`사건 카드: ${room.event.title}`} data-testid="event-popup">
+      <div className="event-pop-card">
+        <EventCard event={room.event} />
+        <button className="icon-button event-pop-close" aria-label="닫기" data-testid="event-popup-close" autoFocus onClick={close}>
+          <X size={18} />
+        </button>
+      </div>
+    </div>
   );
 }
 
-function Questions({ rounds, participants, me, floor }: { rounds: Rounds; participants: Participant[]; me: Me; floor: ReturnType<typeof useFloor>["floor"] }) {
+function QuestionsPopup({ rounds, participants, me, room, offset }: { rounds: Rounds; participants: Participant[]; me: Me; room: Room; offset: number }) {
+  const { floor } = useFloor(room, offset);
   return (
-    <section className="panel questions">
-      <h3 className="memo-title">질문</h3>
-      <QuestionList participants={participants} rounds={rounds} floor={floor} myUid={me.uid} />
+    <details className="panel float-pop questions" open>
+      <summary>질문</summary>
+      <QuestionList room={room} participants={participants} rounds={rounds} floor={floor} myUid={me.uid} />
+    </details>
+  );
+}
+
+/** The result as a popup over the table. Its header holds the close button; closed, a small button brings it back. */
+function ResultPopup({ reveal, participants, room, me }: { reveal: Reveal; participants: Participant[]; room: Room; me: Me }) {
+  const [open, setOpen] = useState(true);
+  if (!open)
+    return (
+      <button className="button primary result-reopen" data-testid="result-reopen" onClick={() => setOpen(true)}>
+        결과 보기
+      </button>
+    );
+  return (
+    <section className="panel result-popup" role="dialog" aria-label="게임 결과" data-testid="result-popup">
+      <header className="result-head">
+        <strong>{room.phase === "ended" ? "게임이 끝났어요" : "결과"}</strong>
+        <button className="icon-button" aria-label="결과 닫기" onClick={() => setOpen(false)}>
+          <X size={18} />
+        </button>
+      </header>
+      <RevealView reveal={reveal} participants={participants} topic={room.topic} myUid={me.uid} />
     </section>
   );
 }

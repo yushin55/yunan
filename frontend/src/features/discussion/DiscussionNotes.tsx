@@ -26,38 +26,46 @@ export function StatementList({ room, participants, rounds, myUid }: { room: Roo
 }
 
 /**
- * Just the questions ("Q. …"), each opening to the answers given after it. Rebuttals head their
- * own group the same way, since answers follow them too.
+ * Just the questions ("Q. …"), each opening to the answers given after it — several people can
+ * answer the same question. Questions about the statements and about the event are kept apart.
  */
-export function QuestionList({ participants, rounds, floor, myUid }: { participants: Participant[]; rounds: Rounds; floor: Floor | null; myUid?: string }) {
+export function QuestionList({ room, participants, rounds, floor, myUid }: { room: Room; participants: Participant[]; rounds: Rounds; floor: Floor | null; myUid?: string }) {
   const groups: { head: ExchangeRow; replies: ExchangeRow[] }[] = [];
-  for (const row of exchangeRows(rounds.transcript, floor)) {
+  for (const row of exchangeRows(rounds.transcript, floor, room.phase)) {
     if (row.kind === "answer" && groups.length) groups.at(-1)!.replies.push(row);
     else groups.push({ head: row, replies: [] });
   }
   const who = (uid: string) => (uid === myUid ? "나" : (participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자"));
   const said = (row: ExchangeRow) => (row.pending ? "말하는 중이에요" : row.text);
+  const grouped = groups.some((g) => g.head.phase !== groups[0].head.phase);
   if (!groups.length) return <p className="muted small exchange-empty">아직 질문이 없어요. 궁금한 것이 있으면 먼저 눌러 주세요.</p>;
   return (
     <div className="question-list" data-testid="question-list">
-      {groups.map(({ head, replies }) => (
-        <details key={head.key} className={`question kind-${head.kind}`} data-testid="question">
-          <summary>
-            <b>{head.kind === "question" ? "Q." : head.kind === "rebuttal" ? "반론." : "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
-            <small className="muted"> · {who(head.uid)}</small>
-          </summary>
-          {replies.length ? (
-            <ol className="question-replies">
-              {replies.map((r) => (
-                <li key={r.key}>
-                  <b>A.</b> <strong>{who(r.uid)}</strong> <span className={r.pending ? "muted" : undefined}>{said(r)}</span>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <p className="muted small">아직 답변이 없어요.</p>
-          )}
-        </details>
+      {groups.map(({ head, replies }, i) => (
+        <div key={head.key} className="question-group">
+          {grouped && (i === 0 || groups[i - 1].head.phase !== head.phase) && <p className="question-about">{head.phase === "statement" ? "입장 발표에 대한 질문" : "사건에 대한 질문"}</p>}
+          <details className={`question kind-${head.kind}`} data-testid="question">
+            <summary>
+              <b>{head.kind === "question" ? "Q." : head.kind === "rebuttal" ? "반론." : "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
+              <small className="muted">
+                {" "}
+                · {who(head.uid)}
+                {replies.length > 0 && ` · 답변 ${replies.length}`}
+              </small>
+            </summary>
+            {replies.length ? (
+              <ol className="question-replies">
+                {replies.map((r) => (
+                  <li key={r.key}>
+                    <b>A.</b> <strong>{who(r.uid)}</strong> <span className={r.pending ? "muted" : undefined}>{said(r)}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className="muted small">아직 답변이 없어요.</p>
+            )}
+          </details>
+        </div>
       ))}
     </div>
   );

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic } from "lucide-react";
 import Sheet from "../../components/Sheet";
 import type { Me, Room, SpeechKind } from "../../types/game";
-import { formatSeconds, KIND_LABEL, MIC_KINDS } from "../game/phases";
+import { formatSeconds, KIND_LABEL, micKinds, openFloor } from "../game/phases";
 import type { RoomApi } from "../room/useRoom";
 import { useFloor } from "./floor";
 import { LineInput } from "./TranscriptFeed";
@@ -52,7 +52,8 @@ function typing(target: EventTarget | null) {
 export default function MicControls({ room, me, api, engine, allowTyping }: { room: Room; me: Me; api: RoomApi; engine: SpeechEngine; allowTyping?: boolean }) {
   const { action, quiet, busy, offset } = api;
   const { floor, seconds } = useFloor(room, offset);
-  const kinds = MIC_KINDS[room.phase] ?? [];
+  const kinds = micKinds(room);
+  const open = openFloor(room);
   const mine = floor?.uid === me.uid;
   const listening = mine && !room.paused;
   const myTurn = room.turn?.uid === me.uid;
@@ -68,26 +69,30 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
   const [asking, setAsking] = useState<SpeechKind | null>(null);
   const confirm = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const noticeKey = `bridge.micNotice.${room.roomId}.${room.createdAt}`;
-  const free = !room.paused && !floor && (!room.turn || myTurn);
+  const free = !room.paused && !floor && (open || myTurn);
 
   const claim = useCallback(
     async (kind: SpeechKind) => {
       setClaiming(true);
       clearTimeout(confirm.current);
       // Mic first: time on the floor should not run out while the browser asks for permission.
+      // A refusal (someone was quicker) needs no message: the buttons simply go off.
       await start();
-      const granted = await action("mic-on", { kind });
+      const granted = await quiet("mic-on", { kind }).then(
+        () => true,
+        () => false,
+      );
       if (!granted) setClaiming(false);
       else confirm.current = setTimeout(() => setClaiming(false), CONFIRM_MS);
     },
-    [action, start],
+    [quiet, start],
   );
 
   // Stopping is one press. During statements it hands over to the next speaker too.
   const release = useCallback(() => {
     if (!floor) return;
-    void (room.turn ? action("end-turn", { phaseVersion: floor.version }) : action("mic-off", { phaseVersion: floor.version }));
-  }, [action, floor, room.turn]);
+    void quiet(open ? "mic-off" : "end-turn", { phaseVersion: floor.version }).catch(() => {});
+  }, [quiet, floor, open]);
 
   const press = useCallback(
     (kind: SpeechKind) => {
@@ -114,8 +119,8 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
   // Time is up: free the microphone for the next person without waiting for anyone to press anything.
   const held = room.floor?.uid === me.uid ? room.floor.version : null;
   useEffect(() => {
-    if (held !== null && !mine && !room.turn) void quiet("mic-off", { phaseVersion: held }).catch(() => {});
-  }, [held, mine, quiet, room.turn]);
+    if (held !== null && !mine && open) void quiet("mic-off", { phaseVersion: held }).catch(() => {});
+  }, [held, mine, quiet, open]);
 
   // Back from a reload still holding the microphone, with nothing listening: let it go so it can be pressed again.
   const mounted = useRef(false);
@@ -180,7 +185,7 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
             </button>
           );
         })}
-        {myTurn && !mine && (
+        {myTurn && !mine && !open && (
           <button className="button ghost" data-testid="end-turn" disabled={busy || room.paused} onClick={() => void action("end-turn", { phaseVersion: room.phaseVersion })}>
             차례 넘기기
           </button>

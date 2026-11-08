@@ -170,25 +170,16 @@ details.panel[open] > summary::after { content: "\2212"; }
 details.panel .summary-board { margin: 0 0 18px; padding: 0; border: 0; background: none; }
 details.panel .transcript { max-height: none; padding-right: 0; overflow: visible; }
 
-/* Classroom display: only the public picture, larger. */
-.teacher-room.present .teacher-grid { grid-template-columns: minmax(0, 1fr); max-width: none; }
-.teacher-room.present .teacher-side { display: none; }
-.teacher-room.present .transcript-line p, .teacher-room.present .summary-body li { font-size: 1.15rem; }
-.teacher-room.present .transcript-turn header strong { font-size: 1.1rem; }
-/* Fill a projector of any size without scrolling the page: --present-used is everything above and
-   around the record, including the event card when there is one. The summary has no input row. */
-.teacher-room.present { --present-used: 550px; }
-.teacher-room.present:has(.event-card.folded) { --present-used: 610px; }
-.teacher-room.present:has(.event-card:not(.folded)) { --present-used: 750px; }
-.teacher-room.present .transcript { max-height: max(180px, calc(100vh - var(--present-used))); }
-.teacher-room.present .discussion-grid .summary-body { max-height: max(240px, calc(100vh - var(--present-used) + 60px)); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; }
-@media (min-width: 861px) {
-  .teacher-room.present .discussion-grid { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
-}
-/* One screen, no scrolling: everything that is not the discussion itself steps aside. */
-.teacher-room.present .teacher-main > .banner, .teacher-room.present .phase-header .todo { display: none; }
-.teacher-room.present .teacher-grid { padding: 10px 18px; }
-.teacher-room.present.discussing .phase-header { margin-bottom: 10px; }
+/* Classroom screen: the game alone, full screen, for the projector. */
+.class-screen { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; background: #0b1210; }
+.class-screen-top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 1.2rem; }
+.class-screen .speaker-stage { margin: 0; border-radius: 0; border-inline: 0; }
+.class-screen-table { position: relative; flex: 1 1 auto; min-height: 0; }
+.class-screen-table .table-view { height: 100%; }
+.class-screen-result { position: absolute; z-index: 4; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100% - 32px)); margin: 0; box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6); }
+.reveal-summary { display: grid; gap: 10px; }
+.reveal-summary-who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; font-size: 1.1rem; }
+.reveal-summary-who strong { color: var(--gold); }
 .teacher-attention { padding: 3px 10px; border-radius: 99px; color: var(--gold-ink); background: var(--amber); font-size: 0.82rem; font-weight: 700; white-space: nowrap; }
 
 /* Student screen during the discussion: one calm panel with whose turn it is and what to do. */
@@ -224,3 +215,133 @@ details.panel .transcript { max-height: none; padding-right: 0; overflow: visibl
 @media (prefers-reduced-motion: reduce) {
   .start-countdown strong { animation: none; }
 }
+
+/* ── Full-stage play: after the lobby the table fills the window and the tools float over it ── */
+.student-room.full-stage { height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; padding-bottom: 0; }
+.student-room.full-stage > * { flex: none; }
+.student-room .room-layout.full-stage { flex: 1 1 auto; min-height: 0; display: block; width: 100%; max-width: none; }
+.student-room .room-layout.full-stage .stage { position: relative; top: auto; height: 100%; border: 0; }
+.stage-center { position: absolute; inset: 0; z-index: 4; display: grid; place-items: center; padding: 16px; pointer-events: none; }
+.stage-center > * { pointer-events: auto; }
+.stage-panels { position: absolute; z-index: 5; top: 12px; right: 12px; width: min(340px, calc(100% - 24px)); max-height: calc(100% - 64px); display: flex; flex-direction: column; gap: 8px; overflow-y: auto; pointer-events: none; scrollbar-width: thin; }
+.stage-panels > * { flex: none; margin: 0; pointer-events: auto; }
+.float-pop { margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(23, 34, 30, 0.94); backdrop-filter: blur(6px); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
+details.float-pop > summary { cursor: pointer; font-weight: 700; }
+details.float-pop[open] > summary { margin-bottom: 8px; }
+.room-layout:not(.full-stage) .float-pop { margin-bottom: 12px; background: var(--panel); box-shadow: none; }
+
+/* The microphone, small. */
+.mic-popup { border-color: var(--gold); }
+.mic-popup.mine { box-shadow: 0 0 0 3px rgba(230, 184, 92, 0.35), 0 10px 26px rgba(0, 0, 0, 0.45); }
+.mic-note { margin: 0 0 6px; font-weight: 700; color: var(--gold); font-size: 0.92rem; }
+.mic-popup .mic-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 6px; }
+.mic-popup .mic-buttons .button { margin: 0; padding: 8px 10px; min-height: 0; font-size: 0.92rem; }
+.mic-popup .mic-state:empty { display: none; }
+.mic-popup .mic-state, .mic-popup .mic-interim, .mic-popup .mic-problem { margin: 6px 0 0; font-size: 0.85rem; }
+.stage-panels .question-list { max-height: 38vh; }
+.stage-panels .memo-pad { position: static; padding: 0; background: none; }
+.stage-panels .memo-pad label { display: none; }
+.vote-pop .vote-pointed { margin: 0; }
+.vote-pop .vote-done { margin: 0; }
+
+/* My role and identity, held up close: two game cards. */
+.role-zoom { display: grid; justify-items: center; gap: 14px; margin: 0; padding: 18px 22px; max-width: 100%; max-height: 100%; overflow-y: auto; box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6); }
+.role-zoom .privacy-line { margin: 0; }
+.role-zoom-done { margin: 0; }
+.zoom-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; }
+/* Both cards exactly the same size. */
+.game-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto 11.2em; width: min(260px, 38vw); height: min(430px, calc(100dvh - 260px)); padding: 10px 10px 12px; border: 3px solid #e6b85c; border-radius: 16px; background: linear-gradient(160deg, #4a3522, #1f1610); box-shadow: inset 0 0 0 2px #2a1c10, 0 22px 50px rgba(0, 0, 0, 0.6); animation: zoom-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.game-card + .game-card { animation-delay: 120ms; }
+.game-card-top { padding: 0 0 8px; color: #f0cf8a; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.12em; text-align: center; }
+.game-card-art { display: grid; place-items: center; min-height: 0; overflow: hidden; border: 2px solid #c9a35a; border-radius: 10px; background: radial-gradient(120% 90% at 50% 0%, #2c4a40 0%, #0f1a17 75%); color: #f0cf8a; }
+.game-card-art .role-avatar { height: 100%; width: auto; padding-top: 8px; filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)); }
+.game-card-name { position: relative; z-index: 1; justify-self: center; margin: -16px 0 0; padding: 4px 18px; border-radius: 6px; background: #e6b85c; color: #2a1c0e; font-family: var(--serif); font-size: 1.2rem; text-align: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); word-break: keep-all; }
+.game-card-text { display: grid; align-content: start; gap: 4px; margin-top: 8px; padding: 9px 11px; overflow-y: auto; border-radius: 8px; background: #f5eedd; color: #2a2218; font-size: 0.84rem; line-height: 1.5; scrollbar-width: thin; }
+.game-card-text p { margin: 0; }
+.game-card-text b { margin-right: 4px; color: #a0742a; }
+.game-card-intro { color: #6e5f49; }
+.game-card.identity { border-color: #8fd0a6; background: linear-gradient(160deg, #24493a, #102119); }
+.game-card.identity .game-card-art { border-color: #8fd0a6; color: #b7f0cb; background: radial-gradient(120% 90% at 50% 0%, #2f6b52 0%, #0f1a17 75%); }
+.game-card.identity .game-card-name { background: #8fd0a6; color: #0f241a; }
+.game-card.identity.switcher { border-color: #f08a7a; background: linear-gradient(160deg, #5a2320, #200f0d); }
+.game-card.identity.switcher .game-card-art { border-color: #f08a7a; color: #ffc2b6; background: radial-gradient(120% 90% at 50% 0%, #7a2c25 0%, #1a0d0b 75%); }
+.game-card.identity.switcher .game-card-name { background: #f08a7a; color: #2a0f0b; }
+.game-card.identity .game-card-text { align-content: center; text-align: center; font-size: 0.95rem; }
+@keyframes zoom-in { from { opacity: 0; transform: translateY(60px) scale(0.6); } to { opacity: 1; transform: none; } }
+
+/* The event card alone, once. */
+.event-pop { position: fixed; inset: 0; z-index: 95; display: grid; place-items: center; padding: 16px; background: rgba(6, 10, 9, 0.7); }
+.event-pop-card { position: relative; width: min(560px, 100%); animation: pop-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@keyframes pop-in { from { transform: scale(0.7); } to { transform: none; } }
+.event-pop-card .event-card { margin: 0; box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6); }
+.event-pop-close { position: absolute; top: 8px; right: 8px; }
+
+/* The result popup: its own header row for the close button, the switcher drawn as their character. */
+.result-popup { width: min(520px, 100%); max-height: 100%; margin: 0; overflow-y: auto; scrollbar-width: none; box-shadow: 0 24px 50px rgba(0, 0, 0, 0.6); }
+.result-popup::-webkit-scrollbar { display: none; }
+.result-popup .reveal { gap: 10px; }
+.result-popup .reveal-hero { padding: 12px; gap: 4px; }
+.result-popup .reveal h3 { margin: 4px 0 0; font-size: 0.95rem; }
+.result-popup .tally { gap: 4px; margin: 0; font-size: 0.92rem; }
+.result-popup .tally .bar { height: 8px; }
+.reveal-outcome { margin: 2px 0 0; font-weight: 800; }
+.result-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.result-head strong { font-size: 1.1rem; }
+.stage-center .result-reopen { align-self: end; margin-bottom: 12px; }
+.reveal-switchers { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; }
+.reveal-switcher { display: grid; justify-items: center; gap: 4px; margin: 0; }
+.reveal-switcher figcaption { display: grid; justify-items: center; gap: 2px; }
+.reveal-switcher figcaption strong { font-family: var(--serif); font-size: 1.35rem; }
+.reveal-switcher figcaption span { color: var(--muted); font-size: 0.9rem; }
+.reveal-switcher figcaption em { font-style: normal; font-weight: 800; }
+.reveal-switcher.escaped em { color: var(--gold); }
+.reveal-switcher.caught em { color: #ffc2b6; }
+.block-avatar { width: 120px; height: auto; overflow: visible; }
+.block-avatar .ba-arm, .block-avatar .ba-head, .block-avatar .ba-body { transform-box: fill-box; }
+.block-avatar .ba-arm { transform-origin: 50% 6%; }
+.block-avatar .ba-head { transform-origin: 50% 100%; }
+/* Cheering: arms pumping overhead, hopping. */
+.mood-cheer .ba-arm.left { transform: rotate(155deg); animation: arm-left 0.45s ease-in-out infinite alternate; }
+.mood-cheer .ba-arm.right { transform: rotate(-155deg); animation: arm-right 0.45s ease-in-out infinite alternate; }
+.mood-cheer .ba-body { animation: hop 0.45s ease-in-out infinite alternate; }
+@keyframes arm-left { from { transform: rotate(140deg); } to { transform: rotate(172deg); } }
+@keyframes arm-right { from { transform: rotate(-140deg); } to { transform: rotate(-172deg); } }
+@keyframes hop { from { transform: translateY(0); } to { transform: translateY(-16px); } }
+/* Slumping: hands on the head, head hanging and shaking slowly. */
+.mood-slump .ba-arm.left { transform: rotate(-148deg); }
+.mood-slump .ba-arm.right { transform: rotate(148deg); }
+.mood-slump .ba-head { transform: translateY(10px) rotate(6deg); animation: head-shake 1.6s ease-in-out infinite; }
+.mood-slump .ba-body { transform: translateY(8px); }
+@keyframes head-shake { 0%, 100% { transform: translateY(10px) rotate(8deg); } 50% { transform: translateY(10px) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .block-avatar * { animation: none !important; }
+}
+.lobby-resume { pointer-events: auto; }
+.question-about { margin: 8px 0 2px; color: var(--gold); font-size: 0.8rem; font-weight: 800; }
+.question-group:first-child .question-about { margin-top: 0; }
+.question-list .question-group { display: grid; gap: 6px; }
+
+/* Teacher: one card per student. */
+.participation-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+.participation-chips div { display: grid; padding: 6px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
+.participation-chips dt { color: var(--muted); font-size: 0.75rem; }
+.participation-chips dd { margin: 0; font-size: 1.15rem; font-weight: 800; }
+.participation-quiet { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: rgba(231, 115, 95, 0.12); border: 1px solid rgba(231, 115, 95, 0.5); color: #ffc2b6; }
+.student-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.student-card { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+.student-card header { display: flex; align-items: center; gap: 6px; }
+.student-card header strong { font-size: 1.02rem; }
+.student-card header em { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-size: 0.72rem; font-style: normal; font-weight: 800; }
+.student-card.speaking { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230, 184, 92, 0.3); }
+.student-card.silent { border-color: rgba(231, 115, 95, 0.6); }
+.student-card-role { color: var(--muted); font-size: 0.8rem; }
+.student-card-stats, .student-card-steps { display: flex; flex-wrap: wrap; gap: 4px; }
+.student-card-stats span, .student-card-steps span { padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.06); color: var(--muted); font-size: 0.78rem; }
+.student-card-stats span.on { background: rgba(127, 199, 156, 0.18); color: #a6e3bd; font-weight: 700; }
+.student-card-steps span.on { background: rgba(230, 184, 92, 0.18); color: var(--gold); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) {
+  .game-card, .event-pop-card { animation: none; }
+}
+/* Teacher: long statements and many questions scroll inside their own panel. */
+.teacher-room .discussion-grid .statement-list, .teacher-room .discussion-grid .question-list { max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; }
+.statement-full { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }

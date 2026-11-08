@@ -1,12 +1,12 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { HandCard, TablePlayer } from "../../components/scene/TableScene";
+import { SEAT_COLORS } from "../../components/scene/palette";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
 import { activeFloor, statementCards } from "../discussion/floor";
 import { roleName } from "../roles/roleName";
 import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
-const COLORS = ["#c98d66", "#aaad83", "#a2b3cf", "#86ad98", "#b09bbf", "#d9b263", "#739dba", "#c790a0"];
 // The hand fills up once statements begin; before that it is just cards, face down.
 const CARD_PHASES = ["statement", "event", "rebuttal", "vote", "reveal", "ended"];
 
@@ -31,7 +31,7 @@ function status(room: Room, p: Participant, rounds: Rounds, floor: Floor | null)
     case "event":
     case "rebuttal":
       if (floor?.uid === p.uid) return { label: floor.kind === "statement" ? "말하는 중" : `${KIND_LABEL[floor.kind]} 중`, tone: "done" };
-      return room.turn?.uid === p.uid ? { label: "차례", tone: "waiting" } : undefined;
+      return room.turn?.uid === p.uid ? { label: room.turn.stage === "qa" ? "질문 받는 중" : "차례", tone: "waiting" } : undefined;
     case "vote":
       return done("vote", "투표 완료", "고민 중");
     case "reveal":
@@ -58,6 +58,7 @@ export default function TableView({
   offset = 0,
   hand,
   pointAt,
+  overview = false,
 }: {
   room: Room;
   participants: Participant[];
@@ -69,6 +70,8 @@ export default function TableView({
   /** Cards of my own to hold instead of the statements (my picks in the lobby, my role and identity). */
   hand?: HandCard[];
   pointAt?: string;
+  /** The classroom screen: the whole table from above, no seat and no hand. */
+  overview?: boolean;
 }) {
   const now = useNow(1000) + offset;
   const floor = activeFloor(room, now);
@@ -77,13 +80,13 @@ export default function TableView({
     uid: p.uid,
     nickname: p.nickname,
     order: CARD_PHASES.includes(room.phase) ? p.seat + 1 : undefined,
-    color: COLORS[p.seat % COLORS.length],
+    color: SEAT_COLORS[p.seat % SEAT_COLORS.length],
     tag: p.roleId ? roleName(room.topic, p.roleId) : undefined,
     status: status(room, p, rounds, floor),
   }));
   // Once the event happens its card joins the hand, first in the fan.
-  const eventCard: HandCard[] = room.event ? [{ uid: "event", name: "사건 카드", role: room.event.title, text: room.event.description, state: "speaking" }] : [];
-  const cards = hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statementCards(room, participants, rounds, selfUid)] : undefined);
+  const eventCard: HandCard[] = room.event ? [{ uid: "event", name: room.event.title, role: "사건 발생", text: room.event.description, state: "done", tone: "event" }] : [];
+  const cards = overview ? undefined : hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statementCards(room, participants, rounds, selfUid)] : undefined);
   return (
     <div className="table-view" data-testid="table-view">
       <Suspense
@@ -93,7 +96,7 @@ export default function TableView({
           </div>
         }
       >
-        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} phase={room.phase} quality={narrow ? "low" : "high"} />
+        <TableScene players={players} cards={cards} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} overview={overview} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
     </div>
   );

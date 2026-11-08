@@ -5,9 +5,9 @@ import { api } from "../lib/api";
 import TopicPicker from "../features/topics/TopicPicker";
 import { useTopics } from "../features/topics/useTopics";
 
-// Role check and voting are kept short and questions get the time rebuttals used to have
-// (240 + 180 seconds). The teacher can still change them in the lobby.
-const QUICK_PHASES = { role: 20, event: 420, vote: 20 };
+// Role check and voting are kept short, each statement gets 40 seconds and questions get the
+// time rebuttals used to have (240 + 180 seconds). The teacher can still change them in the lobby.
+const QUICK_PHASES = { role: 20, statement: 40, event: 420, vote: 20 };
 
 export default function TeacherNewPage() {
   const { catalog, error: loadError } = useTopics();

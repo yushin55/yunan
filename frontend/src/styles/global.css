@@ -264,16 +264,13 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .outcome-missed { border-color: var(--red); }
 .outcome-tie, .outcome-partial, .outcome-no_votes { border-color: var(--amber); }
 .my-guess { font-weight: 800; color: var(--gold); margin: 0; }
-.tally, .ballots { list-style: none; padding: 0; display: grid; gap: 6px; }
+.tally { list-style: none; padding: 0; display: grid; gap: 6px; }
 .tally li { display: grid; grid-template-columns: minmax(90px, 1.2fr) 2fr auto; gap: 10px; align-items: center; }
-.tally .who em, .ballots em { font-style: normal; font-size: 0.75rem; margin-left: 6px; color: var(--red); }
+.tally .who em { font-style: normal; font-size: 0.75rem; margin-left: 6px; color: var(--red); }
 .tally .bar { height: 10px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
 .tally .bar i { display: block; height: 100%; background: var(--muted); }
 .tally .is-switcher .bar i { background: var(--red); }
 .tally .votes { font-variant-numeric: tabular-nums; }
-.ballots li { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); }
-.ballots em.hit { color: var(--green); }
-.ballots em.miss { color: var(--muted); }
 
 .roster ul { list-style: none; padding: 0; display: grid; gap: 6px; }
 .roster li { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg-2); }
@@ -289,7 +286,6 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .code-chip strong { letter-spacing: 0.15em; color: var(--gold); }
 .teacher-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(320px, 1fr); gap: 18px; padding: 18px; max-width: 1440px; margin: 0 auto; }
 .teacher-main, .teacher-side { min-width: 0; }
-.teacher-table { position: relative; height: clamp(300px, 46vh, 540px); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--line); margin-bottom: 14px; }
 .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; align-items: center; }
 .blockers { color: var(--amber); font-size: 0.92rem; }
 .progress-panel h3 { display: flex; gap: 10px; align-items: baseline; }

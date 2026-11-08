@@ -1,4 +1,4 @@
-import type { Phase, SpeechKind } from "../../types/game";
+import type { Phase, Room, SpeechKind } from "../../types/game";
 
 // No rebuttal: questions and answers run longer instead. The server still has the phase, so the
 // teacher's screen skips it the moment it starts (see TeacherRoomPage).
@@ -57,6 +57,15 @@ export const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = {
   event: ["question", "answer"],
   rebuttal: ["rebuttal", "answer"],
 };
+
+/** The microphone buttons right now: in the Q&A after the statements, anyone can ask or answer. */
+export function micKinds(room: Room): SpeechKind[] {
+  if (room.phase === "statement" && room.turn?.stage === "qa") return ["question", "answer"];
+  return MIC_KINDS[room.phase] ?? [];
+}
+
+/** Statements go in turn; the Q&A after them and the event phase are open to anyone. */
+export const openFloor = (room: Room) => !room.turn || room.turn.stage === "qa";
 
 export const KIND_LABEL: Record<SpeechKind, string> = { statement: "입장 발표", question: "질문", rebuttal: "반론", answer: "답변" };
 

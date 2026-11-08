@@ -58,6 +58,8 @@ export interface Turn {
   order: string[];
   index: number;
   uid: string;
+  /** After everyone's statement comes a time when anyone can ask about them or answer ("qa"). */
+  stage?: "speech" | "qa";
 }
 
 /** The one microphone in the room. `version` is the phaseVersion what is said gets recorded under. */
