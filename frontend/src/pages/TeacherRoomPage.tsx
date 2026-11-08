@@ -17,7 +17,10 @@ import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
 import LobbySettings from "../features/teacher/LobbySettings";
 import ModerationPanel from "../features/teacher/ModerationPanel";
-import ParticipationBoard, { ParticipationGrid } from "../features/teacher/ParticipationBoard";
+import ParticipationBoard, { GameSummary, ParticipationGrid } from "../features/teacher/ParticipationBoard";
+import PhaseMemo, { usePhaseNotes } from "../features/teacher/PhaseMemo";
+import TeacherReport from "../features/teacher/TeacherReport";
+import { gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
 import TopicPicker from "../features/topics/TopicPicker";
 import { useTopics } from "../features/topics/useTopics";
 import { RevealSummary } from "../features/voting/RevealView";
@@ -26,7 +29,7 @@ import { RevealSummary } from "../features/voting/RevealView";
 function useServerNow(offset: number) {
   const [now, setNow] = useState(Date.now() + offset);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now() + offset), 5000);
+    const t = setInterval(() => setNow(Date.now() + offset), 2000);
     return () => clearInterval(t);
   }, [offset]);
   return now;
@@ -44,7 +47,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const phase = room.phase;
   const speaking = SPEAKING.includes(phase);
   const turn = room.turn;
-  const { floor } = useFloor(room, offset);
+  const { floor, seconds: floorSeconds } = useFloor(room, offset);
   const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
   const upcoming = turn && turn.index + 1 < turn.order.length ? participants.find((p) => p.uid === turn.order[turn.index + 1]) : undefined;
   const toReview = host.moderation.filter((e) => e.status === "flagged" || e.status === "pending_review").length;
@@ -74,6 +77,30 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
     document.addEventListener("fullscreenchange", change);
     return () => document.removeEventListener("fullscreenchange", change);
   }, []);
+  const key = gameKey(room.roomId, room.createdAt);
+  const { notes, addNote, removeNote } = usePhaseNotes(key);
+  const finished = phase === "reveal" || phase === "ended";
+  // Keep the finished game (and later edits or notes) in this browser's debate history.
+  useEffect(() => {
+    if (!finished) return;
+    saveDebate({
+      key,
+      roomId: room.roomId,
+      roomCode: room.code,
+      topic: room.topic,
+      createdAt: room.createdAt,
+      // Until the teacher ends the game, keep the time the result was first shown.
+      endedAt: room.endedAt ?? loadDebate(key)?.endedAt ?? Date.now(),
+      practice,
+      participants,
+      transcript: rounds.transcript,
+      moderation: host.moderation,
+      reveal: rounds.reveal,
+      summary: rounds.summary,
+      settings: room.settings,
+      notes,
+    });
+  }, [finished, key, room.code, room.topic, room.createdAt, room.endedAt, room.settings, practice, participants, rounds.transcript, rounds.reveal, rounds.summary, host.moderation, notes]);
 
   return (
     <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}`}>
@@ -225,15 +252,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
               <h3>
                 참여 현황 <span className="muted small">{count}명</span>
               </h3>
-              <ParticipationGrid room={room} participants={participants} rounds={rounds} serverNow={practice ? room.createdAt : serverNow} speakingUid={floor?.uid ?? turn?.uid} />
-            </section>
-          )}
-
-
-          {(phase === "reveal" || phase === "ended") && rounds.reveal && (
-            <section className="panel">
-              <h3>결과</h3>
-              <RevealSummary reveal={rounds.reveal} participants={participants} topic={room.topic} />
+              <ParticipationGrid room={room} participants={participants} rounds={rounds} serverNow={practice ? room.createdAt : serverNow} speakingUid={floor?.uid ?? (turn?.stage !== "qa" ? turn?.uid : undefined)} floor={floor} floorSeconds={floorSeconds} alwaysOnline={practice} />
             </section>
           )}
 
@@ -270,9 +289,18 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
               {speaking && speaker && <LineInput speaker={speaker.nickname} disabled={busy} onAdd={(text) => void action("line-add", { text, phaseVersion: room.phaseVersion })} />}
             </details>
           )}
+          {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />}
+          {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
         </div>
 
         <aside className="teacher-side">
+          <PhaseMemo phase={phase} notes={notes} participants={participants} onAdd={addNote} onRemove={removeNote} />
+          {finished && rounds.reveal && (
+            <section className="panel reveal-side" data-testid="reveal-side">
+              <h3 className="memo-title">결과 공개</h3>
+              <RevealSummary reveal={rounds.reveal} participants={participants} topic={room.topic} />
+            </section>
+          )}
           {phase === "lobby" && (
             <section className="panel">
               <h3>학생 입장</h3>
@@ -288,6 +316,11 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                 </span>
               </h3>
               <ParticipationBoard
+                room={room}
+                rounds={rounds}
+                alwaysOnline={practice}
+                floor={floor}
+                floorSeconds={floorSeconds}
                 participants={participants}
                 serverNow={practice ? room.createdAt : serverNow}
                 busy={busy}

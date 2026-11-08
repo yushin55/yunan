@@ -306,7 +306,11 @@ async function play(label, options) {
   await expect(page.getByTestId('transcript-turn').first()).toBeVisible();
   await expect(page.locator('.transcript-phase').first()).toHaveText('입장 발표'); // The record is grouped by phase.
   await expect(page.locator('.transcript .turn-kind').first()).toHaveText(/질문|답변/);
-  await expect(page.getByTestId('summary-position').first()).toBeVisible({ timeout: 40000 });
+  // No statement list or discussion summary here; the live board shows who is talking and how far the phase has got.
+  await expect(page.getByTestId('summary-board')).toHaveCount(0);
+  await expect(page.getByTestId('statement-list')).toHaveCount(0);
+  await expect(page.getByTestId('live-progress')).toContainText(/명 참여/);
+  await expect(page.getByTestId('live-status')).toHaveCount(6);
   await page.screenshot({ path: `artifacts/practice-${label}-teacher-event.png`, fullPage: true });
   // Recognition mistakes can be fixed or deleted.
   const line = page.getByTestId('transcript-line').first();
@@ -398,8 +402,9 @@ async function teacherEntry() {
   await expect(page.getByTestId('start-game')).toBeDisabled();
   await expect(page.getByTestId('participant-row')).toHaveCount(6);
   await expect(page.locator('body')).not.toHaveClass(/flow-open/);
-  await page.locator('.guide summary').click();
-  await expect(page.locator('.guide')).toContainText('질문 예시');
+  // The teacher screen keeps only what is needed to run the game: no guide, no 3D table.
+  await expect(page.locator('.guide')).toHaveCount(0);
+  await expect(page.locator('.teacher-table')).toHaveCount(0);
   await page.reload();
   await expect(page.locator('.teacher-room')).toBeVisible();
   await page.getByTestId('practice-view-toggle').click();

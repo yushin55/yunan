@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ArrowRight, Bot, FastForward, Flag, Monitor, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
@@ -6,6 +6,7 @@ import { PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
 import { TOPICS } from "../features/practice/engine";
 import { usePractice } from "../features/practice/usePractice";
 import { allReady, useAutoStart } from "../features/game/useAutoStart";
+import type { Phase } from "../types/game";
 import { rememberNickname, savedNickname } from "../features/room/roomStorage";
 import Sheet from "../components/Sheet";
 import TopicPicker from "../features/topics/TopicPicker";
@@ -14,7 +15,11 @@ import TeacherRoomPage from "./TeacherRoomPage";
 
 /** Try both sides of the same offline game with five computer partners. */
 export default function PracticePage() {
-  const { api, teacherApi, started, begin, reset } = usePractice();
+  const { api, teacherApi, started, begin, beginAt, reset } = usePractice();
+  // /practice?view=teacher (or /teacher/preview) opens the teacher screen directly,
+  // starting a practice game on ?topic= (or a random topic) if none is running yet.
+  const [search, setSearch] = useSearchParams();
+  const directTeacher = useRef(search.get("view") === "teacher");
   // There is no teacher to keep the summary fresh while the player is on the student screen.
   useAutoSummary(api.state?.rounds.transcript ?? [], () => api.quiet("summary"));
   // No teacher here: the practice page starts the game itself once everyone has picked.
@@ -35,6 +40,19 @@ export default function PracticePage() {
     }
     api.setError("");
   };
+  useEffect(() => {
+    if (!directTeacher.current) return;
+    directTeacher.current = false;
+    setTeacherView(true);
+    const topicId = TOPICS.find((t) => t.topicId === search.get("topic"))?.topicId ?? null;
+    const phase = PHASE_ORDER.find((p) => p === search.get("phase"));
+    // A phase in the address always starts a fresh game at that phase; otherwise keep any game in progress.
+    if (phase) beginAt(savedNickname() || "연습생", topicId ?? (started ? api.state?.room.topic.topicId ?? null : null), phase);
+    else if (!started) begin(savedNickname() || "연습생", topicId);
+    setSearch({}, { replace: true });
+    // Runs once on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   if (!started || !api.state) return <PracticeSetup onBegin={(nickname, topicId, teacher = false) => {
     setTeacherView(teacher);
     begin(nickname, topicId);
@@ -56,6 +74,22 @@ export default function PracticePage() {
       <button className="button secondary small" data-testid="practice-view-toggle" onClick={() => setTeacherView(!teacherView)}>
         {teacherView ? <UserRound size={15} /> : <Monitor size={15} />} {teacherView ? "학생 화면으로" : "선생님 화면 보기"}
       </button>
+      {teacherView && (
+        <select
+          className="practice-phase-jump"
+          data-testid="practice-phase-jump"
+          aria-label="단계 바로 보기"
+          title="이 단계로 새 연습 게임을 바로 열어요"
+          value={room.phase}
+          onChange={(e) => beginAt(savedNickname() || "연습생", room.topic.topicId, e.target.value as Phase)}
+        >
+          {PHASE_ORDER.map((p) => (
+            <option key={p} value={p}>
+              {PHASE_SHORT[p]}
+            </option>
+          ))}
+        </select>
+      )}
       {!teacherView && room.phase !== "lobby" && room.phase !== "reveal" && room.phase !== "ended" && (
         <button className="button secondary small" data-testid="practice-next" onClick={() => void api.action("next")}>
           <SkipForward size={15} /> {room.turn ? "다음 차례" : `다음: ${PHASE_SHORT[next]}`}

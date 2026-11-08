@@ -8,6 +8,7 @@ import "./styles/discussion.css";
 import "./styles/news-footage.css";
 import "./styles/flow.css";
 import "./styles/home.css";
+import "./styles/teacher-report.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>

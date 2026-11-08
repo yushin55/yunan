@@ -12,11 +12,11 @@ const OUTCOME: Record<Reveal["outcome"], string> = {
 };
 
 /** Shows who the switchers were and the votes. Preferences and who voted for whom are never shown. */
-export default function RevealView({ reveal, participants, topic, myUid }: { reveal: Reveal; participants: Participant[]; topic: Topic; myUid?: string }) {
+export default function RevealView({ reveal, participants, topic, myUid, compact = false }: { reveal: Reveal; participants: Participant[]; topic: Topic; myUid?: string; compact?: boolean }) {
   const name = (uid: string) => participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자";
   const outcome = OUTCOME[reveal.outcome];
   return (
-    <div className="reveal" data-testid="reveal">
+    <div className={`reveal${compact ? " compact" : ""}`} data-testid="reveal">
       <div className="reveal-hero">
         <span className="eyebrow">역할 전환자</span>
         <div className="reveal-switchers">

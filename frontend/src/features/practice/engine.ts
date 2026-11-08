@@ -431,3 +431,80 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
   }
   return { state: s };
 }
+
+/** What the player "said" in a fast-forwarded preview: one line per speaking phase, written from their role card. */
+function previewLine(s: PracticeState, phase: SpeakingPhase) {
+  const strip = (t: string) => t.replace(/[.。]\s*$/, "");
+  const role = roleOf(s, ME);
+  const other = s.snapshot.room.topic.roles.find((r) => r.id !== role?.id);
+  if (!role) return "";
+  if (phase === "statement")
+    return `저는 ${role.name}입니다. 최근 기사에 따르면 이 문제로 불편을 겪는 학생이 30% 정도라고 해요. 왜냐하면 ‘${strip(role.concerns[0])}’라는 문제가 있기 때문이에요. 그래서 ‘${strip(role.goal)}’ 쪽으로 정해야 한다고 생각합니다.`;
+  if (phase === "event") return "방금 나온 자료는 출처가 어디인가요? 사실인지 먼저 확인해 보고 이야기하면 좋겠어요.";
+  return `${other?.name ?? "상대"}의 걱정은 이해해요. 하지만 실제로 다른 학교 사례를 보면 ‘${strip(role.concerns[role.concerns.length > 1 ? 1 : 0])}’라는 점이 더 컸어요. 처음에는 한쪽만 생각했는데, 듣고 보니 두 입장을 함께 봐야겠다고 생각이 바뀌었어요.`;
+}
+
+/**
+ * A fresh practice game already moved on to `phase`, for previewing one step of the teacher screen.
+ * The phases before it are played out on a fast clock, so partners really speak and the player
+ * gets a sample line in each speaking phase; before the vote ends everyone casts a random vote.
+ * Finally every clock is shifted so the target phase starts now.
+ */
+export function createPracticeAt(nickname: string, topicId: string | null, phase: Phase, now = Date.now()): PracticeState {
+  let s = createPractice(nickname, topicId, now);
+  if (phase === "lobby") return s;
+  let t = now;
+  const roles = s.snapshot.room.topic.roles.map((r) => r.id);
+  s = act(s, "preferences", { first: roles[0], second: roles[1] }, t).state;
+  s = act(s, "start", {}, t).state;
+  const spoke = new Set<number>();
+  for (let guard = 0; guard < 5000 && s.snapshot.room.phase !== phase && s.snapshot.room.phase !== "ended"; guard++) {
+    const room = s.snapshot.room;
+    const say = (kind: SpeechKind) => {
+      s = act(s, "mic-on", { kind }, t).state;
+      s = act(s, "line-add", { text: previewLine(s, room.phase as SpeakingPhase), phaseVersion: s.snapshot.room.phaseVersion }, t).state;
+    };
+    if (room.phase === "vote") {
+      const uids = s.snapshot.participants.map((p) => p.uid);
+      for (const uid of uids) s.votes[uid] = shuffle(uids.filter((u) => u !== uid), rng).slice(0, room.settings.switcherCount);
+      s.snapshot.me!.vote = s.votes[ME];
+      for (const p of s.snapshot.participants) if (!p.submitted.includes("vote")) p.submitted.push("vote");
+      // Votes stay editable until the deadline; the preview explicitly ends voting.
+      s = act(s, "skip-phase", {}, t).state;
+      continue;
+    }
+    if (room.phase === "reveal") {
+      s = act(s, "next", {}, t).state;
+      continue;
+    }
+    if (room.phase === "role") {
+      s = act(s, "skip-phase", {}, t).state;
+      continue;
+    }
+    if (room.phase === "statement" && room.turn?.stage !== "qa" && room.turn?.uid === ME && !spoke.has(room.phaseVersion)) {
+      spoke.add(room.phaseVersion);
+      say("statement");
+      s = act(s, "end-turn", {}, t).state;
+      continue;
+    }
+    if ((room.phase === "event" || room.phase === "rebuttal") && !spoke.has(-ORDER.indexOf(room.phase)) && !(room.floor && room.floor.endsAt > t)) {
+      spoke.add(-ORDER.indexOf(room.phase));
+      say(room.phase === "event" ? "question" : "rebuttal");
+      s = act(s, "mic-off", {}, t).state;
+      continue;
+    }
+    // Jump the clock to whatever happens next: a partner's move or the deadline.
+    const next = Math.min(...s.schedule.map((j) => j.at), room.phaseEndsAt ?? Infinity);
+    t = Number.isFinite(next) ? Math.max(t, next) : t + 1000;
+    s = tick(s, t) ?? s;
+  }
+  // Shift the fast clock back to real time.
+  const shift = now - t;
+  const room = s.snapshot.room;
+  if (room.phaseEndsAt !== null) room.phaseEndsAt += shift;
+  if (room.floor) room.floor.endsAt += shift;
+  if (room.endedAt) room.endedAt = now;
+  for (const job of s.schedule) job.at += shift;
+  for (const line of s.snapshot.rounds.transcript) line.at += shift;
+  return s;
+}

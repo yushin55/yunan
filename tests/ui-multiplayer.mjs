@@ -284,8 +284,8 @@ try {
   await teacher.page.getByTestId('moderation-toggle').click();
   await expect(teacher.page.getByTestId('moderation-entry')).toContainText('닥쳐');
   await teacher.page.getByRole('button', { name: '공개하지 않기' }).click();
-  await expect(teacher.page.getByTestId('moderation-entry')).toContainText('공개하지 않음');
-  await teacher.page.getByTestId('moderation-toggle').click();
+  // Nothing left to review: the moderation panel steps aside until the next held line.
+  await expect(teacher.page.getByTestId('moderation-toggle')).toHaveCount(0);
 
   step('vote for the switcher');
   await teacher.page.getByTestId('next-phase').click();

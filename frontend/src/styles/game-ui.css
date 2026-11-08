@@ -263,3 +263,4 @@
   .student-room .desk { height: 100%; overflow-y: auto; display: flex; flex-direction: column; padding-bottom: 16px; }
   .student-room .desk > * { flex: none; }
 }
+.practice-phase-jump { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line, #ccc); background: var(--panel, #fff); color: inherit; font: inherit; font-size: 0.85rem; font-weight: 700; }

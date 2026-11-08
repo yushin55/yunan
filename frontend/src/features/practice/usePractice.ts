@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Snapshot } from "../../types/game";
+import type { Phase, Snapshot } from "../../types/game";
 import type { RoomApi } from "../room/useRoom";
-import { act, createPractice, PracticeError, teacherSnapshot, tick, type PracticeState } from "./engine";
+import { act, createPractice, createPracticeAt, PracticeError, teacherSnapshot, tick, type PracticeState } from "./engine";
 
 const KEY = "bridge.practice";
 
@@ -74,6 +74,8 @@ export function usePractice() {
     teacherApi: { ...api, state: practice ? teacherSnapshot(practice) : null } satisfies RoomApi,
     started: Boolean(practice),
     begin: (nickname: string, topicId: string | null) => commit(createPractice(nickname, topicId)),
+    /** Start over at a given phase (teacher-screen preview). */
+    beginAt: (nickname: string, topicId: string | null, phase: Phase) => commit(createPracticeAt(nickname, topicId, phase)),
     reset: () => commit(null),
   };
 }
