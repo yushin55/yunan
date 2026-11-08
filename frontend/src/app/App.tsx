@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useParams, useSearchParams } from "react-router-dom";
 import HomePage from "../pages/HomePage";
 import PracticePage from "../pages/PracticePage";
 
@@ -8,6 +8,8 @@ import PracticePage from "../pages/PracticePage";
 const JoinPage = lazy(() => import("../pages/JoinPage"));
 const RoomPage = lazy(() => import("../pages/RoomPage"));
 const TeacherNewPage = lazy(() => import("../pages/TeacherNewPage"));
+const DebateHistoryPage = lazy(() => import("../pages/DebateHistoryPage"));
+const DebateResultPage = lazy(() => import("../pages/DebateResultPage"));
 
 export default function App() {
   return (
@@ -20,7 +22,13 @@ export default function App() {
     >
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/teacher" element={<Navigate to="/teacher/new" replace />} />
         <Route path="/teacher/new" element={<TeacherNewPage />} />
+        <Route path="/teacher/history" element={<DebateHistoryPage />} />
+        <Route path="/teacher/history/:key" element={<DebateResultPage />} />
+        {/* Straight to the teacher screen of an offline practice game (no server needed). */}
+        <Route path="/teacher/preview" element={<TeacherPreview />} />
+        <Route path="/teacher/preview/:phase" element={<TeacherPreview />} />
         <Route path="/join" element={<JoinPage />} />
         <Route path="/room/:roomId" element={<RoomPage />} />
         <Route path="/practice" element={<PracticePage />} />
@@ -35,4 +43,15 @@ export default function App() {
       </Routes>
     </Suspense>
   );
+}
+
+/** /teacher/preview[/:phase][?topic=] → the practice game's teacher screen, optionally at a given phase. */
+function TeacherPreview() {
+  const { phase } = useParams();
+  const [search] = useSearchParams();
+  const query = new URLSearchParams({ view: "teacher" });
+  if (phase) query.set("phase", phase);
+  const topic = search.get("topic");
+  if (topic) query.set("topic", topic);
+  return <Navigate to={`/practice?${query}`} replace />;
 }

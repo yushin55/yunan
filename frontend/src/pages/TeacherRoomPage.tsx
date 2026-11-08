@@ -16,6 +16,10 @@ import type { RoomApi } from "../features/room/useRoom";
 import LobbySettings from "../features/teacher/LobbySettings";
 import ModerationPanel from "../features/teacher/ModerationPanel";
 import ParticipationBoard, { GameSummary } from "../features/teacher/ParticipationBoard";
+import PastDebates from "../features/teacher/PastDebates";
+import PhaseMemo, { usePhaseNotes } from "../features/teacher/PhaseMemo";
+import TeacherReport from "../features/teacher/TeacherReport";
+import { gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
 import TopicPicker from "../features/topics/TopicPicker";
 import { useTopics } from "../features/topics/useTopics";
 import RevealView from "../features/voting/RevealView";
@@ -55,6 +59,29 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
     waiting > 0 && `${waiting}명이 아직 선호 역할을 고르는 중이에요`,
   ].filter(Boolean) as string[];
   const submittedNow = (key: string) => participants.filter((p) => p.submitted.includes(key)).length;
+  const key = gameKey(room.roomId, room.createdAt);
+  const { notes, setNote } = usePhaseNotes(key);
+  const finished = phase === "reveal" || phase === "ended";
+  // Keep the finished game (and later edits or notes) in this browser's debate history.
+  useEffect(() => {
+    if (!finished) return;
+    saveDebate({
+      key,
+      roomCode: room.code,
+      topic: room.topic,
+      createdAt: room.createdAt,
+      // Until the teacher ends the game, keep the time the result was first shown.
+      endedAt: room.endedAt ?? loadDebate(key)?.endedAt ?? Date.now(),
+      practice,
+      participants,
+      transcript: rounds.transcript,
+      moderation: host.moderation,
+      reveal: rounds.reveal,
+      summary: rounds.summary,
+      settings: room.settings,
+      notes,
+    });
+  }, [finished, key, room.code, room.topic, room.createdAt, room.endedAt, room.settings, practice, participants, rounds.transcript, rounds.reveal, rounds.summary, host.moderation, notes]);
 
   return (
     <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}${present ? " present" : ""}`}>
@@ -255,19 +282,13 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
               <RevealView reveal={rounds.reveal} participants={participants} topic={room.topic} />
             </section>
           )}
-          {(phase === "reveal" || phase === "ended") && rounds.transcript.length > 0 && (
-            <>
-              <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />
-              <details className="panel">
-                <summary>전체 발언 기록 다시 보기</summary>
-                <TranscriptFeed lines={rounds.transcript} participants={participants} topic={room.topic} />
-              </details>
-            </>
-          )}
+          {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} />}
+          {finished && rounds.transcript.length > 0 && <SummaryBoard summary={rounds.summary} topic={room.topic} status={summaryStatus} />}
           {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
         </div>
 
         <aside className="teacher-side">
+          <PhaseMemo phase={phase} notes={notes} onChange={setNote} />
           {phase === "lobby" && (
             <section className="panel">
               <h3>학생 입장</h3>
@@ -291,6 +312,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls }: 
             />
           </details>
           <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
+          <PastDebates exclude={key} newTab />
           <details className="panel guide">
             <summary>
               <BookOpen size={17} aria-hidden /> 진행 안내

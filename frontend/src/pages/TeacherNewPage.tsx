@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowRight, Shuffle } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, History, Shuffle } from "lucide-react";
 import { api } from "../lib/api";
+import PastDebates from "../features/teacher/PastDebates";
 import TopicPicker from "../features/topics/TopicPicker";
 import { useTopics } from "../features/topics/useTopics";
 
@@ -28,6 +29,9 @@ export default function TeacherNewPage() {
 
   return (
     <main className="setup">
+      <Link to="/teacher/history" className="button ghost small history-shortcut">
+        <History size={15} /> 진행된 토론
+      </Link>
       <span className="eyebrow">선생님 · 게임 방 만들기</span>
       <h1>오늘 수업의 주제를 골라 주세요</h1>
       <p className="muted">브릿지가 미리 검토한 사회 문제 6개 중에서 고르거나, 무작위로 정할 수 있어요. 방을 연 뒤 대기실에서도 바꿀 수 있어요.</p>
@@ -79,6 +83,7 @@ export default function TeacherNewPage() {
           </button>
         </>
       )}
+      <PastDebates />
     </main>
   );
 }
