@@ -6,5 +6,6 @@ if __name__ == "__main__":
     topics = load_topics()
     load_game_config()
     paths = app.openapi()["paths"]
-    assert paths["/api/rooms/{room_id}/messages"]["post"]
+    assert paths["/api/rooms/{room_id}/speech"]["post"]
+    assert paths["/api/rooms/{room_id}/line-add"]["post"]
     print(f"Build validated: {len(topics)} topic packs, {len(paths)} FastAPI API paths")
