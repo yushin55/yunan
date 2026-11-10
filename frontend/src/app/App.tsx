@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
-import { Link, Navigate, Route, Routes, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
+import PageNavigation from "../components/PageNavigation";
 import HomePage from "../pages/HomePage";
 import PracticePage from "../pages/PracticePage";
 
@@ -12,36 +13,40 @@ const DebateHistoryPage = lazy(() => import("../pages/DebateHistoryPage"));
 const DebateResultPage = lazy(() => import("../pages/DebateResultPage"));
 
 export default function App() {
+  const { pathname } = useLocation();
   return (
-    <Suspense
-      fallback={
-        <main className="page-loading">
-          <span className="spinner" /> 불러오는 중이에요.
-        </main>
-      }
-    >
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/teacher" element={<Navigate to="/teacher/new" replace />} />
-        <Route path="/teacher/new" element={<TeacherNewPage />} />
-        <Route path="/teacher/history" element={<DebateHistoryPage />} />
-        <Route path="/teacher/history/:key" element={<DebateResultPage />} />
-        {/* Straight to the teacher screen of an offline practice game (no server needed). */}
-        <Route path="/teacher/preview" element={<TeacherPreview />} />
-        <Route path="/teacher/preview/:phase" element={<TeacherPreview />} />
-        <Route path="/join" element={<JoinPage />} />
-        <Route path="/room/:roomId" element={<RoomPage />} />
-        <Route path="/practice" element={<PracticePage />} />
-        <Route
-          path="*"
-          element={
-            <main className="page-loading">
-              존재하지 않는 페이지예요. <Link to="/">처음으로</Link>
-            </main>
-          }
-        />
-      </Routes>
-    </Suspense>
+    <div className={`app-shell${pathname !== "/" ? " with-navigation" : ""}`}>
+      <PageNavigation />
+      <Suspense
+        fallback={
+          <main className="page-loading">
+            <span className="spinner" /> 불러오는 중이에요.
+          </main>
+        }
+      >
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/teacher" element={<Navigate to="/teacher/new" replace />} />
+          <Route path="/teacher/new" element={<TeacherNewPage />} />
+          <Route path="/teacher/history" element={<DebateHistoryPage />} />
+          <Route path="/teacher/history/:key" element={<DebateResultPage />} />
+          {/* Straight to the teacher screen of an offline practice game (no server needed). */}
+          <Route path="/teacher/preview" element={<TeacherPreview />} />
+          <Route path="/teacher/preview/:phase" element={<TeacherPreview />} />
+          <Route path="/join" element={<JoinPage />} />
+          <Route path="/room/:roomId" element={<RoomPage />} />
+          <Route path="/practice" element={<PracticePage />} />
+          <Route
+            path="*"
+            element={
+              <main className="page-loading">
+                존재하지 않는 페이지예요. <Link to="/">처음으로</Link>
+              </main>
+            }
+          />
+        </Routes>
+      </Suspense>
+    </div>
   );
 }
 

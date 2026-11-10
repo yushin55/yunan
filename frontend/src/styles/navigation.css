@@ -1,0 +1,26 @@
+.app-shell { --page-navigation-height: 0px; }
+.app-shell.with-navigation { --page-navigation-height: calc(52px + env(safe-area-inset-top, 0px)); }
+.page-navigation {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--page-navigation-height);
+  padding: env(safe-area-inset-top, 0px) 16px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+}
+.with-navigation .game-bar,
+.with-navigation .teacher-top { top: var(--page-navigation-height); }
+.with-navigation .flow-overlay,
+.with-navigation .class-screen { top: var(--page-navigation-height); }
+.with-navigation .student-room.full-stage { height: calc(100dvh - var(--page-navigation-height)); }
+.with-navigation .tabs { top: calc(72px + var(--page-navigation-height)); }
+@media (min-width: 1000px) {
+  .with-navigation .student-room { height: calc(100dvh - var(--page-navigation-height)); }
+}
+@media (max-width: 560px) {
+  .page-navigation { padding-inline: 12px; }
+}

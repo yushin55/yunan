@@ -20,31 +20,45 @@ function detail(data: unknown): string {
 }
 
 export async function api<T = Snapshot>(path: string, body?: unknown, timeoutMs = 20000): Promise<T> {
-  let token: string;
+  let user: import("firebase/auth").User;
   let useEmulators = false;
+  const authError = () => new ApiError(
+    useEmulators
+      ? "로그인 서버(Firebase 에뮬레이터)에 연결하지 못했어요. 저장소 루트에서 `npm run emulators`가 실행 중인지 확인해 주세요."
+      : "익명 로그인에 실패했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.",
+    0,
+  );
+  let token: string;
   try {
     // Loaded only here: the offline practice mode shares this module and must never start Firebase.
     const firebase = await import("./firebase");
     useEmulators = firebase.useEmulators;
-    token = await (await firebase.authenticate()).getIdToken();
+    user = await firebase.authenticate();
+    token = await user.getIdToken();
   } catch {
-    throw new ApiError(
-      useEmulators
-        ? "로그인 서버(Firebase 에뮬레이터)에 연결하지 못했어요. 저장소 루트에서 `npm run emulators`가 실행 중인지 확인해 주세요."
-        : "익명 로그인에 실패했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.",
-      0,
-    );
+    throw authError();
   }
-  let res: Response;
-  try {
-    res = await fetch(base + path, {
-      method: body === undefined ? "GET" : "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch {
-    throw new ApiError(`게임 서버(${base})에 연결하지 못했어요. 서버가 실행 중인지, 인터넷 연결을 확인해 주세요.`, 0);
+  const send = async (idToken: string) => {
+    try {
+      return await fetch(base + path, {
+        method: body === undefined ? "GET" : "POST",
+        headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch {
+      throw new ApiError(`게임 서버(${base})에 연결하지 못했어요. 서버가 실행 중인지, 인터넷 연결을 확인해 주세요.`, 0);
+    }
+  };
+  let res = await send(token);
+  if (res.status === 401) {
+    // Refresh once, preserving the anonymous UID that owns this game room.
+    try {
+      token = await user.getIdToken(true);
+    } catch {
+      throw authError();
+    }
+    res = await send(token);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(detail(data), res.status);
