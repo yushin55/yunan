@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from app.api.dependencies import game_service
 from app.api.rooms import RoomId
 from app.core.auth import current_uid
-from app.models.requests import Empty, Extend, Kick, LineDelete, LineAdd, LineEdit, MicOn, Preferences, Review, Settings, Speaker, Speech, Sync, Vote
+from app.models.requests import Empty, Extend, Intro, Kick, LineDelete, LineAdd, LineEdit, MicOn, Preferences, Review, Settings, Speaker, Speech, Sync, Vote
 from app.services.game import GameService
 
 router = APIRouter(prefix="/api/rooms", tags=["game"])
@@ -23,7 +23,7 @@ def action(name):
 
 
 # Teacher (room creator) controls. The service rejects everyone else with 403.
-for name, schema in [("settings", Settings), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("skip-phase", Sync), ("speaker", Speaker), ("extend", Extend), ("end", Empty), ("review", Review), ("line-edit", LineEdit), ("line-delete", LineDelete)]:
+for name, schema in [("settings", Settings), ("intro", Intro), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("skip-phase", Sync), ("speaker", Speaker), ("extend", Extend), ("end", Empty), ("review", Review), ("line-edit", LineEdit), ("line-delete", LineDelete)]:
     register(name, schema, action(name))
 
 # Student actions.

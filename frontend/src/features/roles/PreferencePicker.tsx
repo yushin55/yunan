@@ -24,7 +24,7 @@ export function place(picked: Picked, id: string, slot: number): Picked {
 
 /**
  * Role cards: the front shows the character, the back what the role wants and worries about.
- * Tap a card to turn it over; drag it into the 1st or 2nd choice slot. The keys 1 and 2 do the
+ * Tap a card to turn it over; tap "1순위로"/"2순위로" under it, or drag it into a slot. The keys 1 and 2 do the
  * same for keyboards. Students pick the roles closest to what they really think; nobody else
  * (including the teacher) can see the choice.
  */
@@ -111,7 +111,7 @@ export default function PreferencePicker({
   return (
     <div className="role-deck" data-testid="wardrobe">
       <p className="muted role-deck-hint">
-        <strong>내 생각과 가장 가까운 역할</strong> 카드를 끌어서 1순위·2순위 칸에 놓아 주세요. 카드를 누르면 뒷면의 설명을 볼 수 있어요.
+        <strong>내 생각과 가장 가까운 역할</strong>을 카드 아래 ‘1순위로’·‘2순위로’ 버튼으로 골라 주세요. 카드를 끌어서 칸에 놓아도 돼요. 카드를 누르면 뒷면의 설명을 볼 수 있어요.
       </p>
       <div className="wardrobe-slots">
         {[0, 1].map((slot) => {
@@ -128,7 +128,7 @@ export default function PreferencePicker({
                   </button>
                 </>
               ) : (
-                <span className="muted small">여기에 카드를 끌어 놓으세요</span>
+                <span className="muted small">카드 아래 ‘{slot + 1}순위로’를 누르세요</span>
               )}
             </div>
           );
@@ -140,9 +140,8 @@ export default function PreferencePicker({
           const rank = picked.indexOf(role.id) + 1;
           const back = flipped.includes(role.id);
           return (
+            <div key={role.id} className="role-pick" role="listitem">
             <button
-              key={role.id}
-              role="listitem"
               data-testid="role-card"
               className={`role-flip${back ? " flipped" : ""}${rank ? " picked" : ""}${drag?.id === role.id ? " dragging" : ""}`}
               aria-label={`${role.name}${rank ? ` (${rank}순위)` : ""}. 누르면 카드를 뒤집어요. 1 또는 2를 누르면 그 순위에 놓아요.`}
@@ -176,6 +175,26 @@ export default function PreferencePicker({
               </span>
               {rank > 0 && <em className="role-flip-rank">{rank}순위</em>}
             </button>
+            {/* Tapping works where dragging is awkward (phones, tablets, a slot scrolled out of view). */}
+            <div className="role-pick-buttons">
+              {[0, 1].map((slot) => {
+                const here = picked[slot] === role.id;
+                return (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={`button small ${here ? "primary" : "secondary"}`}
+                    data-testid={`pick-${slot + 1}`}
+                    aria-pressed={here}
+                    aria-label={`${role.name}: ${here ? `${slot + 1}순위에서 빼기` : `${slot + 1}순위로 고르기`}`}
+                    onClick={() => (here ? clear(slot) : put(role.id, slot))}
+                  >
+                    {slot + 1}순위{here ? "" : "로"}
+                  </button>
+                );
+              })}
+            </div>
+            </div>
           );
         })}
       </div>

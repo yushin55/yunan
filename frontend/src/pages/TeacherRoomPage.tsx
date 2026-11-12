@@ -13,6 +13,7 @@ import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../fea
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import IssueBriefing from "../features/briefing/IssueBriefing";
+import IntroControl from "../features/teacher/IntroControl";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
 import LobbySettings from "../features/teacher/LobbySettings";
@@ -22,6 +23,7 @@ import PhaseMemo, { usePhaseNotes } from "../features/teacher/PhaseMemo";
 import TeacherReport from "../features/teacher/TeacherReport";
 import { gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
 import TopicPicker from "../features/topics/TopicPicker";
+import PauseOverlay from "../components/PauseOverlay";
 import { useTopics } from "../features/topics/useTopics";
 import { RevealSummary } from "../features/voting/RevealView";
 
@@ -59,6 +61,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const blockers = [
     count < room.minStudents && `학생이 ${room.minStudents}명 이상 필요해요 (지금 ${count}명)`,
     count > room.maxStudents && `학생은 최대 ${room.maxStudents}명이에요`,
+    room.intro && room.intro.step !== "roles" && "영상을 마치고 ‘역할 고르기 시작’을 눌러 주세요",
     waiting > 0 && `${waiting}명이 아직 선호 역할을 고르는 중이에요`,
   ].filter(Boolean) as string[];
   const autoLeft = useAutoStart(!practice && allReady(room, participants), () => void action("start"));
@@ -224,11 +227,15 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                   </>
                 )}
               </section>
-              <section className="panel">
-                <h3>이슈 브리핑</h3>
-                <p className="muted small">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
-                <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
-              </section>
+              {room.intro ? (
+                <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} />
+              ) : (
+                <section className="panel">
+                  <h3>이슈 브리핑</h3>
+                  <p className="muted small">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
+                  <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
+                </section>
+              )}
               <section className="panel">
                 <h3>진행 설정</h3>
                 {(catalog || practice) && (
@@ -373,6 +380,7 @@ function ClassScreen({ room, participants, rounds, offset, onClose }: { room: Ro
       {SPEAKING.includes(room.phase) && <SpeakerStage room={room} participants={participants} offset={offset} />}
       <div className="class-screen-table">
         <TableView room={room} participants={participants} rounds={rounds} offset={offset} overview />
+        {room.paused && <PauseOverlay />}
         {reveal && (
           <section className="panel class-screen-result">
             <RevealSummary reveal={reveal} participants={participants} topic={room.topic} />

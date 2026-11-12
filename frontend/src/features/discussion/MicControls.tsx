@@ -210,6 +210,7 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
       {capture.failed > 0 && (
         <p className="mic-problem" data-testid="mic-failed">
           글로 바꾸지 못한 구간이 {capture.failed}건 있어요. 필요하면 선생님이 대신 적어 줄 수 있어요.
+          {capture.reason && <span className="mic-reason"> ({capture.reason})</span>}
         </p>
       )}
       {problem && (

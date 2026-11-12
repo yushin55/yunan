@@ -160,9 +160,10 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 });
 
 /** The game rules as a short narrated video around the table, like the earlier rule briefing. */
-export default function RulesVideo({ onFinish, onNext, nextLabel }: { onFinish?: () => void; onNext?: () => void; nextLabel?: string }) {
+export default function RulesVideo({ onFinish, onNext, nextLabel, startAt }: { onFinish?: () => void; onNext?: () => void; nextLabel?: string; /** Teacher-led: see IssueBriefing. */ startAt?: number }) {
   const frame = useRef<HTMLDivElement>(null);
-  const player = useScenePlayer({ audioKey: "_rules", scenes: SCENES, onFinish });
+  const led = startAt !== undefined;
+  const player = useScenePlayer({ audioKey: "_rules", scenes: SCENES, onFinish, startAt });
   const { scene, line, text, mouth, playing, sound, elapsed, totalSeconds } = player;
   const current = SCENES[scene];
 
@@ -193,7 +194,7 @@ export default function RulesVideo({ onFinish, onNext, nextLabel }: { onFinish?:
           <div className="news-voices-bg">
             <Diagram id="welcome" />
           </div>
-          <EndCard title="규칙 영상이 끝났어요" onReplay={player.restart} onNext={onNext} nextLabel={nextLabel} />
+          <EndCard title="규칙 영상이 끝났어요" note={led ? "선생님이 역할 고르기를 시작할 때까지 기다려 주세요." : undefined} onReplay={led ? undefined : player.restart} onNext={onNext} nextLabel={nextLabel} />
         </div>
       </div>
     );
@@ -218,7 +219,7 @@ export default function RulesVideo({ onFinish, onNext, nextLabel }: { onFinish?:
           </div>
         </div>
       </div>
-      <PlayerControls player={player} frame={frame} note="게임 규칙 안내" elapsed={elapsed} total={totalSeconds} playing={playing} />
+      <PlayerControls player={player} frame={frame} note="게임 규칙 안내" elapsed={elapsed} total={totalSeconds} playing={playing} locked={led} />
     </div>
   );
 }

@@ -76,18 +76,9 @@ try {
   await page.getByLabel('이름').fill('음성학생');
   await page.getByRole('button', { name: '입장하기' }).click();
   await page.waitForURL(/\/room\//);
-  // Past the briefing and the rules: seat one, so this student speaks first.
-  await page.getByTestId('briefing-play').click();
-  await expect(page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
-  for (let i = 0; i < 8 && !(await page.getByTestId('video-end').count()); i++) await page.getByTestId('briefing-next').click({ force: true });
-  await page.getByTestId('video-next').click();
-  await page.getByTestId('rules-play').click();
-  await page.getByTestId('video-skip').click({ force: true });
-  await page.getByTestId('video-next').click();
-  for (const i of [0, 1]) {
-    await page.locator('.rack-item').nth(i).click();
-    await page.getByTestId('wardrobe-add').click();
-  }
+  // The teacher skips straight to role picking; seat one, so this student speaks first.
+  await post(teacher, `/api/rooms/${roomId}/intro`, { step: 'roles' });
+  for (const i of [0, 1]) await page.getByTestId('role-card').nth(i).locator('xpath=..').getByTestId(`pick-${i + 1}`).click();
   await page.getByTestId('wardrobe-submit').click();
   const others = [];
   for (let i = 0; i < 5; i++) {

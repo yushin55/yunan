@@ -24,3 +24,6 @@
 @media (max-width: 560px) {
   .page-navigation { padding-inline: 12px; }
 }
+/* Full-stage play: the room itself is the scroll box (overflow: hidden), so a sticky offset there
+   would push the bar down over the table and the side panels. It just sits at the top. */
+.with-navigation .student-room.full-stage > .game-bar { position: relative; top: 0; }

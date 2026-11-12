@@ -38,7 +38,20 @@ function lineAt(lines: string[], seconds: number, t: number) {
  * Plays a narrated, captioned scene sequence. One pre-recorded clip per scene drives captions
  * and mouth movement; without a clip (or if playback is blocked) a timer keeps the same pacing.
  */
-export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }: { audioKey: string; scenes: PlayerScene[]; introSeconds?: number; onFinish?: () => void }) {
+export function useScenePlayer({
+  audioKey,
+  scenes,
+  introSeconds = 0,
+  onFinish,
+  startAt,
+}: {
+  audioKey: string;
+  scenes: PlayerScene[];
+  introSeconds?: number;
+  onFinish?: () => void;
+  /** Teacher-led: plays by itself from this many seconds in, so every screen in the class is at the same spot. */
+  startAt?: number;
+}) {
   const [started, setStarted] = useState(false);
   const [intro, setIntro] = useState(introSeconds > 0);
   const [scene, setScene] = useState(0);
@@ -149,6 +162,37 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
   }, [sound]);
   useEffect(() => () => audio.current?.pause(), []);
 
+  const seek = (seconds: number) => {
+    audio.current?.pause();
+    let rest = Math.max(0, seconds - introSeconds);
+    let index = 0;
+    while (index < lengths.length - 1 && rest >= lengths[index]) {
+      rest -= lengths[index];
+      index += 1;
+    }
+    rest = Math.min(rest, Math.max(0, lengths[index] - 0.2));
+    resumeAt.current = rest;
+    setIntro(false);
+    setEnded(false);
+    setScene(index);
+    setT(rest);
+    setPlaying(true);
+    setSeekCount((n) => n + 1);
+  };
+
+  // Joined by the teacher's signal (or late): start at once, from where the class is.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (startAt === undefined || autoStarted.current) return;
+    autoStarted.current = true;
+    setStarted(true);
+    if (startAt >= totalSeconds) finish();
+    else if (startAt < 1) setPlaying(true);
+    else seek(startAt);
+    // Once, on mount: a new start time from the teacher mounts a new player.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return {
     started,
     intro,
@@ -168,23 +212,7 @@ export function useScenePlayer({ audioKey, scenes, introSeconds = 0, onFinish }:
     /** Jump to the end screen; counts as watched. */
     skip: finish,
     /** Jump to a moment on the overall timeline (seconds from the very start). */
-    seek: (seconds: number) => {
-      audio.current?.pause();
-      let rest = Math.max(0, seconds - introSeconds);
-      let index = 0;
-      while (index < lengths.length - 1 && rest >= lengths[index]) {
-        rest -= lengths[index];
-        index += 1;
-      }
-      rest = Math.min(rest, Math.max(0, lengths[index] - 0.2));
-      resumeAt.current = rest;
-      setIntro(false);
-      setEnded(false);
-      setScene(index);
-      setT(rest);
-      setPlaying(true);
-      setSeekCount((n) => n + 1);
-    },
+    seek,
     start: () => {
       setStarted(true);
       setPlaying(true);

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
+import { BookOpen, X } from "lucide-react";
 import type { TablePlayer } from "../../components/scene/TableScene";
 import { SEAT_COLORS } from "../../components/scene/palette";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
@@ -8,7 +9,7 @@ import CardStrip, { type TableCard } from "./CardStrip";
 import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
-// Cards float over the table from the statements to the vote; the result stage shows the result alone.
+// During voting the cards start folded so the pointing hand stays visible.
 const CARD_PHASES = ["statement", "event", "vote"];
 
 function useNow(every: number) {
@@ -75,6 +76,8 @@ export default function TableView({
   overview?: boolean;
 }) {
   const now = useNow(1000) + offset;
+  const [voteCardsOpen, setVoteCardsOpen] = useState(false);
+  useEffect(() => setVoteCardsOpen(false), [room.phase, pointAt]);
   const floor = activeFloor(room, now);
   const narrow = typeof window !== "undefined" && window.innerWidth < 700;
   const players: TablePlayer[] = participants.map((p) => ({
@@ -106,8 +109,10 @@ export default function TableView({
       return { ...c, text: summaryOf(c.uid), record: lines, summarizing: lines.some((l) => l.kind === KIND_LABEL.statement), color: seatColor(c.uid) };
     });
   const cards = overview ? undefined : hand ?? (CARD_PHASES.includes(room.phase) ? [...eventCard, ...statements()] : undefined);
+  const voting = room.phase === "vote";
+  const showCards = Boolean(cards?.length) && (!voting || voteCardsOpen);
   return (
-    <div className={`table-view${cards?.length ? " with-cards" : ""}`} data-testid="table-view">
+    <div className={`table-view${showCards ? " with-cards" : ""}`} data-testid="table-view">
       <div className="table-view-scene">
       <Suspense
         fallback={
@@ -119,7 +124,13 @@ export default function TableView({
         <TableScene players={players} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} overview={overview} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
       </div>
-      {cards?.length ? <CardStrip cards={cards} /> : null}
+      {voting && cards?.length ? (
+        <button className="button secondary vote-cards-toggle" type="button" aria-expanded={voteCardsOpen} onClick={() => setVoteCardsOpen((open) => !open)}>
+          {voteCardsOpen ? <X size={17} aria-hidden /> : <BookOpen size={17} aria-hidden />}
+          {voteCardsOpen ? "카드 접고 투표하기" : "발언 카드 보기"}
+        </button>
+      ) : null}
+      {showCards && cards ? <CardStrip key={room.phase} cards={cards} /> : null}
     </div>
   );
 }

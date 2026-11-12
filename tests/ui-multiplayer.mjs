@@ -35,28 +35,23 @@ const shot = (who, file) => who.page.screenshot({ path: `artifacts/${file}.png`,
 // Students see the phase in the top status bar; the teacher keeps the larger phase header.
 const phaseTitle = (who) => who.page.locator('.phase-header h2, [data-testid=phase-pill]').first();
 
-// Watch the issue briefing to the end (stepping through scenes), then read the rules.
-async function brief(page) {
-  await page.getByTestId('briefing-play').click();
-  // The anchor segment starts after the opening title card.
-  await expect(page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
-  for (let i = 0; i < 8 && !(await page.getByTestId('video-end').count()); i++) await page.getByTestId('briefing-next').click({ force: true });
-  await page.getByTestId('video-next').click(); // The last frame offers replay or the next step.
-  // The rules video, stepped through scene by scene, unlocks role picking.
-  await page.getByTestId('rules-play').click();
-  for (let i = 0; i < 10 && !(await page.getByTestId('video-end').count()); i++) {
-    await page.getByTestId('briefing-next').click({ force: true }).catch(() => {});
-    await page.waitForTimeout(150);
+// The teacher runs the videos for everyone: waiting, the briefing, the rules, then role picking.
+// Students cannot move on by themselves.
+async function teacherRunsIntro(teacher, students) {
+  for (const student of students) await expect(student.page.getByTestId('intro-waiting')).toBeVisible();
+  await teacher.page.getByTestId('intro-next').click(); // Briefing: every screen starts playing.
+  for (const student of students) {
+    await expect(student.page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
+    await expect(student.page.getByTestId('video-skip')).toHaveCount(0);
   }
-  await page.getByTestId('video-next').click();
+  await teacher.page.getByTestId('intro-next').click(); // Rules.
+  for (const student of students) await expect(student.page.getByTestId('rules-video')).toBeVisible();
+  await teacher.page.getByTestId('intro-next').click(); // Role picking.
 }
 
-// Dressing-room picker: show a role from the rack, put it in the next slot, then confirm.
+// Role cards: the "1순위로" / "2순위로" buttons under each card, then confirm.
 async function pickRoles(page, indices) {
-  for (const i of indices) {
-    await page.locator('.rack-item').nth(i).click();
-    await page.getByTestId('wardrobe-add').click();
-  }
+  for (const [slot, i] of indices.entries()) await page.getByTestId('role-card').nth(i).locator('xpath=..').getByTestId(`pick-${slot + 1}`).click();
   await page.getByTestId('wardrobe-submit').click();
 }
 
@@ -92,10 +87,10 @@ try {
   await expect(teacher.page.getByTestId('participant-row')).toHaveCount(6);
   await expect(teacher.page.getByTestId('start-game')).toBeDisabled();
 
-  step('students read the rules and pick two preferred roles');
+  step('the teacher plays the videos for everyone, then students pick two preferred roles');
+  await teacherRunsIntro(teacher, students);
   const picks = [[0, 1], [0, 1], [0, 1], [1, 2], [2, 3], [3, 4]];
   for (const [i, student] of students.entries()) {
-    await brief(student.page);
     await pickRoles(student.page, picks[i]);
     await expect(student.page.getByText('선호 역할을 골랐어요')).toBeVisible();
   }
@@ -309,7 +304,7 @@ try {
   await teacher.page.getByRole('button', { name: '게임 종료' }).click();
   await expect(teacher.page.getByTestId('game-summary')).toContainText('참여 인원 6명');
   await expect(students[0].page.getByText('게임이 끝났어요. 참여해 줘서 고마워요!').first()).toBeVisible();
-  await expect(students[0].page.locator('textarea')).toHaveCount(0); // The memo was for the discussion.
+  await expect(students[0].page.locator('#memo-text')).toBeVisible(); // The memo stays to the end of the game.
   await shot(teacher, 'teacher-ended');
 
   expect(pageErrors).toEqual([]);

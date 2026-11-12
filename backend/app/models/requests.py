@@ -41,6 +41,11 @@ class CreateRoom(Settings):
         return self
 
 
+class Intro(Input):
+    """Where the whole class is before the game: waiting, a video, or picking roles."""
+    step: Literal["waiting", "briefing", "rules", "roles"]
+
+
 class JoinRoom(Input):
     nickname: str = Field(min_length=1, max_length=12)
     code: str = Field(pattern=r"^[A-Za-z0-9]{6}$")

@@ -1,4 +1,5 @@
 import copy
+import logging
 import random
 import secrets
 import uuid
@@ -13,7 +14,9 @@ from app.services.moderation import Moderator, check_rate, validate_text_fields
 from app.services.phase_engine import MAX_TURNS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
-HOST_ACTIONS = {"settings", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete"}
+logger = logging.getLogger(__name__)
+
+HOST_ACTIONS = {"settings", "intro", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete"}
 STUDENT_ACTIONS = {"preferences", "confirm-role", "end-turn", "mic-on", "mic-off", "vote"}
 MAX_LINES = 300
 MAX_LOG = 100
@@ -57,6 +60,8 @@ class GameService:
                 "topicId": topic["topicId"], "topic": public_topic(topic), "event": None, "turn": None, "floor": None,
                 "settings": self._settings(data, {"switcherCount": config["defaultSwitcherCount"], "phaseSeconds": default_phase_seconds(), "micSeconds": config["micSeconds"]}),
                 "createdAt": now, "updatedAt": now, "endedAt": None,
+                # The videos before the game: the teacher moves everyone through them together.
+                "intro": {"step": "waiting", "startedAt": None},
             },
             "participants": {}, "privatePlayers": {},
             "host": {"uid": uid, "teacherGuide": copy.deepcopy(topic["teacherGuide"]), "moderation": []},
@@ -165,6 +170,8 @@ class GameService:
         try:
             text = self.transcriber(data["audio"], data["mimeType"])
         except AIUnavailable as exc:
+            # The reason (an invalid API key, a timeout) only goes to the server log, never to the student.
+            logger.error("Transcription failed: %s", exc)
             raise HTTPException(503, "음성을 글로 바꾸지 못했어요. 잠시 후 다시 시도하거나 직접 입력해 주세요.") from exc
         if not text:
             return {**self.read(room_id, uid), "speech": "silent"}
@@ -292,9 +299,19 @@ class GameService:
                 for uid in state["participants"]:
                     state["participants"][uid]["prefsDone"] = False
                     state["privatePlayers"][uid]["preferences"] = None
+                if room.get("intro"):
+                    room["intro"] = {"step": "waiting", "startedAt": None}  # The briefing belongs to the old topic too.
         room["settings"] = self._settings(data, room["settings"])
         room["updatedAt"] = now
         self._arm_start(state, now)
+
+    def _host_intro(self, state, data, now):
+        """Briefing video, rules video, then role picking: every student's screen follows the teacher's.
+        `startedAt` lets each screen play from the same moment, including someone who joins late."""
+        room = state["room"]
+        if room["phase"] != "lobby":
+            raise HTTPException(409, "영상과 역할 고르기는 게임 시작 전에만 진행할 수 있어요.")
+        room.update(intro={"step": data["step"], "startedAt": now}, updatedAt=now)
 
     def _host_kick(self, state, data, now):
         room = state["room"]

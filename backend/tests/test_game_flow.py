@@ -262,3 +262,27 @@ def test_auto_start_is_called_off_when_the_table_changes(game):
     assert service.repository.read(rid)["room"]["phaseEndsAt"]
     service.join(STUDENTS[7], {"nickname": "새학생", "code": service.repository.read(rid)["room"]["code"]})
     assert service.repository.read(rid)["room"]["phaseEndsAt"] is None  # The newcomer has not picked.
+
+
+def test_teacher_moves_the_whole_class_through_the_videos(game, client):
+    service, clock = game
+    rid, uids = open_room(service)
+    assert service.repository.read(rid)["room"]["intro"] == {"step": "waiting", "startedAt": None}
+    room = service.action(rid, TEACHER, "intro", {"step": "briefing"})["room"]
+    assert room["intro"] == {"step": "briefing", "startedAt": clock[0]}  # Every screen plays from this moment.
+    with pytest.raises(HTTPException) as refused:
+        service.action(rid, uids[0], "intro", {"step": "roles"})
+    assert refused.value.status_code == 403  # Students cannot skip ahead.
+    http, actor = client
+    actor[0] = TEACHER
+    assert http.post(f"/api/rooms/{rid}/intro", json={"step": "skip"}).status_code == 422
+    clock[0] += 5000
+    assert service.action(rid, TEACHER, "intro", {"step": "roles"})["room"]["intro"]["step"] == "roles"
+    # A new topic means a new briefing: back to waiting.
+    other = next(t["topicId"] for t in load_topics() if t["topicId"] != service.repository.read(rid)["room"]["topicId"])
+    assert service.action(rid, TEACHER, "settings", {"topicId": other})["room"]["intro"]["step"] == "waiting"
+    choose(service, rid, {uid: (0, 1) for uid in uids})
+    service.action(rid, TEACHER, "start", {})
+    with pytest.raises(HTTPException) as late:
+        service.action(rid, TEACHER, "intro", {"step": "briefing"})
+    assert late.value.status_code == 409

@@ -28,6 +28,7 @@ export default function IssueBriefing({
   onFinish,
   onNext,
   nextLabel,
+  startAt,
 }: {
   briefing: Briefing;
   topicId?: string;
@@ -36,10 +37,13 @@ export default function IssueBriefing({
   /** Shown on the last frame next to "다시 보기" (e.g. moving on to the rules). */
   onNext?: () => void;
   nextLabel?: string;
+  /** Teacher-led: everyone watches together from this point, with no skipping or seeking. */
+  startAt?: number;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const scenes = briefing.scenes;
-  const player = useScenePlayer({ audioKey: topicId ?? "", scenes, introSeconds: INTRO_SECONDS, onFinish });
+  const led = startAt !== undefined;
+  const player = useScenePlayer({ audioKey: topicId ?? "", scenes, introSeconds: INTRO_SECONDS, onFinish, startAt });
   const { scene, line, text, mouth, intro, playing, sound, elapsed, totalSeconds } = player;
   const current = scenes[scene];
   const quoted = text.startsWith("“");
@@ -85,10 +89,15 @@ export default function IssueBriefing({
           </div>
           <EndCard
             title="브리핑이 끝났어요"
-            onReplay={() => {
-              player.restart();
-              if (sound) playSting();
-            }}
+            note={led ? "선생님이 다음으로 넘길 때까지 기다려 주세요." : undefined}
+            onReplay={
+              led
+                ? undefined
+                : () => {
+                    player.restart();
+                    if (sound) playSting();
+                  }
+            }
             onNext={onNext}
             nextLabel={nextLabel}
             sources={briefing.sources}
@@ -175,7 +184,7 @@ export default function IssueBriefing({
           </div>
         </div>
       </div>
-      <PlayerControls player={player} frame={frame} note="실제 보도 요약 · AI 합성 음성 · 출처는 끝에" elapsed={elapsed} total={totalSeconds} playing={playing} />
+      <PlayerControls player={player} frame={frame} note="실제 보도 요약 · AI 합성 음성 · 출처는 끝에" elapsed={elapsed} total={totalSeconds} playing={playing} locked={led} />
     </div>
   );
 }
@@ -187,6 +196,7 @@ export function PlayerControls({
   elapsed,
   total,
   playing,
+  locked,
 }: {
   player: ReturnType<typeof useScenePlayer>;
   frame: React.RefObject<HTMLDivElement | null>;
@@ -194,7 +204,31 @@ export function PlayerControls({
   elapsed: number;
   total: number;
   playing: boolean;
+  /** The teacher runs the video for the whole class: only sound and full screen are left. */
+  locked?: boolean;
 }) {
+  if (locked)
+    return (
+      <div className="news-controls">
+        <div className="news-scrub locked" aria-hidden>
+          <span className="scrub-track">
+            <i style={{ width: `${(elapsed / total) * 100}%` }} />
+          </span>
+        </div>
+        <div className="news-buttons">
+          <button className="icon-button" onClick={() => player.setSound((v) => !v)} aria-pressed={player.sound} aria-label={player.sound ? "소리 끄기" : "소리 켜기"} title={player.sound ? "소리 끄기" : "소리 켜기"}>
+            {player.sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
+          </button>
+          <span className="news-time">
+            {clock(elapsed)} / {clock(total)}
+          </span>
+          <span className="muted small news-note">선생님이 진행하는 영상이에요 · {note}</span>
+          <button className="icon-button" onClick={() => void frame.current?.requestFullscreen?.()} aria-label="전체 화면" title="전체 화면">
+            <Maximize2 size={17} />
+          </button>
+        </div>
+      </div>
+    );
   return (
     <div className="news-controls">
       <Scrubber elapsed={elapsed} total={total} onSeek={player.seek} />
@@ -285,13 +319,15 @@ function Scrubber({ elapsed, total, onSeek }: { elapsed: number; total: number; 
 
 export function EndCard({
   title,
+  note,
   onReplay,
   onNext,
   nextLabel = "다음으로",
   sources,
 }: {
   title: string;
-  onReplay: () => void;
+  note?: string;
+  onReplay?: () => void;
   onNext?: () => void;
   nextLabel?: string;
   sources?: Briefing["sources"];
@@ -299,10 +335,13 @@ export function EndCard({
   return (
     <div className="video-end" data-testid="video-end">
       <strong>{title}</strong>
+      {note && <p className="video-end-note">{note}</p>}
       <div className="video-end-buttons">
-        <button className="button ghost large" onClick={onReplay}>
-          <RotateCcw size={18} /> 다시 보기
-        </button>
+        {onReplay && (
+          <button className="button ghost large" onClick={onReplay}>
+            <RotateCcw size={18} /> 다시 보기
+          </button>
+        )}
         {onNext && (
           <button className="button primary large" data-testid="video-next" onClick={onNext}>
             {nextLabel} <ChevronRight size={18} />

@@ -55,6 +55,8 @@ export function useSpeechCapture({
   const [interim, setInterim] = useState("");
   const [pending, setPending] = useState(0);
   const [failed, setFailed] = useState(0);
+  // Why the last clip failed, as the server put it: a broken AI key looks very different from a slow network.
+  const [reason, setReason] = useState("");
   const stopRef = useRef<(() => void) | null>(null);
   const listeningRef = useRef(listening);
   const versionRef = useRef(version);
@@ -85,6 +87,7 @@ export function useSpeechCapture({
             const retry = e instanceof ApiError && (e.status === 0 || e.status >= 500);
             if (!retry || attempt === 1) {
               setFailed((n) => n + 1);
+              setReason((e as Error).message);
               break;
             }
             await new Promise((resolve) => setTimeout(resolve, 1500));
@@ -229,5 +232,5 @@ export function useSpeechCapture({
 
   useEffect(() => close, [close]);
 
-  return { status, level, interim, pending, failed, start, stop };
+  return { status, level, interim, pending, failed, reason, start, stop };
 }

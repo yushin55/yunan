@@ -90,6 +90,15 @@ export interface Room {
   settings: GameSettings;
   createdAt: number;
   endedAt: number | null;
+  /** Real rooms: the teacher takes the class through the videos together. Practice rooms have none and go at their own pace. */
+  intro?: Intro;
+}
+
+export type IntroStep = "waiting" | "briefing" | "rules" | "roles";
+export interface Intro {
+  step: IntroStep;
+  /** Server time the teacher started this step; every screen plays the video from it. */
+  startedAt: number | null;
 }
 
 export interface Participant {

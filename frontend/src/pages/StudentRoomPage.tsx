@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import RoleAvatar from "../features/roles/RoleAvatar";
-import { ArrowRight, BookOpen, Check, EyeOff, Maximize2, Minimize2, Pause, Search, VenetianMask, X } from "lucide-react";
+import { ArrowRight, BookOpen, Check, EyeOff, Maximize2, Minimize2, Search, VenetianMask, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
+import PauseOverlay from "../components/PauseOverlay";
 import RoleCard from "../components/RoleCard";
 import Sheet from "../components/Sheet";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RulesVideo from "../features/briefing/RulesVideo";
+import { introElapsed } from "../features/briefing/intro";
 import { MemoPad, QuestionList, StatementList } from "../features/discussion/DiscussionNotes";
 import { useFloor } from "../features/discussion/floor";
 import MicControls from "../features/discussion/MicControls";
@@ -59,12 +61,12 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const [focus, setFocus] = useState("");
   const [votePicked, setVotePicked] = useState<string[]>([]);
   const [show3d, setShow3d] = useState(() => stored("bridge.table3d", true));
+  const [memoOpen, setMemoOpen] = useState(true);
   const self = participants.find((p) => p.uid === me.uid);
   const myRole = room.topic.roles.find((r) => r.id === me.roleId);
   const others = participants.filter((p) => p.uid !== me.uid);
   const phase = room.phase;
   const secretStillHidden = phase !== "reveal" && phase !== "ended";
-  const discussing = SPEAKING.includes(phase) || phase === "vote";
   // At the 3D table the table fills the screen and everything else floats over it.
   const fullStage = show3d;
   // In a real room the server starts the game; this only shows the same countdown.
@@ -105,17 +107,12 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
     <>
       {phase === "role" && myRole && <RoleZoom me={me} role={myRole} roles={room.topic.roles} confirmed={Boolean(self?.submitted.includes("role"))} disabled={busy || room.paused} onConfirm={() => void action("confirm-role")} />}
       {(phase === "reveal" || phase === "ended") && rounds.reveal && <ResultPopup key={phase} reveal={rounds.reveal} participants={participants} room={room} me={me} />}
-      {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} bare onPrefs={(first, second) => void action("preferences", { first, second })} />}
+      {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} offset={offset} bare onPrefs={(first, second) => void action("preferences", { first, second })} />}
     </>
   );
   // Small things at the side: the microphone, the questions, my memo, the vote.
   const side = (
     <>
-      {room.paused && (
-        <p className="todo-callout paused">
-          <Pause size={18} aria-hidden /> 선생님이 진행을 잠시 멈췄어요.
-        </p>
-      )}
       {fullStage && error && (
         <p className="error-box" role="alert">
           {error}
@@ -135,8 +132,9 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
           <VotePanel atTable={show3d} candidates={others} count={count} myVote={me.vote} picked={picked} onPick={pick} disabled={room.paused} />
         </section>
       )}
-      {discussing && (
-        <details className="panel float-pop memo-pop">
+      {/* From the role card to the result: the same memo the whole game, open unless closed. */}
+      {phase !== "lobby" && (
+        <details className="panel float-pop memo-pop" open={memoOpen} onToggle={(e) => setMemoOpen(e.currentTarget.open)}>
           <summary>내 메모</summary>
           <MemoPad key={room.roomId} room={room} />
         </details>
@@ -198,7 +196,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
                 {error}
               </p>
             )}
-            {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} onPrefs={(first, second) => void action("preferences", { first, second })} />}
+            {phase === "lobby" && <LobbyFlow key={`${room.topicId}.${room.createdAt}`} room={room} me={me} participants={participants} busy={busy} offset={offset} onPrefs={(first, second) => void action("preferences", { first, second })} />}
             {phase !== "lobby" && (
               <>
                 {center}
@@ -208,6 +206,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
             )}
           </div>
         )}
+        {room.paused && <PauseOverlay />}
       </div>
 
       {phase === "event" && room.event && <EventPopup room={room} />}
@@ -227,7 +226,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
  * the whole screen; once roles are chosen the student is back in the lobby around the table.
  */
 /** `bare`: at the 3D table the lobby shows nothing but the characters, so the summaries step aside. */
-function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room; me: Me; participants: Participant[]; busy: boolean; onPrefs: (first: string, second: string) => void; bare?: boolean }) {
+function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { room: Room; me: Me; participants: Participant[]; busy: boolean; offset: number; onPrefs: (first: string, second: string) => void; bare?: boolean }) {
   const key = `bridge.briefed.${room.roomId}.${room.createdAt}.${room.topicId}`;
   const [briefed, setBriefed] = useState(() => {
     try {
@@ -242,7 +241,14 @@ function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room
   const [rechoosing, setRechoosing] = useState(false);
   // "나가기" closes the full-screen steps; the lobby then offers to continue where they stopped.
   const [away, setAway] = useState(false);
-  const step = !briefed ? 0 : !rulesRead ? 1 : 2;
+  // A real room: the teacher decides when the class watches each video, and everyone watches together.
+  // Practice rooms have no `intro` and go at the student's own pace.
+  const led = room.intro;
+  const step = led ? { waiting: 0, briefing: 0, rules: 1, roles: 2 }[led.step] : !briefed ? 0 : !rulesRead ? 1 : 2;
+  // The teacher moving on pulls everyone back in, even someone who stepped out.
+  useEffect(() => {
+    if (led) setAway(false);
+  }, [led?.step, led?.startedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const finishBriefing = () => {
     setBriefed(true);
     try {
@@ -285,8 +291,7 @@ function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room
       </>
     );
 
-  const action =
-    step === 0 && !videoDone ? (
+  const action = led ? null : step === 0 && !videoDone ? (
       <button className="button primary large" data-testid="briefing-done" disabled>
         브리핑을 끝까지 보면 다음으로 넘어갈 수 있어요
       </button>
@@ -304,14 +309,23 @@ function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room
             <span className="eyebrow">오늘의 주제</span>
             <h2>{room.topic.title}</h2>
           </div>
-          <IssueBriefing
-            briefing={room.topic.briefing}
-            topicId={room.topicId}
-            headline={room.topic.shortTitle}
-            onFinish={() => setVideoDone(true)}
-            onNext={finishBriefing}
-            nextLabel="다음: 게임 규칙"
-          />
+          {led?.step === "waiting" ? (
+            <div className="intro-waiting" data-testid="intro-waiting">
+              <strong>선생님이 영상을 시작하면 다 함께 봐요</strong>
+              <p className="muted">이슈 브리핑과 게임 규칙 영상을 본 뒤에 역할을 골라요. 소리가 나오니 볼륨을 확인해 주세요.</p>
+            </div>
+          ) : led ? (
+            <IssueBriefing key={led.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} />
+          ) : (
+            <IssueBriefing
+              briefing={room.topic.briefing}
+              topicId={room.topicId}
+              headline={room.topic.shortTitle}
+              onFinish={() => setVideoDone(true)}
+              onNext={finishBriefing}
+              nextLabel="다음: 게임 규칙"
+            />
+          )}
         </>
       )}
       {step === 1 && (
@@ -322,7 +336,11 @@ function LobbyFlow({ room, me, participants, busy, onPrefs, bare }: { room: Room
             </span>
             <h2>테이블에서는 이렇게 진행돼요</h2>
           </div>
-          <RulesVideo onFinish={() => setRulesWatched(true)} onNext={() => setRulesRead(true)} nextLabel="역할 고르러 가기" />
+          {led ? (
+            <RulesVideo key={led.startedAt} startAt={introElapsed(led, offset)} />
+          ) : (
+            <RulesVideo onFinish={() => setRulesWatched(true)} onNext={() => setRulesRead(true)} nextLabel="역할 고르러 가기" />
+          )}
           <details className="rules-text">
             <summary>규칙을 글로 보기</summary>
             <ol className="rules-list">

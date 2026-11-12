@@ -72,29 +72,90 @@ export function QuestionList({ room, participants, rounds, floor, myUid }: { roo
 }
 
 /** A small private note. It never leaves this device: not to the server, the teacher or anyone else. */
+function readNotes(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    try {
+      const value = JSON.parse(raw);
+      if (Array.isArray(value)) return value.filter((n): n is string => typeof n === "string" && n.trim() !== "");
+    } catch {
+      /* An older memo: one plain block of text. */
+    }
+    return raw.trim() ? [raw.trim()] : [];
+  } catch {
+    return [];
+  }
+}
+
+function store(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* The memo still works until the page closes. */
+  }
+}
+
+/**
+ * My own notes for the whole game. Enter writes the line down, Shift+Enter starts a new line.
+ * Kept in this browser per game, so moving to the next phase (or reloading) never loses them.
+ */
 export function MemoPad({ room }: { room: Room }) {
   const key = `bridge.memo.${room.roomId}.${room.createdAt}`;
-  const [text, setText] = useState(() => {
+  const [notes, setNotes] = useState(() => readNotes(key));
+  const [draft, setDraft] = useState(() => {
     try {
-      return localStorage.getItem(key) ?? "";
+      return localStorage.getItem(`${key}.draft`) ?? "";
     } catch {
       return "";
     }
   });
-  const change = (value: string) => {
-    setText(value);
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      /* The note still works until the page closes. */
-    }
+  const save = (next: string[]) => {
+    setNotes(next);
+    store(key, JSON.stringify(next));
+  };
+  const type = (value: string) => {
+    setDraft(value);
+    store(`${key}.draft`, value);
+  };
+  const add = () => {
+    const text = draft.trim();
+    if (!text) return;
+    save([...notes, text]);
+    type("");
   };
   return (
     <section className="memo-pad" data-testid="memo-pad">
       <label htmlFor="memo-text">
         내 메모 <span className="muted small">나만 보여요</span>
       </label>
-      <textarea id="memo-text" rows={2} maxLength={MEMO_LIMIT} value={text} placeholder="누가 수상한지, 묻고 싶은 것을 적어 두세요" onChange={(e) => change(e.target.value)} />
+      {notes.length > 0 && (
+        <ul className="memo-notes" data-testid="memo-notes">
+          {notes.map((note, i) => (
+            <li key={`${i}-${note}`}>
+              <p>{note}</p>
+              <button type="button" className="memo-note-remove" aria-label="이 메모 지우기" onClick={() => save(notes.filter((_, j) => j !== i))}>
+                지우기
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <textarea
+        id="memo-text"
+        rows={2}
+        maxLength={MEMO_LIMIT}
+        value={draft}
+        placeholder="누가 수상한지, 묻고 싶은 것을 적고 Enter"
+        onChange={(e) => type(e.target.value)}
+        onKeyDown={(e) => {
+          // While Korean is still being composed, Enter only finishes the syllable.
+          if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return;
+          e.preventDefault();
+          add();
+        }}
+      />
+      <p className="memo-hint muted small">Enter로 적어 두기 · Shift+Enter로 줄 바꾸기</p>
     </section>
   );
 }

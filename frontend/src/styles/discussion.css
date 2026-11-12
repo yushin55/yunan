@@ -238,9 +238,15 @@ details.float-pop[open] > summary { margin-bottom: 8px; }
 .mic-popup .mic-buttons .button { margin: 0; padding: 8px 10px; min-height: 0; font-size: 0.92rem; }
 .mic-popup .mic-state:empty { display: none; }
 .mic-popup .mic-state, .mic-popup .mic-interim, .mic-popup .mic-problem { margin: 6px 0 0; font-size: 0.85rem; }
-.stage-panels .question-list { max-height: 38vh; }
+.stage-panels .question-list { max-height: 26vh; }
 .stage-panels .memo-pad { position: static; padding: 0; background: none; }
 .stage-panels .memo-pad label { display: none; }
+.memo-notes { display: grid; gap: 4px; max-height: 22vh; margin: 0 0 6px; padding: 0; overflow-y: auto; list-style: none; scrollbar-width: thin; }
+.memo-notes li { display: flex; align-items: flex-start; gap: 6px; padding: 6px 8px; border-radius: 8px; background: var(--bg-2); }
+.memo-notes p { flex: 1; margin: 0; font-size: 0.9rem; line-height: 1.45; white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; }
+.memo-note-remove { flex: none; padding: 0 2px; border: 0; background: none; color: var(--muted); font-size: 0.75rem; cursor: pointer; }
+.memo-note-remove:hover { color: var(--red); }
+.memo-hint { margin: 2px 0 0; }
 .vote-pop .vote-pointed { margin: 0; }
 
 /* My role and identity, held up close: two game cards. */
