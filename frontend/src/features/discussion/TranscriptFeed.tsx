@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
-import type { Participant, Topic, TranscriptLine } from "../../types/game";
+import type { Floor, Participant, Room, SpeechKind, Topic, TranscriptLine } from "../../types/game";
 import { KIND_LABEL, PHASE_SHORT, SPEAKING } from "../game/phases";
 import { roleName } from "../roles/roleName";
 
@@ -95,7 +95,22 @@ function Line({ line, disabled, onEdit, onDelete }: { line: TranscriptLine; disa
           setDraft(null);
         }}
       >
-        <textarea value={draft} autoFocus maxLength={LIMIT} rows={2} aria-label="발언 고치기" onChange={(e) => setDraft(e.target.value)} />
+        <textarea
+          value={draft}
+          autoFocus
+          maxLength={LIMIT}
+          rows={2}
+          aria-label="발언 고치기"
+          data-testid="line-edit-text"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter saves, Shift+Enter starts a new line, Esc cancels. Enter that finishes a Korean syllable is left alone.
+            if (e.key === "Escape") setDraft(null);
+            if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return;
+            e.preventDefault();
+            e.currentTarget.form?.requestSubmit();
+          }}
+        />
         <button className="icon-button" type="submit" aria-label="고친 내용 저장" title="저장" disabled={!draft.trim()}>
           <Check size={16} />
         </button>
@@ -110,7 +125,7 @@ function Line({ line, disabled, onEdit, onDelete }: { line: TranscriptLine; disa
         {line.text}
         {onEdit && onDelete && (
           <span className="line-tools">
-            <button className="icon-button" aria-label="이 발언 고치기" title="고치기" disabled={disabled} onClick={() => setDraft(line.text)}>
+            <button className="icon-button" aria-label="이 발언 고치기" title="고치기" data-testid="line-edit" disabled={disabled} onClick={() => setDraft(line.text)}>
               <Pencil size={14} />
             </button>
             <button className="icon-button" aria-label="이 발언 지우기" title="지우기" disabled={disabled} onClick={() => onDelete(line.id)}>
@@ -140,6 +155,80 @@ export function LineInput({ speaker, disabled, onAdd }: { speaker: string; disab
       <button className="button secondary small" type="submit" data-testid="line-add" disabled={disabled || !text.trim()}>
         기록
       </button>
+    </form>
+  );
+}
+
+/**
+ * The teacher writes down what a student said when the microphone missed it (or could not turn it
+ * into text): pick the student and what kind of words they were. Starts on whoever is speaking now.
+ */
+export function TeacherLineInput({
+  room,
+  participants,
+  floor,
+  speakingUid,
+  disabled,
+  onAdd,
+}: {
+  room: Room;
+  participants: Participant[];
+  /** Whoever holds the microphone now: until the teacher picks someone else, the words join their turn. */
+  floor?: Floor | null;
+  speakingUid?: string;
+  disabled?: boolean;
+  onAdd: (body: { text: string; targetUid?: string; kind?: SpeechKind; phaseVersion?: number }) => Promise<unknown>;
+}) {
+  const turn = room.phase === "statement" ? room.turn : null;
+  const qa = turn?.stage === "qa";
+  const kinds: SpeechKind[] = room.phase === "event" ? ["question", "answer"] : qa ? ["question", "answer", "statement"] : ["statement"];
+  // Statements only for someone whose turn has come.
+  const spoke = turn ? turn.order.slice(0, qa ? turn.order.length : turn.index + 1) : [];
+  const [kind, setKind] = useState<SpeechKind | null>(null);
+  const current = kind && kinds.includes(kind) ? kind : floor && kinds.includes(floor.kind) ? floor.kind : kinds[0];
+  const people = current === "statement" ? participants.filter((p) => spoke.includes(p.uid)) : participants;
+  const [chosen, setChosen] = useState("");
+  const target = people.some((p) => p.uid === chosen) ? chosen : people.some((p) => p.uid === speakingUid) ? speakingUid! : (people.at(-1)?.uid ?? "");
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  return (
+    <form
+      className="teacher-line-input"
+      data-testid="teacher-line-input"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!text.trim() || !target || sending) return;
+        setSending(true);
+        const live = floor && floor.uid === target && floor.kind === current;
+        const done = await onAdd(live ? { text: text.trim(), phaseVersion: floor.version } : { text: text.trim(), targetUid: target, kind: current });
+        setSending(false);
+        if (done) setText(""); // On an error the words stay, to try again.
+      }}
+    >
+      <div className="teacher-line-pick">
+        <select value={target} aria-label="누구의 발언인지" data-testid="line-target" onChange={(e) => setChosen(e.target.value)}>
+          {people.map((p) => (
+            <option key={p.uid} value={p.uid}>
+              {p.seat + 1}. {p.nickname}
+            </option>
+          ))}
+        </select>
+        {kinds.length > 1 && (
+          <select value={current} aria-label="발언 종류" data-testid="line-kind" onChange={(e) => setKind(e.target.value as SpeechKind)}>
+            {kinds.map((k) => (
+              <option key={k} value={k}>
+                {KIND_LABEL[k]}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className="teacher-line-row">
+        <input value={text} maxLength={LIMIT} disabled={disabled || sending} data-testid="line-input" aria-label="발언 직접 입력" placeholder="학생이 한 말을 적고 Enter" onChange={(e) => setText(e.target.value)} />
+        <button className="button secondary small" type="submit" data-testid="line-add" disabled={disabled || sending || !text.trim() || !target}>
+          기록
+        </button>
+      </div>
     </form>
   );
 }

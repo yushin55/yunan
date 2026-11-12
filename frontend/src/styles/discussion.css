@@ -405,3 +405,10 @@ details.float-pop[open] > summary { margin-bottom: 8px; }
 .card-detail-record li { padding: 12px 16px; border-radius: 10px; background: #fff; border: 1px solid #e6dbc4; }
 .card-detail-kind { display: inline-block; margin-bottom: 6px; padding: 2px 10px; border-radius: 99px; background: #f3e3bd; color: #7a5518; font-size: 0.8rem; font-weight: 800; }
 .card-detail-empty { color: #9a8b70; }
+
+/* The teacher writing down a student's words: who, what kind, then the words. */
+.teacher-line-input { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.teacher-line-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.teacher-line-pick select { flex: 1 1 160px; width: auto; min-width: 0; padding: 6px 10px; font-size: 0.9rem; }
+.teacher-line-row { display: flex; gap: 6px; }
+.teacher-line-row input { flex: 1; min-width: 0; }

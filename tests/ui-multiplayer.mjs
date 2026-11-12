@@ -182,7 +182,7 @@ try {
   for (const who of [teacher, ...students]) await expect(who.page.locator('.event-card')).toBeVisible();
   await micFree();
   await expect(teacher.page.getByTestId('call-speaker')).toHaveCount(0);
-  await expect(teacher.page.getByTestId('line-input')).toHaveCount(0); // Nobody is talking, so there is nobody to write for.
+  await expect(teacher.page.getByTestId('teacher-line-input')).toBeVisible(); // The teacher can still write down anyone's question or answer.
   // Two phones press at the same moment: one gets it and the other is told who did.
   const [a, b, c] = [students[1], students[3], students[5]];
   await Promise.all([a, b].map((s) => s.page.getByTestId('mic-question').click()));

@@ -7,7 +7,7 @@ import PhaseHeader from "../components/PhaseHeader";
 import { QuestionList, StatementList } from "../features/discussion/DiscussionNotes";
 import { useFloor } from "../features/discussion/floor";
 import SpeakerStage from "../features/discussion/SpeakerStage";
-import TranscriptFeed, { LineInput } from "../features/discussion/TranscriptFeed";
+import TranscriptFeed, { TeacherLineInput } from "../features/discussion/TranscriptFeed";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
@@ -281,7 +281,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
           )}
 
           {(speaking || rounds.transcript.length > 0) && phase !== "lobby" && (
-            <details className="panel" data-testid="transcript-panel">
+            <details className="panel" data-testid="transcript-panel" open={speaking}>
               <summary>발언 기록 고치기 · 대신 적기</summary>
               <TranscriptFeed
                 lines={rounds.transcript}
@@ -293,7 +293,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                 onEdit={(lineId, text) => void action("line-edit", { lineId, text })}
                 onDelete={(lineId) => void action("line-delete", { lineId })}
               />
-              {speaking && speaker && <LineInput speaker={speaker.nickname} disabled={busy} onAdd={(text) => void action("line-add", { text, phaseVersion: room.phaseVersion })} />}
+              {speaking && <TeacherLineInput key={phase} room={room} participants={participants} floor={floor} speakingUid={speaker?.uid} disabled={busy} onAdd={(body) => action("line-add", body)} />}
             </details>
           )}
           {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />}

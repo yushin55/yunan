@@ -312,7 +312,6 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
           {led?.step === "waiting" ? (
             <div className="intro-waiting" data-testid="intro-waiting">
               <strong>선생님이 영상을 시작하면 다 함께 봐요</strong>
-              <p className="muted">이슈 브리핑과 게임 규칙 영상을 본 뒤에 역할을 골라요. 소리가 나오니 볼륨을 확인해 주세요.</p>
             </div>
           ) : led ? (
             <IssueBriefing key={led.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} />

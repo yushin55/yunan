@@ -10,8 +10,8 @@ from app.repositories.topics import find_topic, load_game_config, load_topics, p
 from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
 from app.services.student_report import build_student_reports
-from app.services.moderation import Moderator, check_rate, validate_text_fields
-from app.services.phase_engine import MAX_TURNS, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.moderation import Moderator, Verdict, check_rate, rule_check, validate_text_fields
+from app.services.phase_engine import MAX_TURNS, OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
 logger = logging.getLogger(__name__)
@@ -172,39 +172,81 @@ class GameService:
         except AIUnavailable as exc:
             # The reason (an invalid API key, a timeout) only goes to the server log, never to the student.
             logger.error("Transcription failed: %s", exc)
-            raise HTTPException(503, "음성을 글로 바꾸지 못했어요. 잠시 후 다시 시도하거나 직접 입력해 주세요.") from exc
+            message = {
+                "ai_auth": "음성 인식 서버의 AI 인증에 실패했어요. 관리자에게 API 키 확인을 요청해 주세요.",
+                "ai_service_blocked": "음성 인식용 API 키의 서비스 접근이 차단됐어요. 관리자에게 API 제한 설정 확인을 요청해 주세요.",
+                "ai_billing": "음성 인식 서비스의 사용 잔액이 부족해요. 관리자에게 결제 설정 확인을 요청해 주세요.",
+                "ai_configuration": "음성 인식 서버의 AI 설정을 확인해야 해요. 관리자에게 알려 주세요.",
+            }.get(exc.code, "음성을 글로 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.")
+            raise HTTPException(503, {"message": message, "code": exc.code, "retryable": exc.retryable}) from exc
         if not text:
             return {**self.read(room_id, uid), "speech": "silent"}
         return self._post_line(room_id, uid, text[:LINE_LIMIT], version, "voice", data.get("clip"))
 
     def add_line(self, room_id, uid, data):
-        """Typed by the teacher when a microphone missed something. Goes to the current speaker."""
+        """Typed by the teacher when a microphone missed something. Goes to the current speaker, or to
+        `targetUid`: a statement joins that student's statement turn, a question or answer becomes a new
+        turn of its own, as if they had taken the microphone."""
         validate_text_fields(data)
         state = self.repository.read(room_id)
         if viewer(state, uid) != "host":
             raise HTTPException(403, "선생님만 발언 기록을 넣을 수 있어요.")
+        text = data["text"].strip()
+        target = data.get("targetUid")
+        if target:
+            if target not in state["participants"]:
+                raise HTTPException(404, "이 방의 참가자가 아니에요.")
+            if state["room"]["phase"] not in SPEAKING_PHASES:
+                raise HTTPException(409, "발언 단계에서만 기록을 넣을 수 있어요.")
+            kind = data.get("kind") or "statement"
+            if kind == "statement":
+                return self._post_line(room_id, uid, text, self._statement_turn(state, target), "typed")
+            return self._post_line(room_id, uid, text, None, "typed", new_turn=(target, kind))
         version = data.get("phaseVersion")
         if version is None:
             if not (state["room"].get("turn") or state["room"].get("floor")):
                 raise HTTPException(409, "지금 말하는 사람이 없어요.")
             version = state["room"]["phaseVersion"]
-        return self._post_line(room_id, uid, data["text"].strip(), version, "typed")
+        return self._post_line(room_id, uid, text, version, "typed")
 
-    def _post_line(self, room_id, uid, text, version, source, clip=None):
-        verdict = self.moderator.review(text)
+    @staticmethod
+    def _statement_turn(state, target):
+        turns = [int(v) for v, t in state.get("turnLog", {}).items() if t["uid"] == target and t["kind"] == "statement"]
+        if not turns:
+            raise HTTPException(409, "이 학생은 아직 입장 발표 차례가 없었어요.")
+        return max(turns)
+
+    def _typed_turn(self, state, target, kind, now):
+        """A question or answer the teacher writes down for a student: its own turn, like a microphone
+        press. Whoever holds the microphone keeps it; their audio still finds its turn by its version."""
+        room = state["room"]
+        if kind not in OPEN_KINDS or not (in_qa(room) or room["phase"] == "event"):
+            raise HTTPException(409, "질문과 답변은 질의응답이나 사건 단계에서만 넣을 수 있어요.")
+        if len(state["turnLog"]) >= MAX_FLOORS:
+            raise HTTPException(409, "이 게임에서 기록할 수 있는 발언 수를 넘었어요.")
+        room["phaseVersion"] += 1
+        state["turnLog"][str(room["phaseVersion"])] = {"uid": target, "phase": room["phase"], "kind": kind, "until": now}
+        room["updatedAt"] = now
+        return room["phaseVersion"]
+
+    def _post_line(self, room_id, uid, text, version, source, clip=None, new_turn=None):
+        # The teacher is the one who reviews: their own typing gets only the quick local word check,
+        # so it is never stuck waiting on (or held back by) the AI.
+        verdict = (rule_check(text) or Verdict("ok", "teacher")) if source == "typed" else self.moderator.review(text)
         outcome = {}
 
         def update(state):
             outcome.clear()
             now = self.clock()
-            turn = self._turn_of(state, version)
+            at = self._typed_turn(state, *new_turn, now) if new_turn else version
+            turn = self._turn_of(state, at)
             self._check_room_for_line(state)
             state["seq"] += 1
-            entry = {"id": f"m{state['seq']}", "uid": turn["uid"], "phase": turn["phase"], "kind": turn["kind"], "turn": version, "clip": clip, "text": text, "source": source, "at": now}
+            entry = {"id": f"m{state['seq']}", "uid": turn["uid"], "phase": turn["phase"], "kind": turn["kind"], "turn": at, "clip": clip, "text": text, "source": source, "at": now}
             if verdict.status == "ok":
                 self._publish(state, entry)
                 outcome["speech"] = "published"
-                outcome["late_statement"] = turn["kind"] == "statement" and version != state["room"]["phaseVersion"]
+                outcome["late_statement"] = turn["kind"] == "statement" and at != state["room"]["phaseVersion"]
             else:
                 self._log(state, entry, "flagged" if verdict.status == "flag" else "pending_review", verdict)
                 outcome["speech"] = "held"

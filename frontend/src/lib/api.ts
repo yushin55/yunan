@@ -6,6 +6,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public status: number,
+    public retryable?: boolean,
+    public code?: string,
   ) {
     super(message);
   }
@@ -14,6 +16,7 @@ export class ApiError extends Error {
 function detail(data: unknown): string {
   const value = (data as { detail?: unknown })?.detail;
   if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "message" in value && typeof value.message === "string") return value.message;
   if (Array.isArray(value) && typeof value[0]?.msg === "string")
     return value[0].msg.replace(/^Value error, /, "");
   return "요청을 처리하지 못했어요. 입력과 현재 단계를 확인해 주세요.";
@@ -61,7 +64,12 @@ export async function api<T = Snapshot>(path: string, body?: unknown, timeoutMs 
     res = await send(token);
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(detail(data), res.status);
+  if (!res.ok) throw new ApiError(
+    detail(data),
+    res.status,
+    typeof data.detail?.retryable === "boolean" ? data.detail.retryable : undefined,
+    typeof data.detail?.code === "string" ? data.detail.code : undefined,
+  );
   return data as T;
 }
 

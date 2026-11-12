@@ -79,6 +79,9 @@ class Speech(Input):
 class LineAdd(Input):
     text: str = Field(min_length=1, max_length=400)
     phaseVersion: int | None = Field(default=None, ge=0)
+    # Written down for this student instead of the current speaker; a statement joins their statement turn.
+    targetUid: ShortId | None = None
+    kind: Literal["statement", "question", "answer"] | None = None
 
 
 class LineEdit(Input):

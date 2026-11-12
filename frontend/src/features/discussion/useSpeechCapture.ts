@@ -84,7 +84,7 @@ export function useSpeechCapture({
             await uploadRef.current(clip.audio, clip.version, clip.clip);
             break;
           } catch (e) {
-            const retry = e instanceof ApiError && (e.status === 0 || e.status >= 500);
+            const retry = e instanceof ApiError && (e.retryable ?? (e.status === 0 || e.status >= 500));
             if (!retry || attempt === 1) {
               setFailed((n) => n + 1);
               setReason((e as Error).message);

@@ -345,6 +345,25 @@ def test_transcription_outage_is_reported_and_stores_nothing(game):
     with pytest.raises(HTTPException) as error:
         service.speech(rid, uids[0], {"audio": AUDIO, "mimeType": "audio/wav", "phaseVersion": version})
     assert error.value.status_code == 503
+    assert error.value.detail["retryable"] is True
+    assert service.repository.read(rid)["rounds"]["transcript"] == []
+
+
+@pytest.mark.parametrize("code", ["ai_auth", "ai_configuration", "ai_billing", "ai_service_blocked"])
+def test_transcription_setup_failures_are_actionable_without_exposing_credentials(game, client, code):
+    service, _ = game
+    rid, uids = in_statement(service)
+    version = service.action(rid, uids[0], "mic-on", {"kind": "statement"})["room"]["phaseVersion"]
+    service.transcriber = lambda audio, mime: (_ for _ in ()).throw(AIUnavailable("private-provider-error", code=code, retryable=False))
+    api, actor = client
+    actor[0] = uids[0]
+    response = api.post(f"/api/rooms/{rid}/speech", json={"audio": AUDIO, "mimeType": "audio/wav", "phaseVersion": version})
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["code"] == code
+    assert detail["retryable"] is False
+    assert "private-provider-error" not in response.text
+    assert "관리자" in detail["message"]
     assert service.repository.read(rid)["rounds"]["transcript"] == []
 
 
@@ -585,3 +604,34 @@ def test_the_game_goes_on_when_the_ai_is_down(game):
     assert room["turn"]["uid"] == uids[1]
     assert "summary" not in service.repository.read(rid)["rounds"]
 
+
+
+def test_teacher_writes_down_any_students_words_without_waiting_for_the_ai(game):
+    service, clock = game
+    rid, uids = in_statement(service)
+    service.moderator.review = lambda text: (_ for _ in ()).throw(AssertionError("the AI check is for students"))
+    # A statement for the student speaking now, and later for an earlier speaker: it joins their own turn.
+    first_turn = service.repository.read(rid)["room"]["phaseVersion"]
+    assert service.add_line(rid, TEACHER, {"text": "첫 번째 발표", "targetUid": uids[0], "kind": "statement"})["speech"] == "published"
+    service.action(rid, TEACHER, "next", {})
+    service.add_line(rid, TEACHER, {"text": "늦게 적은 첫 발표", "targetUid": uids[0], "kind": "statement"})
+    lines = service.repository.read(rid)["rounds"]["transcript"]
+    assert [(l["uid"], l["turn"], l["kind"]) for l in lines] == [(uids[0], first_turn, "statement")] * 2
+    with pytest.raises(HTTPException) as early:
+        service.add_line(rid, TEACHER, {"text": "아직 차례 전", "targetUid": uids[3], "kind": "statement"})
+    assert early.value.status_code == 409
+    with pytest.raises(HTTPException) as no_qa:
+        service.add_line(rid, TEACHER, {"text": "질문", "targetUid": uids[2], "kind": "question"})
+    assert no_qa.value.status_code == 409  # Questions come after the statements.
+    to_phase(service, rid, "event")
+    # In the open floor a question and its answer each get their own turn, in order, while a student holds the microphone.
+    held = service.action(rid, uids[4], "mic-on", {"kind": "question"})["room"]["floor"]
+    service.add_line(rid, TEACHER, {"text": "누가 관리하나요?", "targetUid": uids[2], "kind": "question"})
+    service.add_line(rid, TEACHER, {"text": "행정실이 관리해요.", "targetUid": uids[1], "kind": "answer"})
+    room = service.repository.read(rid)["room"]
+    assert room["floor"] == held
+    asked, answered = service.repository.read(rid)["rounds"]["transcript"][-2:]
+    assert (asked["uid"], asked["kind"], answered["uid"], answered["kind"]) == (uids[2], "question", uids[1], "answer")
+    assert asked["turn"] < answered["turn"]
+    # Rude words still go to the review list, even typed by the teacher.
+    assert service.add_line(rid, TEACHER, {"text": "닥쳐", "targetUid": uids[2], "kind": "question"})["speech"] == "held"

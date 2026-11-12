@@ -376,6 +376,26 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     return { state: s };
   }
   if (name === "line-add") {
+    // As on the server: written down for a chosen student, a statement joins their statement turn and
+    // a question or answer becomes a turn of its own.
+    if (body.targetUid) {
+      const target = String(body.targetUid);
+      const kind = (body.kind as SpeechKind | undefined) ?? "statement";
+      if (room.phase !== "statement" && room.phase !== "event") return fail("발언 단계에서만 기록을 넣을 수 있어요.");
+      let version: number;
+      if (kind === "statement") {
+        const turns = Object.entries(s.turnLog).filter(([, t]) => t.uid === target && t.kind === "statement").map(([v]) => Number(v));
+        if (!turns.length) return fail("이 학생은 아직 입장 발표 차례가 없었어요.");
+        version = Math.max(...turns);
+      } else {
+        if (!(room.phase === "event" || room.turn?.stage === "qa")) return fail("질문과 답변은 질의응답이나 사건 단계에서만 넣을 수 있어요.");
+        room.phaseVersion += 1;
+        version = room.phaseVersion;
+        s.turnLog[version] = { uid: target, phase: room.phase as SpeakingPhase, kind };
+      }
+      addLine(s, version, String(body.text ?? "").trim(), "typed", now);
+      return { state: s };
+    }
     const version = body.phaseVersion === undefined ? room.phaseVersion : Number(body.phaseVersion);
     if (!s.turnLog[version]) fail("지금 말하는 사람이 없어요.");
     addLine(s, version, String(body.text ?? "").trim(), "typed", now);

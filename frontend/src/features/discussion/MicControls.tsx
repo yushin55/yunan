@@ -208,9 +208,8 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
       {capture.interim && <p className="mic-interim">{capture.interim}</p>}
       {capture.pending > 0 && <p className="muted small">글로 바꾸는 중 {capture.pending}건</p>}
       {capture.failed > 0 && (
-        <p className="mic-problem" data-testid="mic-failed">
-          글로 바꾸지 못한 구간이 {capture.failed}건 있어요. 필요하면 선생님이 대신 적어 줄 수 있어요.
-          {capture.reason && <span className="mic-reason"> ({capture.reason})</span>}
+        <p className="mic-problem" data-testid="mic-failed" role="alert">
+          {capture.reason || `글로 바꾸지 못한 구간이 ${capture.failed}건 있어요. 잠시 후 다시 시도해 주세요.`}
         </p>
       )}
       {problem && (
