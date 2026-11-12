@@ -9,6 +9,7 @@
     "test:e2e": "node tests/ui-multiplayer.mjs",
     "content:sync": "node scripts/sync-practice-topics.mjs",
     "test:practice": "node tests/ui-practice.mjs",
+    "test:briefing-audio": "node --test tests/briefing-audio.test.mjs",
     "test:voice": "node tests/ui-voice.mjs"
   },
   "devDependencies": {
