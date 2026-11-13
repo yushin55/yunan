@@ -82,9 +82,6 @@ export default function DebateHistoryPage() {
             <Link to="/teacher/new" className="button primary">
               방 만들기
             </Link>
-            <Link to="/teacher/preview/reveal" className="button ghost">
-              연습 결과 화면 미리보기
-            </Link>
           </div>
         </div>
       ) : shown.length === 0 ? (
