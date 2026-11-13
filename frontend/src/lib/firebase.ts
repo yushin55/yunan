@@ -1,5 +1,15 @@
 import { initializeApp } from "firebase/app";
-import { connectAuthEmulator, getAuth, signInAnonymously } from "firebase/auth";
+import {
+  connectAuthEmulator,
+  getAuth,
+  GoogleAuthProvider,
+  signInAnonymously,
+  signInWithCredential,
+  signInWithCustomToken,
+  signInWithPopup,
+  signOut,
+  type User,
+} from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 const env = import.meta.env;
 export const useEmulators =
@@ -20,6 +30,7 @@ if (useEmulators) {
   connectFirestoreEmulator(db, location.hostname, 8080);
 }
 let signingIn: Promise<unknown> | null = null;
+/** The current account: a signed-in teacher, or else an anonymous student account. */
 export async function authenticate() {
   await auth.authStateReady();
   if (!auth.currentUser) {
@@ -30,3 +41,26 @@ export async function authenticate() {
   }
   return auth.currentUser!;
 }
+
+/** Teachers sign in with Google or Kakao; students stay anonymous. */
+export const isTeacher = (user: User | null): user is User => !!user && !user.isAnonymous;
+
+export async function signInWithGoogle() {
+  const provider = new GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  return (await signInWithPopup(auth, provider)).user;
+}
+
+/** Local emulator only: a fake Google teacher, so development and UI tests need no real account. */
+export async function signInAsTestTeacher() {
+  if (!useEmulators) throw new Error("Test sign-in is for the Firebase emulator only.");
+  const idToken = JSON.stringify({ sub: "local-teacher", email: "teacher@example.com", email_verified: true, name: "테스트 선생님" });
+  return (await signInWithCredential(auth, GoogleAuthProvider.credential(idToken))).user;
+}
+
+/** The custom token our server issues after checking the Kakao login. */
+export async function signInWithKakaoToken(token: string) {
+  return (await signInWithCustomToken(auth, token)).user;
+}
+
+export const signOutTeacher = () => signOut(auth);

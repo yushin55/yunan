@@ -60,6 +60,9 @@ try {
   step('teacher creates a room');
   const teacher = await open('teacher', { viewport: { width: 1400, height: 950 } });
   await teacher.page.goto(`${origin}/teacher/new`);
+  // Teachers sign in (Google/Kakao); the emulator offers a fake Google teacher.
+  await teacher.page.getByTestId('login-test').click();
+  await expect(teacher.page.getByTestId('teacher-account')).toBeVisible();
   await teacher.page.getByRole('radio', { name: /수업 중 학생의 스마트폰/ }).click();
   await teacher.page.getByTestId('create-room').click();
   await teacher.page.waitForURL(/\/room\//);

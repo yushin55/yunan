@@ -254,6 +254,7 @@ npm run build                                              # 타입 검사 + 프
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_APP_ID` | Firebase Web App 설정값 |
 | `VITE_API_BASE_URL` | 백엔드 배포 주소 (예: `https://bridge-api.vercel.app`) |
 | `VITE_USE_FIREBASE_EMULATORS` | `false` |
+| `VITE_KAKAO_REST_API_KEY` | 카카오 REST API 키 (비우면 카카오 로그인 버튼 숨김) |
 
 **백엔드 환경변수** (서버 전용, `VITE_`에 넣지 말 것)
 
@@ -269,16 +270,19 @@ npm run build                                              # 타입 검사 + 프
 | `AI_PROVIDER` | `gemini`(기본) 또는 `vertex` |
 | `VERTEX_API_KEY`, `VERTEX_MODEL` | `AI_PROVIDER=vertex`일 때 서버용 키와 모델 ID |
 | `MODERATION_MODE` | `ai` (기본값, 운영에서는 `rules` 불가) |
+| `KAKAO_REST_API_KEY` | 선생님 카카오 로그인용 REST API 키 |
+| `KAKAO_CLIENT_SECRET` | 카카오 Client Secret을 켠 경우에만 |
 
 운영에는 `FIRESTORE_EMULATOR_HOST`·`FIREBASE_AUTH_EMULATOR_HOST`를 **넣지 않습니다**(있으면 서버가 시작을 거부).
 
 배포 순서:
 
-1. Firebase 프로젝트 생성 → Firestore 생성 → Authentication에서 **익명 로그인** 사용 → Web App 등록.
+1. Firebase 프로젝트 생성 → Firestore 생성 → Authentication에서 **익명**(학생)과 **Google**(선생님) 로그인 사용 → Web App 등록.
 2. 보안 규칙 배포: `npx firebase deploy --only firestore:rules,firestore:indexes --project YOUR_PROJECT_ID`
 3. Vercel 백엔드 프로젝트 생성·환경변수 등록·배포 → `https://백엔드주소/health`에서 `"moderation": "ai"` 확인.
 4. Vercel 프런트엔드 프로젝트 생성·`VITE_API_BASE_URL`에 백엔드 주소 등록·배포.
 5. 백엔드 `ALLOWED_ORIGINS`와 Firebase Authentication 승인 도메인에 프런트엔드 주소 추가 → 백엔드 재배포.
+6. Kakao Developers 카카오 로그인 Redirect URI에 `https://프런트엔드주소/auth/kakao` 등록.
 
 자세한 API·데이터 구조는 [backend/README.backend.md](backend/README.backend.md)에 있습니다.
 

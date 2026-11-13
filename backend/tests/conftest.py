@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.api.dependencies import game_service
-from app.core.auth import current_uid
+from app.core.auth import current_teacher, current_uid
 from app.main import app
 from app.repositories.rooms import MemoryRoomRepository
 from app.services.ai import AIUnavailable
@@ -33,6 +33,7 @@ def client(game):
     actor = [TEACHER]
     app.dependency_overrides[game_service] = lambda: service
     app.dependency_overrides[current_uid] = lambda: actor[0]
+    app.dependency_overrides[current_teacher] = lambda: actor[0]
     with TestClient(app) as instance:
         yield instance, actor
     app.dependency_overrides.clear()

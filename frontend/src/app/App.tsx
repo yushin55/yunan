@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
 import PageNavigation from "../components/PageNavigation";
 import HomePage from "../pages/HomePage";
@@ -11,6 +11,10 @@ const RoomPage = lazy(() => import("../pages/RoomPage"));
 const TeacherNewPage = lazy(() => import("../pages/TeacherNewPage"));
 const DebateHistoryPage = lazy(() => import("../pages/DebateHistoryPage"));
 const DebateResultPage = lazy(() => import("../pages/DebateResultPage"));
+const KakaoCallbackPage = lazy(() => import("../pages/KakaoCallbackPage"));
+// Only teachers sign in (Google or Kakao); students join anonymously with a room code.
+const TeacherGate = lazy(() => import("../features/auth/TeacherGate"));
+const teacherOnly = (page: ReactNode) => <TeacherGate>{page}</TeacherGate>;
 
 export default function App() {
   const { pathname } = useLocation();
@@ -27,9 +31,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/teacher" element={<Navigate to="/teacher/new" replace />} />
-          <Route path="/teacher/new" element={<TeacherNewPage />} />
-          <Route path="/teacher/history" element={<DebateHistoryPage />} />
-          <Route path="/teacher/history/:key" element={<DebateResultPage />} />
+          <Route path="/teacher/new" element={teacherOnly(<TeacherNewPage />)} />
+          <Route path="/teacher/history" element={teacherOnly(<DebateHistoryPage />)} />
+          <Route path="/teacher/history/:key" element={teacherOnly(<DebateResultPage />)} />
+          <Route path="/auth/kakao" element={<KakaoCallbackPage />} />
           {/* Straight to the teacher screen of an offline practice game (no server needed). */}
           <Route path="/teacher/preview" element={<TeacherPreview />} />
           <Route path="/teacher/preview/:phase" element={<TeacherPreview />} />

@@ -10,6 +10,7 @@ import "./styles/flow.css";
 import "./styles/home.css";
 import "./styles/teacher-report.css";
 import "./styles/navigation.css";
+import "./styles/login.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>

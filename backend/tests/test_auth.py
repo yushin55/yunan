@@ -83,6 +83,20 @@ def test_verified_uid_is_used_with_project_scoped_app(configured, monkeypatch):
     assert auth.current_uid(token()) == "existing-anonymous-user"
 
 
+@pytest.mark.parametrize("provider", ["google.com", "custom"])
+def test_google_and_kakao_teachers_are_accepted(configured, monkeypatch, provider):
+    monkeypatch.setattr(auth.auth, "verify_id_token", lambda *a, **k: {"uid": "t1", "firebase": {"sign_in_provider": provider}})
+    assert auth.current_teacher(token()) == "t1"
+
+
+@pytest.mark.parametrize("claims", [{"uid": "s1", "firebase": {"sign_in_provider": "anonymous"}}, {"uid": "s1"}])
+def test_anonymous_students_cannot_act_as_teacher(configured, monkeypatch, claims):
+    monkeypatch.setattr(auth.auth, "verify_id_token", lambda *a, **k: claims)
+    with pytest.raises(HTTPException) as error:
+        auth.current_teacher(token())
+    assert error.value.status_code == 403
+
+
 def test_claims_without_uid_are_rejected(configured, monkeypatch):
     monkeypatch.setattr(auth.auth, "verify_id_token", lambda *a, **k: {})
     with pytest.raises(HTTPException) as error:
