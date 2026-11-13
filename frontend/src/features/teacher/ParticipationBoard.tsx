@@ -227,7 +227,6 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
   // Quiet students stand out once there has been a chance to talk.
   const quiet = reached("event") ? people.filter((x) => x.statement + x.question + x.answer === 0) : [];
   const chips: [string, string][] = [
-    ["역할 확인", `${has("role")}/${total}`],
     ...(reached("statement") ? ([["입장 발표", `${someone("statement")}/${total}`]] as [string, string][]) : []),
     ...(reached("statement") ? ([["질문한 학생", `${someone("question")}/${total}`], ["답변한 학생", `${someone("answer")}/${total}`]] as [string, string][]) : []),
     ...(reached("vote") ? ([["투표", `${rounds.reveal ? rounds.reveal.ballots.filter((b) => b.voted).length : has("vote")}/${total}`]] as [string, string][]) : []),
@@ -277,10 +276,11 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
                 <span className={question ? "on" : ""}>질문 {question}</span>
                 <span className={answer ? "on" : ""}>답변 {answer}</span>
               </div>
-              <div className="student-card-steps">
-                <span className={p.submitted.includes("role") ? "on" : ""}>역할 확인</span>
-                {reached("vote") && <span className={p.submitted.includes("vote") || rounds.reveal?.ballots.find((b) => b.uid === p.uid)?.voted ? "on" : ""}>투표</span>}
-              </div>
+              {reached("vote") && (
+                <div className="student-card-steps">
+                  <span className={p.submitted.includes("vote") || rounds.reveal?.ballots.find((b) => b.uid === p.uid)?.voted ? "on" : ""}>투표</span>
+                </div>
+              )}
             </li>
           );
         })}
