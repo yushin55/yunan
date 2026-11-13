@@ -189,7 +189,6 @@ button.teacher-attention { border: 0; cursor: pointer; font: inherit; font-size:
 .side-body > .panel:last-child { border-bottom: 0; }
 .moderation-pending { color: var(--amber); font-weight: 700; }
 .panel-toggle > span + span { flex: none; }
-.guide summary { font-weight: 700; }
 .side-backdrop { display: none; }
 @media (prefers-reduced-motion: reduce) { .teacher-side, .side-panel, .side-handle { transition: none; } }
 

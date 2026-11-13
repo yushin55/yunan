@@ -386,22 +386,6 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
         <TeacherSidebar open={sideOpen} onOpenChange={setSideOpen} count={countNotes(notes)} attention={toReview}>
           <PhaseMemo phase={phase} notes={notes} participants={participants} onAdd={addNote} onRemove={removeNote} />
           <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
-          <details className="panel guide">
-            <summary>진행 안내와 질문 예시</summary>
-            <p>{host.teacherGuide.summary}</p>
-            <ul>
-              {host.teacherGuide.tips.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-            {host.teacherGuide.caution && <p className="banner warn">{host.teacherGuide.caution}</p>}
-            <h4>질문 예시</h4>
-            <ul>
-              {room.topic.questionPrompts.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
-          </details>
         </TeacherSidebar>
       </div>
     </main>

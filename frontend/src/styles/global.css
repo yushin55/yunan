@@ -320,8 +320,6 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .moderation-body .entry { padding: 10px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
 .moderation-body .entry.status-pending_review { border-color: var(--amber); }
 .moderation-body .entry p { margin: 6px 0; word-break: break-word; }
-.guide ul { display: grid; gap: 6px; margin: 8px 0; }
-.guide h4 { margin-top: 12px; }
 .lobby-settings { display: grid; gap: 6px; justify-items: start; }
 .lobby-settings fieldset { width: 100%; }
 .seconds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; width: 100%; }
