@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useTeacherStorage } from "./useTeacherStorage";
 import { api, ApiError } from "../../lib/api";
 import type { ModerationEntry, Participant, Topic, TranscriptLine } from "../../types/game";
 import { PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
 import Evidence from "./Evidence";
 import { buildReport, type CriterionId } from "./report";
-import { loadAiReports, saveAiReports, type EvidencedText, type StoredAiReports, type StudentAiReport } from "./teacherStorage";
+import { loadAiReports, saveAiReports, teacherStorageAccount, teacherStorageLocation, type EvidencedText, type StoredAiReports, type StudentAiReport } from "./teacherStorage";
 
 const POINTS: { label: string; rule: CriterionId }[] = [
   { label: "자료 조사", rule: "research" },
@@ -39,7 +40,7 @@ const same = (a: StudentAiReport | undefined, b: StudentAiReport | undefined) =>
 
 /**
  * Per-student evaluation reports drafted by AI (or the offline stand-in), each claim with the lines
- * behind it one click away. The teacher can rewrite any of it; the working copy stays on this device.
+ * behind it one click away. The teacher's working copy belongs to their account.
  */
 export default function AiStudentReport({
   storageKey,
@@ -57,8 +58,7 @@ export default function AiStudentReport({
   transcript: TranscriptLine[];
   moderation?: ModerationEntry[];
 }) {
-  const [stored, setStored] = useState<StoredAiReports | null>(() => (storageKey ? loadAiReports(storageKey) : null));
-  useEffect(() => setStored(storageKey ? loadAiReports(storageKey) : null), [storageKey]);
+  const [stored, setStored] = useTeacherStorage(storageKey ?? "", loadAiReports);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -80,8 +80,10 @@ export default function AiStudentReport({
       return;
     }
     setBusy(true);
+    const owner = teacherStorageAccount();
     try {
       const result = await api<{ reports: StudentAiReport[]; source: "ai"; at: number }>(`/api/rooms/${roomId}/student-report`, {}, 90000);
+      if (teacherStorageAccount() !== owner) return;
       keep({ source: "ai", at: result.at, original: result.reports, current: result.reports });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "AI 리포트를 만들지 못했어요.");
@@ -133,7 +135,7 @@ export default function AiStudentReport({
       <div className="rubric-toolbar">
         <p className="small">
           <span className={`ai-source ${stored.source}`}>{stored.source === "ai" ? "AI 초안" : "간이 리포트 (AI 아님)"}</span>{" "}
-          {editing ? "문장을 고치고 근거를 더하거나 뺄 수 있어요. 이 기기에 바로 저장돼요." : `${new Date(stored.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}에 만들었어요. 근거 버튼을 눌러 확인하고 고쳐 써 주세요.`}
+          {editing ? `문장을 고치고 근거를 더하거나 뺄 수 있어요. ${teacherStorageLocation()} 저장돼요.` : `${new Date(stored.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}에 만들었어요. 근거 버튼을 눌러 확인하고 고쳐 써 주세요.`}
         </p>
         <div className="ai-bar-actions">
           {!editing && (

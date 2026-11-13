@@ -12,9 +12,15 @@ async function contextFor(viewport) {
   context.on('page', page => {
     page.on('pageerror', error => errors.push(error.message));
     page.on('request', request => {
-      if (/\/api\/|identitytoolkit|firestore\.googleapis/.test(request.url())) errors.push(`Unexpected offline request: ${request.url()}`);
+      const url = new URL(request.url());
+      if (/\/api\//.test(url.pathname) || (!['localhost', '127.0.0.1'].includes(url.hostname) && /identitytoolkit|firestore\.googleapis/.test(url.hostname))) errors.push(`Unexpected live request: ${url.origin}`);
     });
   });
+  const login = await context.newPage();
+  await login.goto(`${origin}/teacher/history`);
+  await login.getByTestId('login-test').click();
+  await expect(login.getByTestId('history-page')).toBeVisible();
+  await login.close();
   return context;
 }
 
@@ -37,7 +43,7 @@ try {
       if (phase === 'ended') await expect(page.getByTestId('game-summary')).toBeVisible();
       await page.getByRole('tab', { name: '수행평가 레포트' }).click();
       await expect(page.getByTestId('teacher-report')).toBeVisible();
-      const state = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')));
+      const state = await page.evaluate(async () => JSON.parse(localStorage.getItem((await import('/src/features/practice/usePractice.ts')).practiceStorageKey())));
       if (!state.snapshot.rounds.reveal.ballots.every(ballot => ballot.voted)) throw new Error('Preview lost the completed votes');
       await page.getByRole('tab', { name: '학생별 리포트', exact: true }).click();
       await page.getByTestId('ai-report-generate').click();
@@ -65,6 +71,8 @@ try {
     await expect(page.locator('#phase-memo-text')).toBeFocused();
     await page.locator('#phase-memo-text').fill('Merge verification: evidence from the discussion');
     await page.getByTestId('memo-add').click();
+    await expect(page.getByTestId('memo-entry')).toContainText('Merge verification');
+    await expect(page.getByText('계정에 저장하는 중이에요…', { exact: true })).toBeHidden();
     await page.reload();
     await expect(page.getByTestId('memo-entry')).toContainText('Merge verification');
     await page.getByTestId('next-phase').click();
@@ -77,7 +85,7 @@ try {
     await expect(page.getByTestId('game-summary')).toBeVisible();
     await page.goto(`${origin}/teacher/history`);
     await expect(page.getByTestId('history-page')).toBeVisible();
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.debateHistory'))[0]);
+    const saved = await page.evaluate(async () => (await import('/src/features/teacher/teacherStorage.ts')).loadHistory()[0]);
     if (!saved.notes.event.some(note => note.text.includes('Merge verification'))) throw new Error('Saved debate lost teacher notes');
     await page.goto(`${origin}/teacher/history/${encodeURIComponent(saved.key)}`);
     await expect(page.getByTestId('history-result')).toBeVisible();

@@ -20,3 +20,7 @@
   max-width: 1040px; margin: 0 auto; padding: 10px 16px 0;
 }
 .teacher-account > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.teacher-workspace:has(> .teacher-room:not(.history-result)) { height: calc(100dvh - var(--page-navigation-height, 0px)); display: flex; flex-direction: column; }
+.teacher-workspace > .teacher-room:not(.history-result) { flex: 1; min-height: 0; height: auto; }
+.teacher-workspace > .teacher-account { flex: none; width: 100%; }
+.teacher-sync { position: fixed; right: 16px; bottom: 12px; z-index: 100; max-width: min(420px, calc(100vw - 32px)); margin: 0; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }

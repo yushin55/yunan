@@ -2,22 +2,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Phase, Snapshot } from "../../types/game";
 import type { RoomApi } from "../room/useRoom";
 import { act, createPractice, createPracticeAt, PracticeError, teacherSnapshot, tick, type PracticeState } from "./engine";
+import { teacherStorageAccount } from "../teacher/teacherStorage";
 
-const KEY = "bridge.practice";
+export const practiceStorageKey = () => teacherStorageAccount() === "guest" ? "bridge.practice" : `bridge.practice.${encodeURIComponent(teacherStorageAccount())}`;
 
-function load(): PracticeState | null {
+function load(key: string): PracticeState | null {
   try {
-    const value = JSON.parse(localStorage.getItem(KEY) || "null");
+    const value = JSON.parse(localStorage.getItem(key) || "null");
     return value?.version === 5 ? value : null;
   } catch {
     return null;
   }
 }
 
-function save(state: PracticeState | null) {
+function save(key: string, state: PracticeState | null) {
   try {
-    if (state) localStorage.setItem(KEY, JSON.stringify(state));
-    else localStorage.removeItem(KEY);
+    if (state) localStorage.setItem(key, JSON.stringify(state));
+    else localStorage.removeItem(key);
   } catch {
     /* Practice still works without storage; it just won't survive a reload. */
   }
@@ -25,15 +26,16 @@ function save(state: PracticeState | null) {
 
 /** Same shape as useRoom, so the real student screen runs on top of the offline engine. */
 export function usePractice() {
-  const [practice, setPractice] = useState<PracticeState | null>(load);
+  const [storageKey] = useState(practiceStorageKey);
+  const [practice, setPractice] = useState<PracticeState | null>(() => load(storageKey));
   const [error, setError] = useState("");
   const current = useRef(practice);
 
   const commit = useCallback((next: PracticeState | null) => {
     current.current = next;
     setPractice(next);
-    save(next);
-  }, []);
+    save(storageKey, next);
+  }, [storageKey]);
 
   useEffect(() => {
     const timer = setInterval(() => {

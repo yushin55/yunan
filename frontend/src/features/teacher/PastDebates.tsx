@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, History } from "lucide-react";
-import { loadHistory, type PastDebate } from "./teacherStorage";
+import { loadHistory } from "./teacherStorage";
+import { useTeacherStorage } from "./useTeacherStorage";
 
 const fmt = (t: number) => new Date(t).toLocaleDateString("ko-KR", { month: "short", day: "numeric", weekday: "short" });
 const RECENT = 5;
@@ -11,7 +11,7 @@ const RECENT = 5;
  * During a live game (`newTab`) the links open in a new tab so the running game stays on screen.
  */
 export default function PastDebates({ exclude, open = false, newTab = false }: { exclude?: string; open?: boolean; newTab?: boolean }) {
-  const [list, setList] = useState<PastDebate[]>(loadHistory);
+  const [list, setList] = useTeacherStorage("history", loadHistory);
   const shown = list.filter((d) => d.key !== exclude);
   const target = newTab ? { target: "_blank", rel: "noopener" } : {};
   return (
@@ -20,7 +20,7 @@ export default function PastDebates({ exclude, open = false, newTab = false }: {
         <History size={17} aria-hidden /> 진행된 토론 <span className="muted small">{shown.length}개</span>
       </summary>
       {shown.length === 0 ? (
-        <p className="muted small">결과 공개까지 진행한 토론은 이 기기에 자동으로 저장돼요.</p>
+        <p className="muted small">결과 공개까지 진행한 토론은 로그인한 선생님 계정에 저장돼요.</p>
       ) : (
         <ul className="past-list">
           {shown.slice(0, RECENT).map((d) => (

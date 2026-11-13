@@ -136,3 +136,37 @@ describe('writes', () => {
     }
   });
 });
+
+describe('teacher account records', () => {
+  const provider = { firebase: { sign_in_provider: 'google.com' } };
+  const ownPath = 'teachers/record-owner/records/finished-game';
+  test('a Google teacher manages only their own private records', async () => {
+    const owner = environment.authenticatedContext('record-owner', provider).firestore();
+    const other = environment.authenticatedContext('other-owner', provider).firestore();
+    await assertSucceeds(setDoc(doc(owner, ownPath), { key: 'finished-game', notes: { event: [] } }));
+    await assertSucceeds(getDoc(doc(owner, ownPath)));
+    await assertSucceeds(getDocs(collection(owner, 'teachers/record-owner/records')));
+    await assertSucceeds(updateDoc(doc(owner, ownPath), { edits: { student: { record: 'private evaluation' } } }));
+    await assertFails(getDoc(doc(other, ownPath)));
+    await assertFails(getDocs(collection(other, 'teachers/record-owner/records')));
+    await assertFails(setDoc(doc(other, ownPath), { notes: {} }));
+    await assertFails(deleteDoc(doc(other, ownPath)));
+    await assertFails(getDocs(collectionGroup(owner, 'records')));
+    await assertSucceeds(deleteDoc(doc(owner, ownPath)));
+  });
+
+  test('Kakao custom-token teachers have the same private account scope', async () => {
+    const kakao = environment.authenticatedContext('kakao-owner', { firebase: { sign_in_provider: 'custom' } }).firestore();
+    await assertSucceeds(setDoc(doc(kakao, 'teachers/kakao-owner/records/test'), { key: 'test' }));
+    await assertFails(getDoc(doc(kakao, ownPath)));
+  });
+
+  test('anonymous students and signed-out visitors cannot read or write teacher records', async () => {
+    const student = environment.authenticatedContext('student-owner', { firebase: { sign_in_provider: 'anonymous' } }).firestore();
+    for (const db of [student, anonymous]) {
+      await assertFails(getDoc(doc(db, ownPath)));
+      await assertFails(getDocs(collection(db, 'teachers/record-owner/records')));
+      await assertFails(setDoc(doc(db, 'teachers/student-owner/records/test'), { key: 'test' }));
+    }
+  });
+});

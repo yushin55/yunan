@@ -6,17 +6,18 @@ import { GameSummary } from "../features/teacher/ParticipationBoard";
 import { MemoList } from "../features/teacher/PhaseMemo";
 import TeacherReport from "../features/teacher/TeacherReport";
 import { loadDebate } from "../features/teacher/teacherStorage";
+import { useTeacherStorage } from "../features/teacher/useTeacherStorage";
 import RevealView from "../features/voting/RevealView";
 import { fmtDay, fmtTime, OUTCOME_SHORT } from "./DebateHistoryPage";
 
-/** The final result screen of a finished debate, rebuilt from what this browser saved. */
+/** A finished debate from the signed-in teacher's private records. */
 export default function DebateResultPage() {
   const { key = "" } = useParams();
-  const d = loadDebate(decodeURIComponent(key));
+  const [d] = useTeacherStorage(key, loadDebate);
   if (!d)
     return (
       <main className="page-loading">
-        <p>이 토론 기록을 찾을 수 없어요. 지웠거나 다른 기기에서 진행한 토론일 수 있어요.</p>
+        <p>내 계정에서 이 토론 기록을 찾을 수 없어요. 삭제되었거나 다른 선생님의 기록일 수 있어요.</p>
         <Link to="/teacher/history" className="button primary">
           진행된 토론 목록
         </Link>

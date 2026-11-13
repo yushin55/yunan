@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useRoom } from "../features/room/useRoom";
 import StudentRoomPage from "./StudentRoomPage";
 import TeacherRoomPage from "./TeacherRoomPage";
+import TeacherGate from "../features/auth/TeacherGate";
 
 export default function RoomPage() {
   const { roomId = "" } = useParams();
@@ -39,5 +40,5 @@ export default function RoomPage() {
         </button>
       </main>
     );
-  return room.state.viewer === "host" ? <TeacherRoomPage api={room} /> : <StudentRoomPage api={room} />;
+  return room.state.viewer === "host" ? <TeacherGate ownerUid={room.state.room.hostUid}><TeacherRoomPage api={room} /></TeacherGate> : <StudentRoomPage api={room} />;
 }

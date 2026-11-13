@@ -1,5 +1,5 @@
 import { lazy, Suspense, type ReactNode } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import PageNavigation from "../components/PageNavigation";
 import HomePage from "../pages/HomePage";
 import PracticePage from "../pages/PracticePage";
@@ -35,9 +35,9 @@ export default function App() {
           <Route path="/teacher/history" element={teacherOnly(<DebateHistoryPage />)} />
           <Route path="/teacher/history/:key" element={teacherOnly(<DebateResultPage />)} />
           <Route path="/auth/kakao" element={<KakaoCallbackPage />} />
-          {/* Straight to the teacher screen of an offline practice game (no server needed). */}
-          <Route path="/teacher/preview" element={<TeacherPreview />} />
-          <Route path="/teacher/preview/:phase" element={<TeacherPreview />} />
+          {/* The local practice engine, with the teacher's account and private records. */}
+          <Route path="/teacher/preview" element={teacherOnly(<PracticePage teacherPreview />)} />
+          <Route path="/teacher/preview/:phase" element={teacherOnly(<PracticePage teacherPreview />)} />
           <Route path="/join" element={<JoinPage />} />
           <Route path="/room/:roomId" element={<RoomPage />} />
           <Route path="/practice" element={<PracticePage />} />
@@ -53,15 +53,4 @@ export default function App() {
       </Suspense>
     </div>
   );
-}
-
-/** /teacher/preview[/:phase][?topic=] → the practice game's teacher screen, optionally at a given phase. */
-function TeacherPreview() {
-  const { phase } = useParams();
-  const [search] = useSearchParams();
-  const query = new URLSearchParams({ view: "teacher" });
-  if (phase) query.set("phase", phase);
-  const topic = search.get("topic");
-  if (topic) query.set("topic", topic);
-  return <Navigate to={`/practice?${query}`} replace />;
 }

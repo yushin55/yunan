@@ -1,12 +1,13 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { LogOut } from "lucide-react";
 import { auth, isTeacher, signInAsTestTeacher, signInWithGoogle, signOutTeacher, useEmulators } from "../../lib/firebase";
 import { kakaoEnabled, startKakaoLogin } from "./kakao";
+import TeacherWorkspace from "./TeacherWorkspace";
 
 /** Teacher pages: shown only to a teacher signed in with Google or Kakao. Students never need this. */
-export default function TeacherGate({ children }: { children: ReactNode }) {
+export default function TeacherGate({ children, ownerUid }: { children: ReactNode; ownerUid?: string }) {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
@@ -17,8 +18,9 @@ export default function TeacherGate({ children }: { children: ReactNode }) {
       </main>
     );
   if (!isTeacher(user)) return <TeacherLogin />;
+  if (ownerUid && user.uid !== ownerUid) return <main className="page-loading"><p>이 토론은 방을 만든 선생님 계정에서만 관리할 수 있어요.</p><Link to="/teacher/history">내 토론 기록으로</Link></main>;
   return (
-    <>
+    <TeacherWorkspace key={user.uid} uid={user.uid}>
       <div className="teacher-account" data-testid="teacher-account">
         <span className="muted small">{user.displayName || user.email || "선생님"} 선생님</span>
         <button type="button" className="button ghost small" onClick={() => signOutTeacher()}>
@@ -26,7 +28,7 @@ export default function TeacherGate({ children }: { children: ReactNode }) {
         </button>
       </div>
       {children}
-    </>
+    </TeacherWorkspace>
   );
 }
 
@@ -54,7 +56,7 @@ function TeacherLogin() {
     <main className="setup teacher-login">
       <section className="panel login-card">
         <span className="eyebrow">선생님 로그인</span>
-        <h1>방을 만들려면 로그인해 주세요</h1>
+        <h1>{pathname.startsWith("/teacher/history") ? "내 토론 기록을 보려면 로그인해 주세요" : "선생님 계정으로 로그인해 주세요"}</h1>
         <p className="muted">게임 방을 열고 진행하는 선생님만 로그인이 필요해요. 학생은 로그인 없이 방 코드로 바로 들어와요.</p>
         <div className="login-buttons">
           <button type="button" className="login-button google" data-testid="login-google" disabled={busy} onClick={() => run(signInWithGoogle)}>

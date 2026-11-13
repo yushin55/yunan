@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useTeacherStorage } from "./useTeacherStorage";
 import Tabs from "../../components/Tabs";
 import type { ModerationEntry, Participant, Phase, Topic, TranscriptLine } from "../../types/game";
 import TranscriptFeed from "../discussion/TranscriptFeed";
 import { KIND_LABEL, PHASE_ORDER, PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
-import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type ClassReport, type CriterionId, type Level, type ReportEdits, type StudentReport } from "./report";
+import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type ClassReport, type CriterionId, type Level, type StudentReport } from "./report";
 import AiStudentReport from "./AiStudentReport";
 import Evidence from "./Evidence";
 import { MemoList } from "./PhaseMemo";
-import { countNotes, loadEdits, saveEdits, type MemoEntry, type PhaseNotes } from "./teacherStorage";
+import { countNotes, loadEdits, saveEdits, teacherStorageLocation, type MemoEntry, type PhaseNotes } from "./teacherStorage";
 
 const LEVELS: Level[] = ["met", "partial", "weak", "none"];
 /** What a rubric cell says: a word, so the table reads without a legend. */
@@ -49,8 +50,7 @@ export default function TeacherReport({
   /** Fill the space it is given, scrolling inside, instead of growing with its content. */
   fill?: boolean;
 }) {
-  const [edits, setEdits] = useState<ReportEdits>(() => (editKey ? loadEdits(editKey) : {}));
-  useEffect(() => setEdits(editKey ? loadEdits(editKey) : {}), [editKey]);
+  const [edits, setEdits] = useTeacherStorage(editKey ?? "", loadEdits);
   const [editing, setEditing] = useState(false);
   const auto = useMemo(() => buildReport(topic, participants, transcript, moderation), [topic, participants, transcript, moderation]);
   const report = useMemo(() => applyEdits(auto, edits), [auto, edits]);
@@ -118,7 +118,7 @@ export default function TeacherReport({
           <div className="rubric-toolbar">
             <p className="small">
               {editing
-                ? "칸이나 학생 이름을 눌러 판정을 고치고 의견을 남겨 주세요. 고친 내용은 이 기기에 바로 저장돼요."
+                ? `칸이나 학생 이름을 눌러 판정을 고치고 의견을 남겨 주세요. 고친 내용은 ${teacherStorageLocation()} 저장돼요.`
                 : `칸을 누르면 그렇게 판단한 이유와 근거 발언이 아래에 열려요.${editedCount ? ` 선생님이 고친 항목 ${editedCount}개가 반영돼 있어요.` : ""}`}
             </p>
             {editKey && (

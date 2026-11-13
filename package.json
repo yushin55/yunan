@@ -10,7 +10,9 @@
     "content:sync": "node scripts/sync-practice-topics.mjs",
     "test:practice": "node tests/ui-practice.mjs",
     "test:briefing-audio": "node --test tests/briefing-audio.test.mjs",
-    "test:voice": "node tests/ui-voice.mjs"
+    "test:voice": "node tests/ui-voice.mjs",
+    "test:teacher-storage": "node --test tests/teacher-storage.test.mjs",
+    "test:teacher-accounts": "node tests/ui-teacher-accounts.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",

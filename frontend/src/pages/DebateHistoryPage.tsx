@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Bot, CalendarDays, History, MessageSquareText, S
 import { buildReport, CRITERIA } from "../features/teacher/report";
 import { deleteDebate, loadHistory, type PastDebate } from "../features/teacher/teacherStorage";
 import type { Reveal } from "../types/game";
+import { useTeacherStorage } from "../features/teacher/useTeacherStorage";
 
 export const OUTCOME_SHORT: Record<Reveal["outcome"], { label: string; tone: "ok" | "warn" | "muted" }> = {
   found: { label: "역할 전환자 찾음", tone: "ok" },
@@ -18,9 +19,9 @@ export const fmtTime = (t: number) => new Date(t).toLocaleTimeString("ko-KR", { 
 
 type Filter = "all" | "class" | "practice";
 
-/** Every finished debate kept in this browser, newest first; each opens its final result page. */
+/** The signed-in teacher's finished debates, newest first. */
 export default function DebateHistoryPage() {
-  const [list, setList] = useState<PastDebate[]>(loadHistory);
+  const [list, setList] = useTeacherStorage("history", loadHistory);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const shown = list.filter(
@@ -45,7 +46,7 @@ export default function DebateHistoryPage() {
       </Link>
       <span className="eyebrow">선생님 · 진행된 토론</span>
       <h1>지난 토론의 결과를 다시 볼 수 있어요</h1>
-      <p className="muted">결과 공개까지 진행한 토론은 이 기기에 자동으로 저장돼요. 카드를 누르면 그때의 결과 화면과 선생님 레포트가 열려요. 최근 30개까지 남아요.</p>
+      <p className="muted">로그인한 선생님의 토론 기록만 보여요. 결과와 메모, 수정한 평가는 내 계정에 저장되어 다른 기기에서도 볼 수 있어요. 최근 30개를 표시해요.</p>
 
       {list.length > 0 && (
         <div className="history-tools">

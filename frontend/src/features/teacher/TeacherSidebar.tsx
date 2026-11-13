@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { teacherStorageLocation } from "./teacherStorage";
 
 const KEY = "bridge.teacher.memoOpen";
 
@@ -55,7 +56,7 @@ export default function TeacherSidebar({ open, onOpenChange, count, attention, c
         <div className="side-head">
           <div>
             <strong>선생님 메모</strong>
-            <span className="muted small">이 기기에만 저장돼요</span>
+            <span className="muted small">{teacherStorageLocation()} 저장돼요</span>
           </div>
           <button className="button ghost small" onClick={() => onOpenChange(false)}>
             닫기

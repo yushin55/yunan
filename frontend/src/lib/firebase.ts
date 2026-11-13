@@ -52,9 +52,9 @@ export async function signInWithGoogle() {
 }
 
 /** Local emulator only: a fake Google teacher, so development and UI tests need no real account. */
-export async function signInAsTestTeacher() {
+export async function signInAsTestTeacher(account = "local-teacher") {
   if (!useEmulators) throw new Error("Test sign-in is for the Firebase emulator only.");
-  const idToken = JSON.stringify({ sub: "local-teacher", email: "teacher@example.com", email_verified: true, name: "테스트 선생님" });
+  const idToken = JSON.stringify({ sub: account, email: `${account}@example.com`, email_verified: true, name: "테스트 선생님" });
   return (await signInWithCredential(auth, GoogleAuthProvider.credential(idToken))).user;
 }
 

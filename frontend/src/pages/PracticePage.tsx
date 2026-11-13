@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, Bot, FastForward, Flag, Monitor, RotateCcw, Shuffle, SkipForward, UserRound } from "lucide-react";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_ORDER, PHASE_SHORT } from "../features/game/phases";
@@ -14,12 +14,14 @@ import StudentRoomPage from "./StudentRoomPage";
 import TeacherRoomPage from "./TeacherRoomPage";
 
 /** Try both sides of the same offline game with five computer partners. */
-export default function PracticePage() {
+export default function PracticePage({ teacherPreview = false }: { teacherPreview?: boolean }) {
   const { api, teacherApi, started, begin, beginAt, reset } = usePractice();
   // /practice?view=teacher (or /teacher/preview) opens the teacher screen directly,
   // starting a practice game on ?topic= (or a random topic) if none is running yet.
   const [search, setSearch] = useSearchParams();
-  const directTeacher = useRef(search.get("view") === "teacher");
+  const { phase: previewPhase } = useParams();
+  const navigate = useNavigate();
+  const directTeacher = useRef(teacherPreview || search.get("view") === "teacher");
   // There is no teacher to keep the summary fresh while the player is on the student screen.
   useAutoSummary(api.state?.rounds.transcript ?? [], () => api.quiet("summary"));
   // No teacher here: the practice page starts the game itself once everyone has picked.
@@ -45,11 +47,12 @@ export default function PracticePage() {
     directTeacher.current = false;
     setTeacherView(true);
     const topicId = TOPICS.find((t) => t.topicId === search.get("topic"))?.topicId ?? null;
-    const phase = PHASE_ORDER.find((p) => p === search.get("phase"));
+    const phase = PHASE_ORDER.find((p) => p === (teacherPreview ? previewPhase : search.get("phase")));
     // A phase in the address always starts a fresh game at that phase; otherwise keep any game in progress.
     if (phase) beginAt(savedNickname() || "연습생", topicId ?? (started ? api.state?.room.topic.topicId ?? null : null), phase);
     else if (!started) begin(savedNickname() || "연습생", topicId);
-    setSearch({}, { replace: true });
+    if (teacherPreview) navigate("/teacher/preview", { replace: true });
+    else setSearch({}, { replace: true });
     // Runs once on arrival.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

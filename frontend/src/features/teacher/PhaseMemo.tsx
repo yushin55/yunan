@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useTeacherStorage } from "./useTeacherStorage";
 import type { Participant, Phase } from "../../types/game";
 import { PHASE_ORDER, PHASE_SHORT } from "../game/phases";
-import { loadNotes, saveNotes, type MemoEntry, type PhaseNotes } from "./teacherStorage";
+import { loadNotes, saveNotes, teacherStorageLocation, type MemoEntry, type PhaseNotes } from "./teacherStorage";
 
-/** Notes per phase for one game, saved in this browser as the teacher adds them. */
+/** Notes per phase for one game, scoped to the active teacher account. */
 export function usePhaseNotes(key: string) {
-  const [notes, setNotes] = useState<PhaseNotes>(() => loadNotes(key));
-  useEffect(() => setNotes(loadNotes(key)), [key]);
+  const [notes, setNotes] = useTeacherStorage(key, loadNotes);
   const update = useCallback(
     (change: (prev: PhaseNotes) => PhaseNotes) =>
       setNotes((prev) => {
@@ -111,7 +111,7 @@ export default function PhaseMemo({
           rows={2}
           maxLength={1000}
           value={text}
-          placeholder={`${uid ? `${participants.find((p) => p.uid === uid)?.nickname}에 대해 ` : ""}${PHASE_SHORT[phase]} 단계에서 눈여겨본 점을 적어 두세요. 이 기기에만 저장돼요.`}
+          placeholder={`${uid ? `${participants.find((p) => p.uid === uid)?.nickname}에 대해 ` : ""}${PHASE_SHORT[phase]} 단계에서 눈여겨본 점을 적어 두세요. ${teacherStorageLocation()} 저장돼요.`}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
