@@ -39,6 +39,7 @@ const phaseTitle = (who) => who.page.locator('.phase-header h2, [data-testid=pha
 // Students cannot move on by themselves.
 async function teacherRunsIntro(teacher, students) {
   for (const student of students) await expect(student.page.getByTestId('intro-waiting')).toBeVisible();
+  await teacher.page.getByRole('tab', { name: /시작 전 영상/ }).click(); // The videos have their own section.
   await teacher.page.getByTestId('intro-next').click(); // Briefing: every screen starts playing.
   for (const student of students) {
     await expect(student.page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
@@ -70,9 +71,11 @@ try {
   expect(code).toMatch(/^[A-Z0-9]{6}$/);
 
   // Generous clocks so a slow machine does not lose the race; one person's microphone is short enough to watch expire.
+  await teacher.page.getByRole('tab', { name: '주제와 설정' }).click();
   for (const [name, seconds] of [[/역할 확인/, 300], [/입장 발표/, 300], [/사건 공개/, 600], [/^반론/, 300], [/역할 전환자 투표/, 300], [/1번 말할 때/, 20]]) await teacher.page.getByRole('spinbutton', { name }).fill(String(seconds));
   await teacher.page.getByRole('button', { name: '설정 저장' }).click();
   await expect(teacher.page.getByRole('button', { name: '설정 저장' })).toBeDisabled();
+  await teacher.page.getByRole('tab', { name: /학생 입장/ }).click();
 
   step('six students join with their names');
   const students = [];
@@ -99,6 +102,7 @@ try {
   }
   await shot(students[0], 'student-lobby');
   // The teacher sees completion only, never which roles were chosen.
+  await teacher.page.getByRole('tab', { name: /학생 입장/ }).click();
   const board = teacher.page.locator('.participation');
   await expect(board.getByText('완료')).toHaveCount(6);
   await expect(board).not.toContainText(/순위|학생회 대표|담임 교사|학부모|정보 교과 교사|상담 교사/);

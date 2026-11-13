@@ -71,22 +71,6 @@
 .memo-pad label .small { font-weight: 400; }
 .memo-pad textarea { width: 100%; resize: vertical; min-height: 54px; max-height: 30vh; padding: 8px 10px; font-size: 0.95rem; line-height: 1.5; }
 
-/* Teacher's screen during the discussion: the header, stage and controls sit on the page itself. */
-.teacher-room.discussing .teacher-main > .banner { margin: 0 0 12px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.88rem; }
-.teacher-room.discussing .phase-header { margin-bottom: 16px; padding: 0; border: 0; background: none; }
-.teacher-room.discussing .phase-title-row .eyebrow { display: none; }
-.teacher-room.discussing .phase-title-row h2 { font-family: inherit; font-size: 1.05rem; font-weight: 700; }
-.teacher-room.discussing .todo:not(.paused-note) { margin: 2px 0 0; padding: 0; background: none; color: var(--muted); font-size: 0.92rem; }
-.teacher-room.discussing .todo:not(.paused-note) strong { display: none; }
-.teacher-room.discussing .run-row { align-items: center; padding: 12px 0; border-block: 1px solid var(--line); }
-.teacher-room.discussing .run-row .button { min-height: 40px; padding: 7px 14px; font-size: 0.94rem; }
-.teacher-room.discussing .run-row .button.secondary { background: transparent; border-color: var(--line); color: var(--text); }
-.teacher-room.discussing .event-card { margin-bottom: 14px; }
-@media (min-width: 1000px) {
-  /* The side panels are folded most of the time; the discussion gets the width. */
-  .teacher-room.discussing .teacher-grid { grid-template-columns: minmax(0, 1fr) 300px; max-width: 1680px; }
-}
-
 /* The event card, once the discussion is on: as readable as the rest, not a bright sheet. */
 .event-card.collapsible { border: 1px solid var(--line); background: var(--panel); color: var(--text); box-shadow: none; }
 .event-card.collapsible .card-kind { color: var(--muted); }
@@ -125,7 +109,7 @@ details.panel[open] > summary::after { content: "\2212"; }
 .transcript-column.vacant { display: none; }
 /* Room for three readable columns: statements on the left, then event, then rebuttal. Each scrolls by itself. */
 @container (min-width: 720px) {
-  .transcript-columns { flex: 0 1 auto; min-height: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: 24px; }
+  .transcript-columns { flex: 0 1 auto; min-height: 0; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-columns: none; grid-template-rows: minmax(0, 1fr); gap: 24px; }
   .transcript-column { min-height: 0; padding-right: 6px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
   .transcript-column.vacant { display: flex; }
   .transcript-phase { position: sticky; top: 0; z-index: 1; background: var(--panel); }
@@ -340,29 +324,9 @@ details.float-pop[open] > summary { margin-bottom: 8px; }
 .question-group:first-child .question-about { margin-top: 0; }
 .question-list .question-group { display: grid; gap: 6px; }
 
-/* Teacher: one card per student. */
-.participation-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
-.participation-chips div { display: grid; padding: 6px 12px; border-radius: 10px; background: var(--bg-2); border: 1px solid var(--line); }
-.participation-chips dt { color: var(--muted); font-size: 0.75rem; }
-.participation-chips dd { margin: 0; font-size: 1.15rem; font-weight: 800; }
-.participation-quiet { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; background: rgba(231, 115, 95, 0.12); border: 1px solid rgba(231, 115, 95, 0.5); color: #ffc2b6; }
-.student-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-.student-card { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
-.student-card header { display: flex; align-items: center; gap: 6px; }
-.student-card header strong { font-size: 1.02rem; }
-.student-card header em { margin-left: auto; padding: 1px 8px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-size: 0.72rem; font-style: normal; font-weight: 800; }
-.student-card.speaking { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230, 184, 92, 0.3); }
-.student-card.silent { border-color: rgba(231, 115, 95, 0.6); }
-.student-card-role { color: var(--muted); font-size: 0.8rem; }
-.student-card-stats, .student-card-steps { display: flex; flex-wrap: wrap; gap: 4px; }
-.student-card-stats span, .student-card-steps span { padding: 2px 8px; border-radius: 99px; background: rgba(255, 255, 255, 0.06); color: var(--muted); font-size: 0.78rem; }
-.student-card-stats span.on { background: rgba(127, 199, 156, 0.18); color: #a6e3bd; font-weight: 700; }
-.student-card-steps span.on { background: rgba(230, 184, 92, 0.18); color: var(--gold); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   .game-card, .event-pop-card { animation: none; }
 }
-/* Teacher: long statements and many questions scroll inside their own panel. */
-.teacher-room .discussion-grid .statement-list, .teacher-room .discussion-grid .question-list { max-height: 60vh; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; }
 .statement-full { margin: 4px 0 0; color: var(--muted); font-size: 0.92rem; line-height: 1.6; }
 
 /* ── Cards first: they float in one row over the bottom of the table, which stays the background ── */

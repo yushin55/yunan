@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, ClipboardCopy, MessageSquareQuote, PenLine, Plus, RefreshCw, RotateCcw, Sparkles, X } from "lucide-react";
 import { api, ApiError } from "../../lib/api";
 import type { ModerationEntry, Participant, Topic, TranscriptLine } from "../../types/game";
-import { KIND_LABEL, PHASE_SHORT } from "../game/phases";
+import { PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
+import Evidence from "./Evidence";
 import { buildReport, type CriterionId } from "./report";
 import { loadAiReports, saveAiReports, type EvidencedText, type StoredAiReports, type StudentAiReport } from "./teacherStorage";
 
@@ -96,7 +96,6 @@ export default function AiStudentReport({
   if (!stored)
     return (
       <div className="ai-empty" data-testid="ai-report-empty">
-        <Sparkles size={28} aria-hidden />
         <p>
           <strong>학생별 평가 리포트를 {roomId ? "AI가 정리해 드려요" : "만들어 드려요"}</strong>
         </p>
@@ -112,7 +111,7 @@ export default function AiStudentReport({
         )}
         <div className="ai-empty-actions">
           <button className="button primary" data-testid="ai-report-generate" disabled={busy} onClick={() => void generate()}>
-            {busy ? <span className="spinner" /> : <Sparkles size={17} />} {busy ? "AI가 정리하는 중…" : roomId ? "AI로 학생별 리포트 만들기" : "간이 리포트 만들기"}
+            {busy && <span className="spinner" />} {busy ? "AI가 정리하는 중…" : roomId ? "AI로 학생별 리포트 만들기" : "간이 리포트 만들기"}
           </button>
           {error && roomId && (
             <button className="button ghost" onClick={() => void generate(true)}>
@@ -131,7 +130,7 @@ export default function AiStudentReport({
 
   return (
     <div className="ai-report" data-testid="ai-report">
-      <div className={`rubric-editbar${editing ? " on" : ""}`}>
+      <div className="rubric-toolbar">
         <p className="small">
           <span className={`ai-source ${stored.source}`}>{stored.source === "ai" ? "AI 초안" : "간이 리포트 (AI 아님)"}</span>{" "}
           {editing ? "문장을 고치고 근거를 더하거나 뺄 수 있어요. 이 기기에 바로 저장돼요." : `${new Date(stored.at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}에 만들었어요. 근거 버튼을 눌러 확인하고 고쳐 써 주세요.`}
@@ -139,11 +138,11 @@ export default function AiStudentReport({
         <div className="ai-bar-actions">
           {!editing && (
             <button className="button ghost small" disabled={busy} onClick={() => void generate()} title="다시 만들기">
-              {busy ? <span className="spinner" /> : <RefreshCw size={15} />} 다시 만들기
+              {busy && <span className="spinner" />} 다시 만들기
             </button>
           )}
-          <button className={`button small ${editing ? "primary" : "secondary"}`} data-testid="ai-report-edit" aria-pressed={editing} onClick={() => setEditing((v) => !v)}>
-            {editing ? <Check size={15} /> : <PenLine size={15} />} {editing ? "수정 마치기" : "리포트 수정하기"}
+          <button className={`button small ${editing ? "primary" : "ghost"}`} data-testid="ai-report-edit" aria-pressed={editing} onClick={() => setEditing((v) => !v)}>
+            {editing ? "수정 마치기" : "리포트 고치기"}
           </button>
         </div>
       </div>
@@ -180,8 +179,8 @@ export default function AiStudentReport({
                 </p>
               </div>
               {editing && !same(current, original) && original && (
-                <button className="button ghost small" onClick={() => update(original)}>
-                  <RotateCcw size={14} /> {stored.source === "ai" ? "AI 원본으로" : "처음 내용으로"}
+                <button className="text-button" onClick={() => update(original)}>
+                  {stored.source === "ai" ? "AI 원본으로" : "처음 내용으로"}
                 </button>
               )}
             </header>
@@ -231,8 +230,8 @@ export default function AiStudentReport({
                     ))}
                   </ul>
                   {editing && (
-                    <button className="button ghost small" onClick={() => update({ ...current, [field]: [...current[field], { text: "", evidence: [] }] })}>
-                      <Plus size={14} /> 추가
+                    <button className="text-button" onClick={() => update({ ...current, [field]: [...current[field], { text: "", evidence: [] }] })}>
+                      항목 추가
                     </button>
                   )}
                 </section>
@@ -293,36 +292,16 @@ function Claim({
         )}
         {!editing && (
           <button className={`evidence-toggle${open ? " open" : ""}`} disabled={!evidence.length} aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="evidence-toggle">
-            <MessageSquareQuote size={14} aria-hidden /> {evidence.length ? `근거 ${evidence.length}` : "근거 없음"}
+            {evidence.length ? (open ? "근거 접기" : `근거 발언 ${evidence.length}`) : "근거 없음"}
           </button>
         )}
         {editing && onRemove && (
-          <button className="memo-remove" aria-label={`${label} 지우기`} title="지우기" onClick={onRemove}>
-            <X size={14} />
+          <button className="text-button danger" aria-label={`${label} 지우기`} onClick={onRemove}>
+            지우기
           </button>
         )}
       </div>
-      {(open || editing) && evidence.length > 0 && (
-        <ul className="evidence">
-          {evidence.map((l) => (
-            <li key={l.id}>
-              <MessageSquareQuote size={15} aria-hidden />
-              <div>
-                <span className="evidence-tag">
-                  {PHASE_SHORT[l.phase]}
-                  {l.kind !== "statement" && ` · ${KIND_LABEL[l.kind]}`}
-                </span>
-                <q>{l.text}</q>
-              </div>
-              {editing && (
-                <button className="memo-remove" aria-label="이 근거 빼기" title="근거 빼기" onClick={() => onChange({ ...item, evidence: item.evidence.filter((id) => id !== l.id) })}>
-                  <X size={13} />
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      {(open || editing) && evidence.length > 0 && <Evidence lines={evidence} onRemove={editing ? (id) => onChange({ ...item, evidence: item.evidence.filter((x) => x !== id) }) : undefined} />}
       {editing && addable.length > 0 && (
         <select
           className="evidence-add"
@@ -356,7 +335,7 @@ function RecordHead({ text }: { text: string }) {
           setTimeout(() => setCopied(false), 1500);
         }}
       >
-        {copied ? <Check size={15} /> : <ClipboardCopy size={15} />} {copied ? "복사했어요" : "복사"}
+        {copied ? "복사했어요" : "복사"}
       </button>
     </div>
   );

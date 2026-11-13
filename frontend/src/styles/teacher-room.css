@@ -1,0 +1,234 @@
+/* The teacher's live screen, made to fit one window: the bar on top runs the game, the area below
+   shows one section at a time, and long lists scroll inside their own panel instead of the page.
+   Gold means "now" (the phase, the speaker, the main button); amber means "needs a look". */
+
+.teacher-room { --pad: 18px; display: flex; flex-direction: column; height: calc(100vh - var(--page-navigation-height, 0px)); height: calc(100dvh - var(--page-navigation-height, 0px)); overflow: hidden; }
+.teacher-room.present .teacher-chrome, .teacher-room.present .teacher-body { display: none; }
+
+/* ── Top: brand and room, then the run bar, then the section tabs ── */
+.teacher-chrome { flex: none; background: var(--bg); }
+.teacher-chrome .teacher-top { position: static; gap: 14px; min-height: 50px; padding: 6px var(--pad); background: none; backdrop-filter: none; }
+.teacher-top .brand-mark { flex: none; }
+.teacher-top .topic-chip { flex: 0 1 auto; color: var(--muted); font-size: 0.92rem; }
+.teacher-top .code-chip { flex: none; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.92rem; }
+.teacher-top .code-chip strong { margin-left: 4px; color: var(--gold); font-size: 1.05rem; letter-spacing: 0.15em; }
+.teacher-top .bar-spacer { flex: 1 1 0; }
+.teacher-top .net { flex: none; display: inline-flex; align-items: center; font-size: 0.82rem; font-weight: 700; }
+.teacher-top .net::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: currentColor; }
+.teacher-top .teacher-attention { flex: none; }
+button.teacher-attention { border: 0; cursor: pointer; font: inherit; font-size: 0.82rem; font-weight: 700; }
+.teacher-room .teacher-top .teacher-practice-controls { flex: none; flex-wrap: nowrap; gap: 8px; }
+.teacher-practice-controls select { width: auto; min-height: 36px; }
+
+.run-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px 24px; padding: 10px var(--pad); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg-2); }
+.run-bar.paused { background: #221e12; }
+.run-info { min-width: 0; }
+.run-steps { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0 0 2px; padding: 0; list-style: none; font-size: 0.78rem; color: var(--muted); }
+.run-steps li { white-space: nowrap; }
+.run-steps li.done { opacity: 0.55; }
+.run-steps li.current { color: var(--gold); font-weight: 800; }
+.run-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.run-bar h2 { margin: 0; font-family: var(--serif); font-size: 1.35rem; line-height: 1.3; white-space: nowrap; }
+.run-todo { margin: 0; color: var(--muted); font-size: 0.9rem; line-height: 1.45; word-break: keep-all; }
+.run-todo.warn { color: var(--amber); font-weight: 700; }
+.run-timer { display: grid; justify-items: end; font-variant-numeric: tabular-nums; }
+.run-timer span { color: var(--muted); font-size: 0.75rem; font-weight: 700; }
+.run-timer strong { font-size: 2rem; line-height: 1.05; }
+.run-timer.urgent strong { color: var(--red); }
+.run-timer.paused, .run-timer.paused span { color: var(--amber); }
+.run-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.run-actions .button { min-height: 44px; }
+.run-actions .button.primary { padding-inline: 22px; }
+
+.view-bar { padding: 0 var(--pad); border-bottom: 1px solid var(--line); }
+.view-bar .tabs.line button { margin-bottom: -1px; font-size: 0.98rem; }
+
+/* ── Body: the section on screen, and the memo sidebar on the right edge ── */
+.teacher-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.teacher-view { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px; padding: 14px var(--pad) 16px; overflow: hidden; }
+.teacher-view > * { flex: none; margin: 0; }
+.teacher-view > .view-fill, .teacher-view > .view-split, .teacher-view > .live-board, .teacher-view > .record-panel, .teacher-view > .teacher-report.fill { flex: 1 1 auto; min-height: 0; }
+.teacher-room .panel { margin: 0; }
+.teacher-room .panel > h3 { margin-bottom: 10px; }
+.teacher-note { color: var(--muted); font-size: 0.86rem; }
+.view-hint { margin: 0; }
+
+/* Two panels side by side, each scrolling by itself */
+.view-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.view-split > * { min-height: 0; }
+.view-fill.scroll, .view-split > .view-fill { overflow-y: auto; scrollbar-width: thin; }
+.view-column { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: thin; }
+.view-column > * { flex: none; }
+
+/* Lobby: the code and who has come in */
+.lobby-join { display: flex; flex-direction: column; }
+.lobby-join .panel-head { flex: none; margin-bottom: 12px; }
+.lobby-join .panel-head h3 { margin: 0; }
+.lobby-join-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px 32px; align-items: start; }
+.lobby-join-list { min-height: 0; max-height: 100%; overflow-y: auto; scrollbar-width: thin; }
+.lobby-join-note { max-width: 220px; margin: 0; }
+.lobby-join .room-code { flex-direction: column; align-items: flex-start; }
+
+/* Lobby: the videos, as large as the window allows */
+.intro-control.view-fill { display: flex; flex-direction: column; gap: 10px; }
+.intro-control > * { flex: none; margin: 0; }
+.intro-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.intro-note { margin: 0; }
+.video-fit { flex: 1 1 auto; min-height: 0; container-type: size; display: flex; justify-content: center; align-items: flex-start; overflow: auto; }
+.video-fit > .news { flex: none; width: min(100cqw, (100cqh - 56px) * 16 / 9); margin: 0; }
+
+/* During the game: who has the floor and who has spoken on the left, what was said on the right */
+.live-board { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; }
+.live-left { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+.live-left > * { flex: none; margin: 0; }
+.live-left > .roster-panel { flex: 1 1 auto; min-height: 0; }
+.stage-panel { padding: 14px 18px; }
+.stage-panel .speaker-stage { margin: 0; }
+.stage-panel .speaker-now h2, .stage-panel .speaker-timer strong { font-size: clamp(1.5rem, 2.3vw, 2.2rem); }
+.stage-hint { margin: 8px 0 0; }
+
+/* Participation */
+.roster-panel { display: flex; flex-direction: column; min-height: 0; }
+.roster-panel > h3 { flex: none; }
+.roster-panel .participation-grid { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.roster-panel .participation-grid > * { flex: none; }
+.roster-panel .roster-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.live-progress { display: grid; gap: 6px; margin: 0 0 10px; padding: 0; border: 0; border-radius: 0; background: none; }
+.live-progress-text { margin: 0; font-weight: 700; }
+.live-bar { height: 4px; margin: 0; }
+.turn-steps { display: flex; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.turn-steps li { flex: 1; height: 4px; border-radius: 99px; background: var(--line); }
+.turn-steps li.done { background: rgba(230, 184, 92, 0.5); }
+.turn-steps li.now { background: var(--gold); }
+.participation-quiet { margin: 0 0 8px; padding: 0; border: 0; background: none; color: var(--amber); font-size: 0.9rem; }
+.participation-quiet strong { margin-left: 6px; }
+.roster-scroll { overflow-x: auto; scrollbar-width: thin; }
+.roster { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.roster th, .roster td { padding: 8px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.roster th:first-child, .roster td:first-child { padding-left: 0; }
+.roster thead th { position: sticky; top: 0; z-index: 1; background: var(--panel); color: var(--muted); font-size: 0.78rem; font-weight: 700; }
+.roster .num { text-align: center; font-variant-numeric: tabular-nums; }
+.roster tbody th strong { display: block; font-size: 0.98rem; }
+.roster tbody th span { display: block; color: var(--muted); font-size: 0.76rem; font-weight: 400; }
+.roster tbody tr.speaking > * { background: var(--gold-soft); }
+.roster tbody tr.speaking th strong { color: var(--gold); }
+.roster tbody tr.silent th strong { color: var(--amber); }
+.roster .no { color: var(--muted); opacity: 0.7; }
+.roster .offline { color: var(--red); font-weight: 700; }
+.roster .online { color: var(--muted); }
+.roster tfoot th, .roster tfoot td { border-bottom: 0; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+
+/* Status words, everywhere on the teacher screen */
+.live-status { display: inline; padding: 0; border-radius: 0; background: none; color: var(--text); font-size: 0.88rem; font-weight: 700; animation: none; }
+.live-status.now, .live-status.speaking, .live-status.turn, .live-status.recent { background: none; color: var(--gold); }
+.live-status.warn, .live-status.idle { background: none; color: var(--amber); }
+.live-status.next { background: none; color: var(--text); }
+.live-status.ready, .live-status.done { background: none; color: var(--muted); }
+
+/* The lobby table */
+.participation table { font-size: 0.92rem; }
+.participation th, .participation td { padding: 9px 8px; }
+.participation th:first-child, .participation td:first-child { padding-left: 0; }
+
+/* The discussion record: one panel, three views; only its body scrolls */
+.record-panel { display: flex; flex-direction: column; min-height: 0; }
+.record-head { flex: none; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; border-bottom: 1px solid var(--line); }
+.record-head h3 { margin: 0; }
+.record-head .tabs.line button { margin-bottom: -1px; }
+.record-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.record-body > * { flex: none; }
+.record-hint { margin: 10px 0 0; }
+.record-body > .transcript, .record-body > .statement-list, .record-body > .question-list { flex: 1 1 auto; min-height: 0; max-height: none; margin-top: 10px; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; scrollbar-width: thin; }
+.record-panel .statement-list { gap: 14px; }
+.record-write { flex: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.record-write h4 { margin: 0; color: var(--muted); font-size: 0.85rem; font-weight: 700; }
+.record-write .teacher-line-input { margin-top: 6px; padding-top: 0; border-top: 0; }
+.record-panel .question { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+.record-panel .question summary { padding: 10px 0; }
+.record-panel .question[open] summary { border-bottom: 0; }
+.record-panel .question-replies { padding: 0 0 12px 22px; }
+
+/* The report, filling its section: header and tabs stay, the body scrolls */
+.teacher-report.fill { display: flex; flex-direction: column; padding: 14px 22px 0; }
+.teacher-report.fill > * { flex: none; }
+.teacher-report.fill .report-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 14px; }
+.teacher-report.fill .report-head .eyebrow { display: none; }
+.teacher-report.fill .report-head h3 { margin: 0; font-size: 1.25rem; }
+.teacher-report.fill .report-meta { margin: 0 0 6px; }
+.teacher-report.fill > .report-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 18px 6px 18px 0; scrollbar-width: thin; }
+.teacher-report.fill .ai-students { top: 0; }
+.teacher-report.fill .student-detail { scroll-margin-top: 8px; }
+.teacher-report.fill .full-log-feed .transcript { max-height: none; }
+
+/* Result */
+.result-panel h3 { margin-bottom: 10px; }
+.summary h3 { margin-bottom: 4px; }
+.summary dl { gap: 0; }
+.summary dl div { padding: 8px 0; border-radius: 0; background: none; border-bottom: 1px solid var(--line); }
+.summary dl div:last-child { border-bottom: 0; }
+
+/* ── Memo sidebar: slides in from the right edge; a tab halfway down pulls it out and back ── */
+.teacher-side { position: relative; width: 0; min-height: 0; transition: width 0.22s ease; }
+.teacher-side.open { width: 340px; }
+.teacher-view { padding-right: 58px; }
+.side-panel { position: absolute; top: 0; bottom: 0; left: 0; width: 340px; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--bg-2); visibility: hidden; transition: visibility 0s linear 0.22s; }
+.teacher-side.open .side-panel { visibility: visible; transition-delay: 0s; }
+.side-handle { position: absolute; z-index: 5; top: 50%; right: 100%; transform: translateY(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: 44px; padding: 16px 0 14px; border: 1px solid #d9cdb2; border-right: 0; border-radius: 14px 0 0 14px; background: var(--paper); color: var(--paper-ink); font: inherit; font-size: 0.95rem; font-weight: 800; cursor: pointer; box-shadow: -8px 6px 24px rgba(0, 0, 0, 0.45); transition: width 0.15s, background 0.15s; }
+.side-handle:hover { width: 50px; background: #fffaf0; }
+.side-handle svg { color: #a0742a; }
+.side-handle-label, .side-handle-alert { writing-mode: vertical-rl; letter-spacing: 0.15em; }
+.side-handle-count { min-width: 24px; padding: 1px 6px; border-radius: 99px; background: var(--paper-ink); color: var(--paper); font-size: 0.78rem; text-align: center; font-variant-numeric: tabular-nums; }
+.side-handle-alert { color: #b4501c; font-size: 0.82rem; }
+.side-handle.alert { border-color: var(--amber); }
+.side-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.side-head > div { display: grid; }
+.side-head strong { font-size: 1.02rem; }
+.side-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* Inside the sidebar the sections are separated by lines, not boxed again. */
+.side-body > .panel { padding: 14px 18px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; }
+.side-body > .panel:last-child { border-bottom: 0; }
+.moderation-pending { color: var(--amber); font-weight: 700; }
+.panel-toggle > span + span { flex: none; }
+.guide summary { font-weight: 700; }
+.side-backdrop { display: none; }
+@media (prefers-reduced-motion: reduce) { .teacher-side, .side-panel, .side-handle { transition: none; } }
+
+@media (max-width: 1180px) {
+  .run-bar { grid-template-columns: minmax(0, 1fr) auto; }
+  .run-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  .teacher-side.open, .side-panel { width: 300px; }
+}
+
+/* Small or short windows: one window is not enough, so the page scrolls as usual. */
+@media (max-width: 960px), (max-height: 599px) {
+  .teacher-room { display: block; height: auto; overflow: visible; }
+  .teacher-body { display: block; }
+  .teacher-view { overflow: visible; padding: 14px 16px 40px; }
+  .view-split, .live-board { grid-template-columns: minmax(0, 1fr); }
+  .view-column, .view-fill.scroll, .view-split > .view-fill, .lobby-join-list { overflow: visible; }
+  .lobby-join-body { grid-template-columns: minmax(0, 1fr); }
+  .video-fit { container-type: normal; overflow: visible; }
+  .video-fit > .news { width: 100%; }
+  .record-body > .transcript, .record-body > .statement-list, .record-body > .question-list { max-height: 60vh; }
+  .roster-panel .roster-scroll { overflow-y: visible; }
+  .teacher-report.fill > .report-body { overflow: visible; }
+}
+
+/* Phones and narrow windows: the bars wrap onto more lines. */
+@media (max-width: 960px) {
+  .teacher-top .topic-chip { display: none; }
+  .teacher-chrome .teacher-top { flex-wrap: wrap; row-gap: 6px; }
+  .run-bar { gap: 8px 16px; }
+  .run-bar h2 { font-size: 1.2rem; }
+  .run-timer strong { font-size: 1.6rem; }
+  .run-actions .button { flex: 1 1 auto; }
+}
+
+/* Small or short windows: the sidebar slides over the page; its tab waits on the right edge. */
+@media (max-width: 960px), (max-height: 599px) {
+  .teacher-view { padding-right: 52px; }
+  .teacher-side { position: fixed; z-index: 120; top: 0; right: 0; height: 100vh; height: 100dvh; }
+  .teacher-side.open, .side-panel { width: min(360px, calc(100vw - 52px)); }
+  .side-panel { z-index: 1; background: var(--panel); box-shadow: -16px 0 40px rgba(0, 0, 0, 0.5); }
+  .side-backdrop { display: block; position: fixed; inset: 0; z-index: 0; border: 0; background: rgba(0, 0, 0, 0.55); cursor: pointer; }
+}

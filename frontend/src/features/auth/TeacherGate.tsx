@@ -91,6 +91,8 @@ function loginErrorMessage(code: string) {
       ? "팝업이 차단되었어요. 브라우저에서 팝업을 허용해 주세요."
       : code === "auth/network-request-failed"
         ? "인터넷 연결을 확인하고 다시 시도해 주세요."
+        : code === "auth/unauthorized-domain"
+          ? `현재 접속 주소(${window.location.hostname})에서는 구글 로그인이 허용되지 않았어요. 사이트 관리자에게 알려 주세요.`
         : SETUP_ERRORS.includes(code)
           ? "이 사이트에서 지금은 구글 로그인을 쓸 수 없어요. 사이트 관리자에게 알려 주세요."
           : "로그인하지 못했어요. 잠시 후 다시 시도해 주세요.";

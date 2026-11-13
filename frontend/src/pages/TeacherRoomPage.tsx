@@ -1,32 +1,31 @@
 import { useEffect, useState } from "react";
-import { BookOpen, FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
 import type { Participant, Room, Rounds } from "../types/game";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import EventCard from "../components/EventCard";
-import PhaseHeader from "../components/PhaseHeader";
-import { QuestionList, StatementList } from "../features/discussion/DiscussionNotes";
+import Tabs from "../components/Tabs";
 import { useFloor } from "../features/discussion/floor";
 import SpeakerStage from "../features/discussion/SpeakerStage";
-import TranscriptFeed, { TeacherLineInput } from "../features/discussion/TranscriptFeed";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
-import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
+import { PHASE_LABELS, PHASE_ORDER, PHASE_SHORT, SPEAKING, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import IntroControl from "../features/teacher/IntroControl";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
+import DiscussionRecord from "../features/teacher/DiscussionRecord";
 import LobbySettings from "../features/teacher/LobbySettings";
 import ModerationPanel from "../features/teacher/ModerationPanel";
 import ParticipationBoard, { GameSummary, ParticipationGrid } from "../features/teacher/ParticipationBoard";
 import PhaseMemo, { usePhaseNotes } from "../features/teacher/PhaseMemo";
+import RunBar from "../features/teacher/RunBar";
 import TeacherReport from "../features/teacher/TeacherReport";
-import { gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
+import TeacherSidebar, { useSidebar } from "../features/teacher/TeacherSidebar";
+import { countNotes, gameKey, loadDebate, saveDebate } from "../features/teacher/teacherStorage";
 import TopicPicker from "../features/topics/TopicPicker";
 import PauseOverlay from "../components/PauseOverlay";
 import { useTopics } from "../features/topics/useTopics";
 import { RevealSummary } from "../features/voting/RevealView";
-
 
 function useServerNow(offset: number) {
   const [now, setNow] = useState(Date.now() + offset);
@@ -37,7 +36,16 @@ function useServerNow(offset: number) {
   return now;
 }
 
-/** `startIn` comes from the practice page, which starts the game itself; a real room starts from here. */
+type LobbyView = "join" | "intro" | "setup";
+type DoneView = "result" | "report" | "record";
+const INTRO_LABEL = { waiting: "대기", briefing: "이슈 브리핑", rules: "게임 규칙", roles: "역할 고르기" } as const;
+
+/**
+ * The teacher's screen, made to fit one window. The bar on top runs the game (phase, what to do,
+ * clock, buttons) and switches between sections; the area below shows one section at a time, and
+ * long lists scroll inside their own panel. Notes live in a sidebar on the right edge.
+ * `startIn` comes from the practice page, which starts the game itself; a real room starts from here.
+ */
 export default function TeacherRoomPage({ api, practice = false, barControls, startIn }: { api: RoomApi; practice?: boolean; barControls?: React.ReactNode; startIn?: number | null }) {
   const { state, action, quiet, busy, error, offset, online } = api;
   const { room, participants, rounds } = state!;
@@ -45,6 +53,9 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const { catalog } = useTopics(!practice);
   const [changingTopic, setChangingTopic] = useState(false);
   const [present, setPresent] = useState(false);
+  const [lobbyView, setLobbyView] = useState<LobbyView>("join");
+  const [doneView, setDoneView] = useState<DoneView>("result");
+  const [sideOpen, setSideOpen] = useSidebar();
   const serverNow = useServerNow(offset);
   const phase = room.phase;
   const speaking = SPEAKING.includes(phase);
@@ -105,106 +116,190 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
     });
   }, [finished, key, room.code, room.topic, room.createdAt, room.endedAt, room.settings, practice, participants, rounds.transcript, rounds.reveal, rounds.summary, host.moderation, notes]);
 
+  const roster = (
+    <section className="panel roster-panel" data-testid="participation-panel">
+      <h3>참여 현황</h3>
+      <ParticipationGrid
+        room={room}
+        participants={participants}
+        rounds={rounds}
+        serverNow={practice ? room.createdAt : serverNow}
+        speakingUid={floor?.uid ?? (turn?.stage !== "qa" ? turn?.uid : undefined)}
+        floor={floor}
+        floorSeconds={floorSeconds}
+        alwaysOnline={practice}
+      />
+    </section>
+  );
+  const record = <DiscussionRecord room={room} participants={participants} rounds={rounds} floor={floor} speakingUid={speaker?.uid} busy={busy} action={action} />;
+
+  // Section tabs: before the game and after it there is more than fits one screen.
+  const tabs =
+    phase === "lobby" ? (
+      <Tabs<LobbyView>
+        label="대기실 화면"
+        variant="line"
+        active={lobbyView}
+        onChange={setLobbyView}
+        items={[
+          { id: "join", label: `학생 입장 ${count}명` },
+          { id: "intro", label: room.intro ? `시작 전 영상 · ${INTRO_LABEL[room.intro.step]}` : "이슈 브리핑" },
+          { id: "setup", label: "주제와 설정" },
+        ]}
+      />
+    ) : finished ? (
+      <Tabs<DoneView>
+        label="결과 화면"
+        variant="line"
+        active={doneView}
+        onChange={setDoneView}
+        items={[
+          { id: "result", label: "결과와 참여" },
+          { id: "report", label: "수행평가 레포트" },
+          { id: "record", label: `토론 기록 ${rounds.transcript.length}` },
+        ]}
+      />
+    ) : null;
+
   return (
-    <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}`}>
+    <main className={`teacher-room${present ? " present" : ""}`}>
       {present && <ClassScreen room={room} participants={participants} rounds={rounds} offset={offset} onClose={closePresent} />}
       <StartCountdown left={countdown} />
-      <header className="teacher-top">
-        <span className="brand-mark">
-          whose side<span>?</span>
-        </span>
-        <span className="tag">선생님 진행 화면</span>
-        <span className="topic-chip" title={room.topic.title}>
-          {room.topic.title}
-        </span>
-        <span className="code-chip">
-          방 코드 <strong>{room.code}</strong>
-        </span>
-        {toReview > 0 && <span className="teacher-attention" data-testid="review-badge">확인할 발언 {toReview}</span>}
-        {phase !== "lobby" && (
-          <button className="button ghost small" data-testid="present-toggle" onClick={openPresent}>
-            <Maximize2 size={15} /> 교실 화면 (전체 화면)
-          </button>
-        )}
-        {barControls && <div className="teacher-practice-controls">{barControls}</div>}
-        <span className={`net ${online ? "on" : "off"}`}>{online ? <Wifi size={16} aria-label="연결됨" /> : <WifiOff size={16} aria-label="연결 끊김" />}</span>
-      </header>
+      <div className="teacher-chrome">
+        <header className="teacher-top">
+          <span className="brand-mark">
+            whose side<span>?</span>
+          </span>
+          <span className="topic-chip" title={room.topic.title}>
+            {room.topic.title}
+          </span>
+          {!practice && (
+            <span className="code-chip">
+              방 코드 <strong>{room.code}</strong>
+            </span>
+          )}
+          {toReview > 0 && (
+            <button className="teacher-attention" data-testid="review-badge" title="메모 사이드바에서 확인하기" onClick={() => setSideOpen(true)}>
+              확인할 발언 {toReview}
+            </button>
+          )}
+          <span className="bar-spacer" />
+          {barControls && <div className="teacher-practice-controls">{barControls}</div>}
+          {phase !== "lobby" && (
+            <button className="button ghost small" data-testid="present-toggle" onClick={openPresent}>
+              교실 화면 띄우기
+            </button>
+          )}
+          <span className={`net ${online ? "on" : "off"}`} role="status">
+            {online ? "연결됨" : "연결 끊김"}
+          </span>
+        </header>
 
-      <div className="teacher-grid">
-        <div className="teacher-main">
+        <RunBar room={room} offset={offset} hideTimer={Boolean(turn)} notice={phase === "lobby" ? blockers : undefined}>
+          {phase === "lobby" ? (
+            <button className="button primary" data-testid="start-game" disabled={busy || blockers.length > 0} onClick={() => void action("start")}>
+              게임 시작
+            </button>
+          ) : (
+            phase !== "ended" && (
+              <>
+                {TIMED.includes(phase) &&
+                  (room.paused ? (
+                    <button className="button ghost" disabled={busy} onClick={() => void action("resume")}>
+                      재개
+                    </button>
+                  ) : (
+                    <button className="button ghost" disabled={busy} onClick={() => void action("pause")}>
+                      일시정지
+                    </button>
+                  ))}
+                {TIMED.includes(phase) && (
+                  <button className="button ghost" disabled={busy} onClick={() => void action("extend", { seconds: 60 })}>
+                    1분 연장
+                  </button>
+                )}
+                {turn && (
+                  <button className="button ghost" data-testid="next-phase" disabled={busy} onClick={() => void action("skip-phase", { phaseVersion: room.phaseVersion })}>
+                    발표 건너뛰고 {PHASE_SHORT[next]}
+                  </button>
+                )}
+                {turn ? (
+                  <button className="button primary" data-testid="next-turn" disabled={busy} onClick={() => void action("next", { phaseVersion: room.phaseVersion })}>
+                    {upcoming ? `다음 차례: ${upcoming.nickname}` : `다음 단계: ${PHASE_SHORT[next]}`}
+                  </button>
+                ) : phase === "reveal" ? (
+                  <button className="button primary" disabled={busy} onClick={() => void action("end")}>
+                    게임 종료
+                  </button>
+                ) : (
+                  <button className="button primary" data-testid="next-phase" disabled={busy} onClick={() => void action("next", { phaseVersion: room.phaseVersion })}>
+                    다음 단계: {PHASE_SHORT[next]}
+                  </button>
+                )}
+              </>
+            )
+          )}
+        </RunBar>
+        {tabs && <nav className="view-bar">{tabs}</nav>}
+      </div>
+
+      <div className={`teacher-body${sideOpen ? " side-open" : ""}`}>
+        <div className="teacher-view">
           {practice && (
-            <p className="banner" data-testid="teacher-practice-note">
-              연습용 선생님 화면이에요. 참여 현황과 발언 정리를 보며 진행을 조작하고, 게임 화면은 ‘교실 화면’으로 띄워요. 학생 입장·주제 및 설정 변경·발언 검토는 실제 방에서 사용할 수 있어요.
+            <p className="teacher-note" data-testid="teacher-practice-note">
+              연습용 선생님 화면이에요. 학생 입장, 주제·설정 변경, 발언 검토는 실제 방에서만 쓸 수 있어요.
               {phase === "lobby" && waiting > 0 && " 학생 화면에서 브리핑을 보고 선호 역할을 고르면 시작할 수 있어요."}
             </p>
           )}
-          <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} hideTimer={Boolean(turn)} />
           {error && (
             <p className="error-box" role="alert">
               {error}
             </p>
           )}
 
-          {speaking && <SpeakerStage room={room} participants={participants} offset={offset} busy={busy} onCall={(uid) => void action("speaker", { targetUid: uid, phaseVersion: room.phaseVersion })} />}
-
-          <div className="run-row">
-          {phase === "lobby" ? (
-            <div className="controls">
-              <button className="button primary large" data-testid="start-game" disabled={busy || blockers.length > 0} onClick={() => void action("start")}>
-                <Play size={18} /> 게임 시작
-              </button>
-              {blockers.length > 0 && (
-                <ul className="blockers">
-                  {blockers.map((b) => (
-                    <li key={b}>{b}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
-            phase !== "ended" && (
-              <div className="controls" aria-label="진행 조작">
-                {TIMED.includes(phase) &&
-                  (room.paused ? (
-                    <button className="button secondary" disabled={busy} onClick={() => void action("resume")}>
-                      <Play size={17} /> 재개
-                    </button>
-                  ) : (
-                    <button className="button secondary" disabled={busy} onClick={() => void action("pause")}>
-                      <Pause size={17} /> 일시정지
-                    </button>
-                  ))}
-                {TIMED.includes(phase) && (
-                  <button className="button ghost" disabled={busy} onClick={() => void action("extend", { seconds: 60 })}>
-                    <Plus size={17} /> 1분 연장
-                  </button>
-                )}
-                {turn && (
-                  <button className="button ghost" data-testid="next-phase" disabled={busy} onClick={() => void action("skip-phase", { phaseVersion: room.phaseVersion })}>
-                    <FastForward size={17} /> 건너뛰고 {PHASE_LABELS[next]}
-                  </button>
-                )}
-                {turn ? (
-                  <button className="button primary" data-testid="next-turn" disabled={busy} onClick={() => void action("next", { phaseVersion: room.phaseVersion })}>
-                    <SkipForward size={17} /> {upcoming ? `다음 차례: ${upcoming.nickname}` : `다음 단계: ${PHASE_LABELS[next]}`}
-                  </button>
-                ) : phase === "reveal" ? (
-                  <button className="button primary" disabled={busy} onClick={() => void action("end")}>
-                    <Flag size={17} /> 게임 종료
-                  </button>
-                ) : (
-                  <button className="button primary" data-testid="next-phase" disabled={busy} onClick={() => void action("next", { phaseVersion: room.phaseVersion })}>
-                    <SkipForward size={17} /> 다음 단계: {PHASE_LABELS[next]}
-                  </button>
-                )}
+          {phase === "lobby" && lobbyView === "join" && (
+            <section className="panel view-fill lobby-join">
+              <div className="panel-head">
+                <h3>학생 입장</h3>
+                <span className="muted small">
+                  {count}명 들어옴 · {room.minStudents}~{room.maxStudents}명
+                </span>
               </div>
-            )
+              <div className="lobby-join-body">
+                {practice ? <p className="muted small lobby-join-note">연습용 방에는 다른 학생이 들어올 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 보여요.</p> : <RoomCode code={room.code} large />}
+                <div className="lobby-join-list">
+                  <ParticipationBoard
+                    room={room}
+                    rounds={rounds}
+                    alwaysOnline={practice}
+                    floor={floor}
+                    floorSeconds={floorSeconds}
+                    participants={participants}
+                    serverNow={practice ? room.createdAt : serverNow}
+                    busy={busy}
+                    onKick={!practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
+                  />
+                </div>
+              </div>
+            </section>
           )}
-          </div>
 
-          {phase === "lobby" && (
-            <>
-              <section className="panel">
+          {phase === "lobby" &&
+            lobbyView === "intro" &&
+            (room.intro ? (
+              <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} />
+            ) : (
+              <section className="panel view-fill intro-control">
+                <p className="muted small intro-note">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
+                <div className="video-fit">
+                  <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
+                </div>
+              </section>
+            ))}
+
+          {phase === "lobby" && lobbyView === "setup" && (
+            <div className="view-split">
+              <section className="panel view-fill scroll">
                 <div className="panel-head">
                   <h3>주제</h3>
                   <button className="button ghost small" disabled={practice} onClick={() => setChangingTopic((v) => !v)}>
@@ -227,16 +322,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                   </>
                 )}
               </section>
-              {room.intro ? (
-                <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} />
-              ) : (
-                <section className="panel">
-                  <h3>이슈 브리핑</h3>
-                  <p className="muted small">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
-                  <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
-                </section>
-              )}
-              <section className="panel">
+              <section className="panel view-fill scroll">
                 <h3>진행 설정</h3>
                 {(catalog || practice) && (
                   <fieldset disabled={practice} className="practice-settings-preview">
@@ -251,95 +337,51 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                   </fieldset>
                 )}
               </section>
-            </>
-          )}
-
-          {phase !== "lobby" && (
-            <section className="panel" data-testid="participation-panel">
-              <h3>
-                참여 현황 <span className="muted small">{count}명</span>
-              </h3>
-              <ParticipationGrid room={room} participants={participants} rounds={rounds} serverNow={practice ? room.createdAt : serverNow} speakingUid={floor?.uid ?? (turn?.stage !== "qa" ? turn?.uid : undefined)} floor={floor} floorSeconds={floorSeconds} alwaysOnline={practice} />
-            </section>
-          )}
-
-          {room.event && phase === "event" && <EventCard event={room.event} collapsible defaultOpen={false} />}
-
-          {phase !== "lobby" && phase !== "role" && (
-            <div className="discussion-grid">
-              <section className="panel">
-                <h3 className="memo-title">학생별 입장 발언</h3>
-                <StatementList room={room} participants={participants} rounds={rounds} />
-              </section>
-              {(phase !== "statement" || rounds.transcript.some((l) => l.kind !== "statement")) && (
-                <section className="panel">
-                  <h3 className="memo-title">질문과 대답</h3>
-                  <QuestionList room={room} participants={participants} rounds={rounds} floor={floor} />
-                </section>
-              )}
             </div>
           )}
 
-          {(speaking || rounds.transcript.length > 0) && phase !== "lobby" && (
-            <details className="panel" data-testid="transcript-panel" open={speaking}>
-              <summary>발언 기록 고치기 · 대신 적기</summary>
-              <TranscriptFeed
-                lines={rounds.transcript}
-                participants={participants}
-                topic={room.topic}
-                speakingUid={speaker?.uid}
-                emptyText="학생이 마이크를 켜고 말하면 여기에 글로 기록돼요."
-                disabled={busy}
-                onEdit={(lineId, text) => void action("line-edit", { lineId, text })}
-                onDelete={(lineId) => void action("line-delete", { lineId })}
-              />
-              {speaking && <TeacherLineInput key={phase} room={room} participants={participants} floor={floor} speakingUid={speaker?.uid} disabled={busy} onAdd={(body) => action("line-add", body)} />}
-            </details>
+          {phase !== "lobby" && !finished && (
+            <div className="live-board">
+              <div className="live-left">
+                {speaking && (
+                  <section className="panel stage-panel">
+                    <SpeakerStage room={room} participants={participants} offset={offset} busy={busy} onCall={(uid) => void action("speaker", { targetUid: uid, phaseVersion: room.phaseVersion })} />
+                    {turn && turn.stage !== "qa" && <p className="muted small stage-hint">이름을 누르면 그 학생에게 바로 차례를 줄 수 있어요.</p>}
+                  </section>
+                )}
+                {room.event && phase === "event" && <EventCard event={room.event} collapsible defaultOpen={false} />}
+                {roster}
+              </div>
+              {record}
+            </div>
           )}
-          {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />}
-          {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
+
+          {finished && doneView === "result" && (
+            <div className="view-split">
+              <div className="view-column">
+                {rounds.reveal && (
+                  <section className="panel result-panel" data-testid="reveal-side">
+                    <h3>결과</h3>
+                    <RevealSummary reveal={rounds.reveal} participants={participants} topic={room.topic} />
+                  </section>
+                )}
+                {phase === "ended" && <GameSummary participants={participants} rounds={rounds} />}
+                <p className="muted small view-hint">학생별 평가와 학생부 기록 초안은 위의 ‘수행평가 레포트’에서 볼 수 있어요.</p>
+              </div>
+              {roster}
+            </div>
+          )}
+          {finished && doneView === "report" && (
+            <TeacherReport fill topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />
+          )}
+          {finished && doneView === "record" && record}
         </div>
 
-        <aside className="teacher-side">
+        <TeacherSidebar open={sideOpen} onOpenChange={setSideOpen} count={countNotes(notes)} attention={toReview}>
           <PhaseMemo phase={phase} notes={notes} participants={participants} onAdd={addNote} onRemove={removeNote} />
-          {finished && rounds.reveal && (
-            <section className="panel reveal-side" data-testid="reveal-side">
-              <h3 className="memo-title">결과 공개</h3>
-              <RevealSummary reveal={rounds.reveal} participants={participants} topic={room.topic} />
-            </section>
-          )}
-          {phase === "lobby" && (
-            <section className="panel">
-              <h3>학생 입장</h3>
-              {practice ? <p className="muted">연습용 방에는 다른 학생이 입장할 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 표시돼요.</p> : <RoomCode code={room.code} large />}
-            </section>
-          )}
-          {phase === "lobby" && (
-            <section className="panel">
-              <h3>
-                참여 현황{" "}
-                <span className="muted small">
-                  {count}명 · {room.minStudents}~{room.maxStudents}명
-                </span>
-              </h3>
-              <ParticipationBoard
-                room={room}
-                rounds={rounds}
-                alwaysOnline={practice}
-                floor={floor}
-                floorSeconds={floorSeconds}
-                participants={participants}
-                serverNow={practice ? room.createdAt : serverNow}
-                busy={busy}
-                onKick={!practice ? (uid) => void action("kick", { targetUid: uid }) : undefined}
-              />
-            </section>
-          )}
           <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
           <details className="panel guide">
-            <summary>
-              <BookOpen size={17} aria-hidden /> 진행 안내
-            </summary>
+            <summary>진행 안내와 질문 예시</summary>
             <p>{host.teacherGuide.summary}</p>
             <ul>
               {host.teacherGuide.tips.map((t) => (
@@ -354,7 +396,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
               ))}
             </ul>
           </details>
-        </aside>
+        </TeacherSidebar>
       </div>
     </main>
   );
@@ -374,7 +416,7 @@ function ClassScreen({ room, participants, rounds, offset, onClose }: { room: Ro
         {timer.label && <span className="bar-timer">{timer.label}</span>}
         <span className="bar-spacer" />
         <button className="button ghost small" onClick={onClose}>
-          <Minimize2 size={15} /> 나가기
+          교실 화면 닫기
         </button>
       </header>
       {SPEAKING.includes(room.phase) && <SpeakerStage room={room} participants={participants} offset={offset} />}

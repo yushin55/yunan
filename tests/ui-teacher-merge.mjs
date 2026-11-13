@@ -29,15 +29,19 @@ try {
     await expect(page.getByTestId('participant-row')).toHaveCount(6);
     await expect(page.getByTestId('phase-memo')).toBeVisible();
     if (phase !== 'lobby') await expect(page.getByTestId('participation-grid')).toBeVisible();
+    // The teacher screen fits one window: nothing below it to scroll to.
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - document.documentElement.clientHeight)).toBeLessThanOrEqual(0);
     if (phase === 'reveal' || phase === 'ended') {
-      await expect(page.getByTestId('teacher-report')).toBeVisible();
+      // Results first; the report is one section tab away.
       await expect(page.getByTestId('reveal-side')).toBeVisible();
+      if (phase === 'ended') await expect(page.getByTestId('game-summary')).toBeVisible();
+      await page.getByRole('tab', { name: '수행평가 레포트' }).click();
+      await expect(page.getByTestId('teacher-report')).toBeVisible();
       const state = await page.evaluate(() => JSON.parse(localStorage.getItem('bridge.practice')));
       if (!state.snapshot.rounds.reveal.ballots.every(ballot => ballot.voted)) throw new Error('Preview lost the completed votes');
       await page.getByRole('tab', { name: '학생별 리포트', exact: true }).click();
       await page.getByTestId('ai-report-generate').click();
       await expect(page.getByTestId('ai-report')).toBeVisible();
-      if (phase === 'ended') await expect(page.getByTestId('game-summary')).toBeVisible();
     }
     await context.close();
     console.log(`PASS teacher preview: ${phase}`);
@@ -48,6 +52,17 @@ try {
     const page = await context.newPage();
     await page.goto(`${origin}/teacher/preview/event?topic=school_cctv`);
     await expect(page.getByTestId('practice-phase-jump')).toHaveValue('event');
+    // The memo lives in a sidebar: open on wide screens, closed on phones until the teacher opens it.
+    const memoToggle = page.getByTestId('memo-toggle');
+    if (viewport.width >= 1200) {
+      await expect(page.getByTestId('phase-memo')).toBeVisible();
+      await memoToggle.click();
+      await expect(page.getByTestId('phase-memo')).toBeHidden();
+    } else {
+      await expect(page.getByTestId('phase-memo')).toBeHidden();
+    }
+    await memoToggle.click();
+    await expect(page.locator('#phase-memo-text')).toBeFocused();
     await page.locator('#phase-memo-text').fill('Merge verification: evidence from the discussion');
     await page.getByTestId('memo-add').click();
     await page.reload();
@@ -55,8 +70,10 @@ try {
     await page.getByTestId('next-phase').click();
     await expect(page.getByTestId('practice-phase-jump')).toHaveValue('vote');
     await page.getByTestId('next-phase').click();
+    await page.getByRole('tab', { name: '수행평가 레포트' }).click();
     await expect(page.getByTestId('teacher-report')).toBeVisible();
     await page.getByRole('button', { name: '게임 종료', exact: true }).click();
+    await page.getByRole('tab', { name: '결과와 참여' }).click();
     await expect(page.getByTestId('game-summary')).toBeVisible();
     await page.goto(`${origin}/teacher/history`);
     await expect(page.getByTestId('history-page')).toBeVisible();

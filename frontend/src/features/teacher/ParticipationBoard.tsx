@@ -1,6 +1,6 @@
-import { Check, Mic, Minus, UserX } from "lucide-react";
+import { Check, Mic, Minus } from "lucide-react";
 import type { Floor, Participant, Phase, Room, Rounds, SpeakingPhase } from "../../types/game";
-import { KIND_LABEL, PHASE_SHORT } from "../game/phases";
+import { KIND_LABEL } from "../game/phases";
 import { roleName } from "../roles/roleName";
 
 const CONNECTED_MS = 100_000;
@@ -117,8 +117,8 @@ export default function ParticipationBoard({
                 </td>
                 {onKick && (
                   <td>
-                    <button className="icon-button" aria-label={`${p.nickname} 내보내기`} title="대기실에서 내보내기" disabled={busy} onClick={() => onKick(p.uid)}>
-                      <UserX size={16} />
+                    <button className="text-button danger" aria-label={`${p.nickname} 내보내기`} title="대기실에서 내보내기" disabled={busy} onClick={() => onKick(p.uid)}>
+                      내보내기
                     </button>
                   </td>
                 )}
@@ -159,10 +159,7 @@ function ProgressStrip({ room, participants, rounds }: { room: Room; participant
   }
   return (
     <div className="live-progress" data-testid="live-progress">
-      <div className="live-progress-text">
-        <span className="phase-memo-phase">{PHASE_SHORT[phase]}</span>
-        <strong>{text}</strong>
-      </div>
+      <p className="live-progress-text">{text}</p>
       {turn ? (
         <ol className="turn-steps" aria-label="발표 순서">
           {turn.order.map((uid, i) => (
@@ -208,8 +205,8 @@ export function GameSummary({ participants, rounds }: { participants: Participan
 }
 
 /**
- * During the game: one card per student, so the teacher sees at a glance who has spoken, asked,
- * answered, checked their role and voted — and who has not said anything yet.
+ * During the game: one row per student, so the teacher reads down a column to see who has spoken,
+ * asked, answered, checked their role and voted — and who has not said anything yet.
  */
 export function ParticipationGrid({ room, participants, rounds, serverNow, speakingUid, floor, floorSeconds = 0, alwaysOnline = false }: { room: Room; participants: Participant[]; rounds: Rounds; serverNow: number; speakingUid?: string; floor?: Floor | null; floorSeconds?: number; alwaysOnline?: boolean }) {
   const turns = (uid: string, kind: string) => new Set(rounds.transcript.filter((l) => l.uid === uid && l.kind === kind).map((l) => l.turn)).size;
@@ -218,73 +215,88 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
     statement: turns(p.uid, "statement"),
     question: turns(p.uid, "question"),
     answer: turns(p.uid, "answer"),
+    voted: p.submitted.includes("vote") || Boolean(rounds.reveal?.ballots.find((b) => b.uid === p.uid)?.voted),
   }));
   const total = participants.length;
-  const someone = (key: "statement" | "question" | "answer") => people.filter((x) => x[key] > 0).length;
-  const has = (key: string) => participants.filter((p) => p.submitted.includes(key)).length;
   const order = ["role", "statement", "event", "vote", "reveal", "ended"];
   const reached = (phase: string) => order.indexOf(room.phase) >= order.indexOf(phase);
   // Quiet students stand out once there has been a chance to talk.
   const quiet = reached("event") ? people.filter((x) => x.statement + x.question + x.answer === 0) : [];
-  const chips: [string, string][] = [
-    ["역할 확인", `${has("role")}/${total}`],
-    ...(reached("statement") ? ([["입장 발표", `${someone("statement")}/${total}`]] as [string, string][]) : []),
-    ...(reached("statement") ? ([["질문한 학생", `${someone("question")}/${total}`], ["답변한 학생", `${someone("answer")}/${total}`]] as [string, string][]) : []),
-    ...(reached("vote") ? ([["투표", `${rounds.reveal ? rounds.reveal.ballots.filter((b) => b.voted).length : has("vote")}/${total}`]] as [string, string][]) : []),
-  ];
+  const showVote = reached("vote");
+  const sum = (key: "statement" | "question" | "answer") => people.filter((x) => x[key] > 0).length;
   return (
     <div className="participation-grid" data-testid="participation-grid">
       <ProgressStrip room={room} participants={participants} rounds={rounds} />
-      <dl className="participation-chips">
-        {chips.map(([label, value]) => (
-          <div key={label}>
-            <dt>{label}</dt>
-            <dd>{value}</dd>
-          </div>
-        ))}
-      </dl>
       {quiet.length > 0 && (
         <p className="participation-quiet" data-testid="quiet-students">
-          아직 한 번도 말하지 않은 학생: <strong>{quiet.map((x) => x.p.nickname).join(", ")}</strong>
+          아직 한 번도 말하지 않은 학생 <strong>{quiet.map((x) => x.p.nickname).join(", ")}</strong>
         </p>
       )}
-      <ul className="student-cards">
-        {people.map(({ p, statement, question, answer }) => {
-          const online = alwaysOnline || serverNow - p.connectedAt < CONNECTED_MS;
-          const silent = quiet.some((x) => x.p.uid === p.uid);
-          const live = p.uid === floor?.uid;
-          const inTurn = room.turn?.stage !== "qa" && p.uid === room.turn?.uid;
-          const last = rounds.transcript.filter((line) => line.uid === p.uid && line.phase === room.phase).at(-1);
-          const status = live && floor
-            ? `${KIND_LABEL[floor.kind]} 중${floorSeconds ? ` · ${floorSeconds}초` : ""}`
-            : inTurn ? "차례 · 마이크 대기"
-            : room.phase === "role" ? p.submitted.includes("role") ? "확인함" : "확인 전"
-            : room.phase === "vote" ? p.submitted.includes("vote") ? "투표함" : "투표 전"
-            : last && serverNow - last.at < RECENT_MS ? "방금 말함"
-            : room.turn?.stage === "qa" ? "질문·답변 대기"
-            : room.phase === "event" ? last ? "발언함" : "아직 안 말함"
-            : "완료";
-          return (
-            <li key={p.uid} className={`student-card${p.uid === speakingUid ? " speaking" : ""}${silent ? " silent" : ""}`} data-testid="participant-row">
-              <header>
-                <span className={`dot ${online ? "on" : "off"}`} title={online ? "접속" : "끊김"} />
-                <strong>{p.nickname}</strong>
-                <span className={`live-status ${live ? "speaking" : inTurn ? "turn" : "idle"}`} data-testid="live-status">{status}</span>
-              </header>
-              <span className="student-card-role">{p.roleId ? roleName(room.topic, p.roleId) : "역할 비공개"}</span>
-              <div className="student-card-stats">
-                <span className={statement ? "on" : ""}>발표 {statement ? "✓" : "–"}</span>
-                <span className={question ? "on" : ""}>질문 {question}</span>
-                <span className={answer ? "on" : ""}>답변 {answer}</span>
-              </div>
-              <div className="student-card-steps">
-                <span className={p.submitted.includes("role") ? "on" : ""}>역할 확인</span>
-                {reached("vote") && <span className={p.submitted.includes("vote") || rounds.reveal?.ballots.find((b) => b.uid === p.uid)?.voted ? "on" : ""}>투표</span>}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="roster-scroll">
+        <table className="roster">
+          <thead>
+            <tr>
+              <th scope="col">학생</th>
+              <th scope="col">지금</th>
+              <th scope="col" className="num">발표</th>
+              <th scope="col" className="num">질문</th>
+              <th scope="col" className="num">답변</th>
+              {showVote && <th scope="col" className="num">투표</th>}
+              <th scope="col" className="num">연결</th>
+            </tr>
+          </thead>
+          <tbody>
+            {people.map(({ p, statement, question, answer, voted }) => {
+              const online = alwaysOnline || serverNow - p.connectedAt < CONNECTED_MS;
+              const silent = quiet.some((x) => x.p.uid === p.uid);
+              const live = p.uid === floor?.uid;
+              const inTurn = room.turn?.stage !== "qa" && p.uid === room.turn?.uid;
+              const last = rounds.transcript.filter((line) => line.uid === p.uid && line.phase === room.phase).at(-1);
+              const [tone, status] = live && floor
+                ? ["now", `${KIND_LABEL[floor.kind]} 중${floorSeconds ? ` · ${floorSeconds}초` : ""}`]
+                : inTurn ? ["now", "차례 · 마이크 대기"]
+                : room.phase === "role" ? (p.submitted.includes("role") ? ["", "확인함"] : ["warn", "확인 전"])
+                : room.phase === "vote" ? (voted ? ["", "투표함"] : ["warn", "투표 전"])
+                : last && serverNow - last.at < RECENT_MS ? ["now", "방금 말함"]
+                : room.turn?.stage === "qa" ? ["", "질문·답변 대기"]
+                : room.phase === "event" ? (last ? ["", "이번 단계 발언함"] : ["", "질문·답변 전"])
+                : room.phase === "statement" ? ["", "듣는 중"]
+                : ["", "완료"];
+              return (
+                <tr key={p.uid} className={`${p.uid === speakingUid ? "speaking" : ""}${silent ? " silent" : ""}`} data-testid="participant-row">
+                  <th scope="row">
+                    <strong>{p.nickname}</strong>
+                    <span>{p.roleId ? roleName(room.topic, p.roleId) : "역할 비공개"}</span>
+                  </th>
+                  <td>
+                    <span className={`live-status ${tone}`} data-testid="live-status">
+                      {status}
+                    </span>
+                  </td>
+                  <td className="num">{statement ? "했음" : <span className="no">–</span>}</td>
+                  <td className="num">{question || <span className="no">0</span>}</td>
+                  <td className="num">{answer || <span className="no">0</span>}</td>
+                  {showVote && <td className="num">{voted ? "했음" : <span className="no">–</span>}</td>}
+                  <td className="num">
+                    <span className={online ? "online" : "offline"}>{online ? "접속" : "끊김"}</span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">합계 {total}명</th>
+              <td />
+              <td className="num">{sum("statement")}</td>
+              <td className="num">{sum("question")}명</td>
+              <td className="num">{sum("answer")}명</td>
+              {showVote && <td className="num">{people.filter((x) => x.voted).length}</td>}
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }

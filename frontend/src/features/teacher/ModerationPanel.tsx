@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { ChevronDown, ShieldAlert } from "lucide-react";
 import type { HostState, ModerationEntry } from "../../types/game";
 import { PHASE_SHORT } from "../game/phases";
 
@@ -22,12 +21,11 @@ export default function ModerationPanel({ host, busy, onReview }: { host: HostSt
   return (
     <section className={`panel moderation${pending.length ? " attention" : ""}`}>
       <button className="panel-toggle" aria-expanded={open} onClick={() => setOpen((v) => !v)} data-testid="moderation-toggle">
-        <ShieldAlert size={18} aria-hidden />
         <span>
-          표현 점검 기록 {host.moderation.length > 0 && <span className="pill">{host.moderation.length}</span>}
-          {pending.length > 0 && <span className="pill warn">확인 필요 {pending.length}</span>}
+          표현 점검 기록 {host.moderation.length > 0 && <span className="muted">{host.moderation.length}건</span>}
+          {pending.length > 0 && <span className="moderation-pending"> · 확인 필요 {pending.length}</span>}
         </span>
-        <ChevronDown size={18} aria-hidden className={open ? "flip" : ""} />
+        <span className="muted small">{open ? "접기" : "펼치기"}</span>
       </button>
       {open && (
         <div className="moderation-body">

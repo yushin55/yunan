@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, ClipboardCopy, Download, FileText, MessageSquareQuote, PenLine, RotateCcw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Tabs from "../../components/Tabs";
 import type { ModerationEntry, Participant, Phase, Topic, TranscriptLine } from "../../types/game";
 import TranscriptFeed from "../discussion/TranscriptFeed";
 import { KIND_LABEL, PHASE_ORDER, PHASE_SHORT } from "../game/phases";
 import { roleName } from "../roles/roleName";
-import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type CriterionId, type Level, type ReportEdits, type StudentReport } from "./report";
+import { applyEdits, buildReport, CRITERIA, GROUPS, LEVEL_LABEL, MAX_SCORE, type ClassReport, type CriterionId, type Level, type ReportEdits, type StudentReport } from "./report";
 import AiStudentReport from "./AiStudentReport";
+import Evidence from "./Evidence";
 import { MemoList } from "./PhaseMemo";
 import { countNotes, loadEdits, saveEdits, type MemoEntry, type PhaseNotes } from "./teacherStorage";
 
 const LEVELS: Level[] = ["met", "partial", "weak", "none"];
+/** What a rubric cell says: a word, so the table reads without a legend. */
+const LEVEL_SHORT: Record<Level, string> = { met: "충족", partial: "부분", weak: "보완", none: "–" };
 
 /** A correction to one student's rubric: a level, a comment or the record draft. `null` puts the automatic value back. */
 type Change = { uid: string } & ({ criterion: CriterionId; level?: Level | null; comment?: string } | { record: string | null });
@@ -32,6 +34,7 @@ export default function TeacherReport({
   at,
   editKey,
   roomId,
+  fill = false,
 }: {
   topic: Topic;
   participants: Participant[];
@@ -43,6 +46,8 @@ export default function TeacherReport({
   editKey?: string;
   /** A real room: the per-student reports can be drafted by the server's AI. */
   roomId?: string;
+  /** Fill the space it is given, scrolling inside, instead of growing with its content. */
+  fill?: boolean;
 }) {
   const [edits, setEdits] = useState<ReportEdits>(() => (editKey ? loadEdits(editKey) : {}));
   useEffect(() => setEdits(editKey ? loadEdits(editKey) : {}), [editKey]);
@@ -84,38 +89,18 @@ export default function TeacherReport({
   const student = report.students.find((s) => s.uid === selected?.uid);
 
   return (
-    <section className="panel teacher-report" data-testid="teacher-report">
+    <section className={`panel teacher-report${fill ? " fill" : ""}`} data-testid="teacher-report">
       <header className="report-head">
-        <div>
-          <span className="eyebrow">
-            <FileText size={13} aria-hidden /> 선생님 레포트
-          </span>
-          <h3>토론·발표 수행평가</h3>
-          <div className="report-chips">
-            <span className="report-chip">시기 단원 마무리 주간</span>
-            <span className="report-chip">반영 예시 10~20%</span>
-          </div>
-        </div>
-        <dl className="report-meta">
-          <div>
-            <dt>참여</dt>
-            <dd>{participants.length}명</dd>
-          </div>
-          <div>
-            <dt>발언</dt>
-            <dd>{report.totalLines}개</dd>
-          </div>
-          {at && (
-            <div>
-              <dt>일시</dt>
-              <dd>{fmtDate(at)}</dd>
-            </div>
-          )}
-        </dl>
+        <span className="eyebrow">선생님 레포트</span>
+        <h3>토론·발표 수행평가</h3>
+        <p className="report-meta">
+          {at ? `${fmtDate(at)} · ` : ""}참여 {participants.length}명 · 발언 {report.totalLines}개 · 단원 마무리 주간 · 반영 예시 10~20%
+        </p>
       </header>
 
       <Tabs<Tab>
         label="레포트 보기"
+        variant="line"
         active={tab}
         onChange={setTab}
         items={[
@@ -127,141 +112,206 @@ export default function TeacherReport({
       />
 
       {tab === "rubric" && (
-        <>
-          {editKey && (
-            <div className={`rubric-editbar${editing ? " on" : ""}`}>
-              <p className="small">
-                {editing
-                  ? "표의 칸이나 학생 이름을 눌러 판정을 고치고 의견을 남겨 주세요. 고친 내용은 이 기기에 바로 저장돼요."
-                  : editedCount
-                    ? `선생님이 고친 항목 ${editedCount}개가 반영돼 있어요.`
-                    : "자동 판정이 수업 중 관찰과 다르면 직접 고칠 수 있어요."}
-              </p>
-              <button className={`button small ${editing ? "primary" : "secondary"}`} data-testid="rubric-edit-toggle" aria-pressed={editing} onClick={() => setEditing((v) => !v)}>
-                {editing ? <Check size={15} /> : <PenLine size={15} />} {editing ? "수정 마치기" : "판정 수정하기"}
+        <div className="report-body">
+          <Highlights report={report} topic={topic} onPick={(uid) => setSelected({ uid })} />
+
+          <div className="rubric-toolbar">
+            <p className="small">
+              {editing
+                ? "칸이나 학생 이름을 눌러 판정을 고치고 의견을 남겨 주세요. 고친 내용은 이 기기에 바로 저장돼요."
+                : `칸을 누르면 그렇게 판단한 이유와 근거 발언이 아래에 열려요.${editedCount ? ` 선생님이 고친 항목 ${editedCount}개가 반영돼 있어요.` : ""}`}
+            </p>
+            {editKey && (
+              <button className={`button small ${editing ? "primary" : "ghost"}`} data-testid="rubric-edit-toggle" aria-pressed={editing} onClick={() => setEditing((v) => !v)}>
+                {editing ? "수정 마치기" : "판정 고치기"}
               </button>
-            </div>
-          )}
-          <ClassOverview report={report} />
+            )}
+          </div>
+
           <RubricMatrix
-            students={report.students}
+            report={report}
             topic={topic}
             selected={selected}
             onSelect={(uid, criterion) => setSelected((cur) => (cur?.uid === uid && cur.criterion === criterion ? null : { uid, criterion }))}
           />
-          {student && <StudentDetail key={`${student.uid}-${selected?.criterion}`} student={student} topic={topic} focus={selected?.criterion} onChange={editing ? change : undefined} memos={memosOf(student.uid)} participants={participants} />}
-          {!student && report.students.length > 0 && <p className="muted small report-hint">학생 이름이나 칸을 누르면 판단 이유와 근거 발언을 볼 수 있어요.</p>}
+          <p className="rubric-legend small muted">
+            충족 2점 · 부분 충족 1점 · 보완 필요 0점 · – 기록된 발언 없음 · <span className="edited-mark">*</span> 선생님이 고친 칸
+          </p>
+
+          {student && (
+            <StudentDetail
+              key={`${student.uid}-${selected?.criterion}`}
+              student={student}
+              topic={topic}
+              focus={selected?.criterion}
+              onChange={editing ? change : undefined}
+              onClose={() => setSelected(null)}
+              memos={memosOf(student.uid)}
+              participants={participants}
+            />
+          )}
           <p className="report-note">발언 기록에서 표현을 찾아 자동으로 고른 참고 자료예요. 점수로 바로 쓰지 말고, 근거 발언과 수업 중 관찰을 함께 보고 판단해 주세요.</p>
-        </>
+        </div>
       )}
 
-      {tab === "students" && <AiStudentReport storageKey={editKey} roomId={roomId} topic={topic} participants={participants} transcript={transcript} moderation={moderation} />}
+      {tab === "students" && (
+        <div className="report-body">
+          <AiStudentReport storageKey={editKey} roomId={roomId} topic={topic} participants={participants} transcript={transcript} moderation={moderation} />
+        </div>
+      )}
 
-      {tab === "log" && <FullLog topic={topic} participants={participants} transcript={transcript} />}
+      {tab === "log" && (
+        <div className="report-body">
+          <FullLog topic={topic} participants={participants} transcript={transcript} />
+        </div>
+      )}
 
-      {tab === "notes" && <NotesTab notes={notes} participants={participants} />}
+      {tab === "notes" && (
+        <div className="report-body">
+          <NotesTab notes={notes} participants={participants} />
+        </div>
+      )}
     </section>
   );
 }
 
-function ClassOverview({ report }: { report: ReturnType<typeof buildReport> }) {
+/** Three plain sentences before the table: what the class did well, what to practise, who to look at. */
+function Highlights({ report, topic, onPick }: { report: ClassReport; topic: Topic; onPick: (uid: string) => void }) {
+  const total = report.students.length;
+  if (!total) return null;
+  const strong = CRITERIA.filter((c) => report.coverage[c.id].met * 2 >= total).sort((a, b) => report.coverage[b.id].met - report.coverage[a.id].met);
+  const weakest = Math.min(...CRITERIA.map((c) => report.coverage[c.id].met));
+  const weak = CRITERIA.filter((c) => report.coverage[c.id].met === weakest && report.coverage[c.id].met * 2 < total);
+  const watch = [...report.students].filter((s) => !s.lines.length || s.score <= MAX_SCORE / 3).sort((a, b) => a.score - b.score);
+  const best = [...report.students].sort((a, b) => b.score - a.score)[0];
   return (
-    <div className="report-overview">
-      {GROUPS.map((g) => (
-        <div key={g.id} className="overview-group">
-          <h4>{g.label}</h4>
-          <ul>
-            {CRITERIA.filter((c) => c.group === g.id).map((c) => {
-              const { met, partial, total } = report.coverage[c.id];
-              const pct = (n: number) => (total ? (n / total) * 100 : 0);
-              return (
-                <li key={c.id} title={c.looksFor}>
-                  <span className="overview-label">{c.label}</span>
-                  <span className="overview-bar" aria-hidden>
-                    <i className="met" style={{ width: `${pct(met)}%` }} />
-                    <i className="partial" style={{ width: `${pct(partial)}%` }} />
-                  </span>
-                  <span className="overview-count">
-                    <strong>{met}</strong>/{total}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-      <p className="overview-legend">
-        <span className="lv met" /> 충족 <span className="lv partial" /> 부분 충족 <span className="lv weak" /> 보완 필요 <span className="lv none" /> 근거 없음 <span className="edited-dot" /> 선생님 수정
-      </p>
-    </div>
+    <dl className="report-highlights">
+      <div>
+        <dt>반 전체가 잘한 항목</dt>
+        <dd>{strong.length ? strong.map((c) => `${c.label} ${report.coverage[c.id].met}/${total}명`).join(", ") : "절반 이상이 충족한 항목은 아직 없어요."}</dd>
+      </div>
+      <div>
+        <dt>함께 더 연습할 항목</dt>
+        <dd>{weak.length ? `${weak.map((c) => c.label).join(", ")} (충족 ${weakest}/${total}명)` : "모든 항목을 절반 이상이 충족했어요."}</dd>
+      </div>
+      <div>
+        <dt>더 살펴볼 학생</dt>
+        <dd>
+          {watch.length
+            ? watch.map((s, i) => (
+                <span key={s.uid}>
+                  {i > 0 && ", "}
+                  <button className="text-button" onClick={() => onPick(s.uid)}>
+                    {s.nickname}
+                  </button>{" "}
+                  <span className="muted">{s.lines.length ? `${s.score}/${MAX_SCORE}점` : "발언 없음"}</span>
+                </span>
+              ))
+            : "점수가 낮은 학생 없이 고르게 참여했어요."}
+          {best && best.score > 0 && (
+            <span className="muted">
+              {" "}
+              · 가장 높은 점수{" "}
+              <button className="text-button" onClick={() => onPick(best.uid)}>
+                {best.nickname}
+              </button>{" "}
+              {best.score}/{MAX_SCORE}점{best.roleId ? ` (${roleName(topic, best.roleId)})` : ""}
+            </span>
+          )}
+        </dd>
+      </div>
+    </dl>
   );
 }
 
 function RubricMatrix({
-  students,
+  report,
   topic,
   selected,
   onSelect,
 }: {
-  students: StudentReport[];
+  report: ClassReport;
   topic: Topic;
   selected: { uid: string; criterion?: CriterionId } | null;
   onSelect: (uid: string, criterion?: CriterionId) => void;
 }) {
+  const students = report.students;
   return (
     <div className="rubric-scroll">
       <table className="rubric-matrix">
         <thead>
-          <tr>
-            <th scope="col">학생</th>
+          <tr className="group-row">
+            <th scope="col" rowSpan={2} className="name-col">
+              학생
+            </th>
+            <th scope="col" rowSpan={2} className="score-col">
+              점수
+            </th>
             {GROUPS.map((g) => (
               <th key={g.id} scope="colgroup" colSpan={CRITERIA.filter((c) => c.group === g.id).length} className="group-head">
                 {g.label}
               </th>
             ))}
-            <th scope="col">종합</th>
           </tr>
           <tr className="criteria-row">
-            <th />
             {CRITERIA.map((c) => (
-              <th key={c.id} scope="col" title={`${c.label}: ${c.looksFor}`}>
+              <th key={c.id} scope="col" title={`${c.label}: ${c.looksFor}`} className={c.id === "attitude" || c.id === "counter" ? "group-end" : ""}>
                 {c.short}
               </th>
             ))}
-            <th />
           </tr>
         </thead>
         <tbody>
           {students.map((s) => (
             <tr key={s.uid} className={selected?.uid === s.uid ? "selected" : ""} data-testid="rubric-row">
-              <th scope="row">
+              <th scope="row" className="name-col">
                 <button className="rubric-name" onClick={() => onSelect(s.uid)} aria-expanded={selected?.uid === s.uid}>
                   <strong>{s.nickname}</strong>
                   {s.roleId && <span>{roleName(topic, s.roleId)}</span>}
                 </button>
               </th>
+              <td className="score-col">
+                <span className="score">
+                  <strong>{s.score}</strong>
+                  <span className="muted">/{MAX_SCORE}</span>
+                </span>
+                <span className="score-bar" aria-hidden>
+                  <i style={{ width: `${(s.score / MAX_SCORE) * 100}%` }} />
+                </span>
+              </td>
               {CRITERIA.map((c) => {
                 const f = s.findings[c.id];
                 const active = selected?.uid === s.uid && selected.criterion === c.id;
                 return (
-                  <td key={c.id}>
-                    <button className={`lv-cell${active ? " active" : ""}${f.autoLevel ? " edited" : ""}`} onClick={() => onSelect(s.uid, c.id)} aria-label={`${s.nickname} ${c.label}: ${LEVEL_LABEL[f.level]}`} title={`${c.label} · ${LEVEL_LABEL[f.level]}${f.autoLevel ? ` (선생님 수정 · 자동 판정 ${LEVEL_LABEL[f.autoLevel]})` : ""}`}>
-                      <span className={`lv ${f.level}`} />
+                  <td key={c.id} className={c.id === "attitude" || c.id === "counter" ? "group-end" : ""}>
+                    <button
+                      className={`lv-cell ${f.level}${active ? " active" : ""}`}
+                      onClick={() => onSelect(s.uid, c.id)}
+                      aria-label={`${s.nickname} ${c.label}: ${LEVEL_LABEL[f.level]}`}
+                      title={`${c.label} · ${LEVEL_LABEL[f.level]}${f.autoLevel ? ` (선생님 수정 · 자동 판정 ${LEVEL_LABEL[f.autoLevel]})` : ""}`}
+                    >
+                      {LEVEL_SHORT[f.level]}
+                      {f.autoLevel && <span className="edited-mark">*</span>}
                     </button>
                   </td>
                 );
               })}
-              <td>
-                <span className="score">
-                  <span className="score-bar" aria-hidden>
-                    <i style={{ width: `${(s.score / MAX_SCORE) * 100}%` }} />
-                  </span>
-                  {s.score}/{MAX_SCORE}
-                </span>
-              </td>
             </tr>
           ))}
         </tbody>
+        <tfoot>
+          <tr>
+            <th scope="row" className="name-col">
+              충족한 학생
+            </th>
+            <td className="score-col" />
+            {CRITERIA.map((c) => (
+              <td key={c.id} className={c.id === "attitude" || c.id === "counter" ? "group-end" : ""}>
+                {report.coverage[c.id].met}/{report.coverage[c.id].total}
+              </td>
+            ))}
+          </tr>
+        </tfoot>
       </table>
     </div>
   );
@@ -272,6 +322,7 @@ function StudentDetail({
   topic,
   focus,
   onChange,
+  onClose,
   memos = [],
   participants = [],
 }: {
@@ -279,44 +330,52 @@ function StudentDetail({
   topic: Topic;
   focus?: CriterionId;
   onChange?: (c: Change) => void;
+  onClose: () => void;
   memos?: { phase: Phase; entry: MemoEntry }[];
   participants?: Participant[];
 }) {
   const [copied, setCopied] = useState(false);
+  const ref = useRef<HTMLElement>(null);
+  // Opened from the table: bring it into view without jumping past it.
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, []);
   const role = roleName(topic, student.roleId);
   return (
-    <article className="student-detail" data-testid="student-detail">
+    <article className="student-detail" data-testid="student-detail" ref={ref}>
       <header>
         <div>
           <h4>{student.nickname}</h4>
           <p className="muted small">
-            {role ? `${role} · ` : ""}발언 {student.lines.length}개 · 충족 {CRITERIA.filter((c) => student.findings[c.id].level === "met").length}/{CRITERIA.length}
+            {role ? `${role} · ` : ""}발언 {student.lines.length}개 · {student.score}/{MAX_SCORE}점 · 충족 {CRITERIA.filter((c) => student.findings[c.id].level === "met").length}/{CRITERIA.length}항목
           </p>
         </div>
+        <button className="button ghost small" onClick={onClose}>
+          닫기
+        </button>
       </header>
       {memos.length > 0 && (
-        <div className="detail-group">
-          <h5>이 학생에 대한 선생님 메모 {memos.length}개</h5>
+        <section className="detail-group">
+          <h5>이 학생에 대한 선생님 메모</h5>
           {memos.map(({ phase, entry }) => (
             <MemoList key={entry.id} entries={[entry]} participants={participants} phase={phase} />
           ))}
-        </div>
+        </section>
       )}
       {GROUPS.map((g) => (
-        <div key={g.id} className="detail-group">
+        <section key={g.id} className="detail-group">
           <h5>{g.label}</h5>
           {CRITERIA.filter((c) => c.group === g.id).map((c) => {
             const f = student.findings[c.id];
             return (
-              <details key={c.id} className={`criterion ${f.level}`} open={focus === c.id}>
+              <details key={c.id} className="criterion" open={focus === c.id}>
                 <summary>
-                  <span className={`lv-badge ${f.level}`}>{LEVEL_LABEL[f.level]}</span>
+                  <span className={`lv-text ${f.level}`}>{LEVEL_LABEL[f.level]}</span>
                   <strong>
                     {c.label}
                     {f.autoLevel && <span className="edited-tag">선생님 수정</span>}
                   </strong>
                   <span className="criterion-reason">{f.reason}</span>
-                  <ChevronRight size={16} className="chev" aria-hidden />
                 </summary>
                 <div className="criterion-body">
                   {onChange ? (
@@ -324,12 +383,12 @@ function StudentDetail({
                       <div className="level-picker" role="radiogroup" aria-label={`${c.label} 판정`}>
                         {LEVELS.map((lv) => (
                           <button key={lv} role="radio" aria-checked={f.level === lv} className={`level-option${f.level === lv ? " active" : ""}`} onClick={() => onChange({ uid: student.uid, criterion: c.id, level: lv })}>
-                            <span className={`lv ${lv}`} /> {LEVEL_LABEL[lv]}
+                            {LEVEL_LABEL[lv]}
                           </button>
                         ))}
                         {f.autoLevel && (
-                          <button className="button ghost small" onClick={() => onChange({ uid: student.uid, criterion: c.id, level: null })} title={`자동 판정(${LEVEL_LABEL[f.autoLevel]})으로 되돌리기`}>
-                            <RotateCcw size={14} /> 자동 판정으로
+                          <button className="text-button" onClick={() => onChange({ uid: student.uid, criterion: c.id, level: null })} title={`자동 판정(${LEVEL_LABEL[f.autoLevel]})으로 되돌리기`}>
+                            자동 판정으로 되돌리기
                           </button>
                         )}
                       </div>
@@ -344,38 +403,17 @@ function StudentDetail({
                       />
                     </div>
                   ) : (
-                    f.comment && (
-                      <p className="teacher-comment-view">
-                        <PenLine size={14} aria-hidden /> {f.comment}
-                      </p>
-                    )
+                    f.comment && <p className="teacher-comment-view">선생님 의견 · {f.comment}</p>
                   )}
                   <p className="muted small">살펴본 점 · {c.looksFor}</p>
-                  {f.evidence.length ? (
-                    <ul className="evidence">
-                      {f.evidence.map((l) => (
-                        <li key={l.id}>
-                          <MessageSquareQuote size={15} aria-hidden />
-                          <div>
-                            <span className="evidence-tag">
-                              {PHASE_SHORT[l.phase]}
-                              {l.kind !== "statement" && ` · ${KIND_LABEL[l.kind]}`}
-                            </span>
-                            <q>{l.text}</q>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="muted small">근거로 보여 줄 발언이 없어요.</p>
-                  )}
+                  {f.evidence.length ? <Evidence lines={f.evidence} /> : <p className="muted small">근거로 보여 줄 발언이 없어요.</p>}
                 </div>
               </details>
             );
           })}
-        </div>
+        </section>
       ))}
-      <div className="record-draft">
+      <section className="record-draft">
         <div className="panel-head">
           <h5>학생부 기록 초안</h5>
           <button
@@ -386,26 +424,26 @@ function StudentDetail({
               setTimeout(() => setCopied(false), 1500);
             }}
           >
-            {copied ? <Check size={15} /> : <ClipboardCopy size={15} />} {copied ? "복사했어요" : "복사"}
+            {copied ? "복사했어요" : "복사"}
           </button>
         </div>
         {onChange ? (
           <>
             <textarea className="record-edit" rows={4} maxLength={1500} value={student.recordDraft} aria-label="학생부 기록 초안 고치기" onChange={(e) => onChange({ uid: student.uid, record: e.target.value })} />
             {student.autoRecordDraft !== undefined && (
-              <button className="button ghost small" onClick={() => onChange({ uid: student.uid, record: null })}>
-                <RotateCcw size={14} /> 자동 초안으로 되돌리기
+              <button className="text-button" onClick={() => onChange({ uid: student.uid, record: null })}>
+                자동 초안으로 되돌리기
               </button>
             )}
           </>
         ) : (
-          <p>
+          <p className="record-text">
             {student.recordDraft}
             {student.autoRecordDraft !== undefined && <span className="edited-tag">선생님 수정</span>}
           </p>
         )}
         <p className="muted small">토론 전후로 관점이 어떻게 바뀌었는지와 자료 검증 과정을 남기면 학생부 소재가 됩니다. 충족한 항목만으로 만든 초안이니 다듬어 써 주세요.</p>
-      </div>
+      </section>
     </article>
   );
 }
@@ -429,26 +467,23 @@ function FullLog({ topic, participants, transcript }: { topic: Topic; participan
   return (
     <div className="full-log">
       <div className="log-tools">
-        <div className="log-filter" role="group" aria-label="학생별 보기">
-          <button className={!who ? "active" : ""} onClick={() => setWho(null)}>
-            전체 <span>{transcript.length}</span>
-          </button>
-          {participants.map((p) => {
-            const n = transcript.filter((l) => l.uid === p.uid).length;
-            return (
-              <button key={p.uid} className={who === p.uid ? "active" : ""} onClick={() => setWho(who === p.uid ? null : p.uid)}>
-                {p.nickname} <span>{n}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="log-search">
-          <Search size={15} aria-hidden />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="발언 검색" aria-label="발언 검색" />
-        </div>
+        <input className="log-query"value={query} onChange={(e) => setQuery(e.target.value)} placeholder="발언 검색" aria-label="발언 검색" />
         <button className="button ghost small" onClick={download} disabled={!transcript.length}>
-          <Download size={15} /> 텍스트로 저장
+          텍스트 파일로 저장
         </button>
+      </div>
+      <div className="log-filter" role="group" aria-label="학생별 보기">
+        <button className={!who ? "active" : ""} onClick={() => setWho(null)}>
+          전체 <span>{transcript.length}</span>
+        </button>
+        {participants.map((p) => {
+          const n = transcript.filter((l) => l.uid === p.uid).length;
+          return (
+            <button key={p.uid} className={who === p.uid ? "active" : ""} onClick={() => setWho(who === p.uid ? null : p.uid)}>
+              {p.nickname} <span>{n}</span>
+            </button>
+          );
+        })}
       </div>
       <div className="full-log-feed">
         <TranscriptFeed lines={lines} participants={participants} topic={topic} emptyText={transcript.length ? "조건에 맞는 발언이 없어요." : "기록된 발언이 없어요."} />
@@ -473,7 +508,7 @@ function NotesTab({ notes, participants }: { notes: PhaseNotes; participants: Pa
         </button>
         {count(null) > 0 && (
           <button className={who === null ? "active" : ""} onClick={() => setWho(null)}>
-            선택 없음 <span>{count(null)}</span>
+            반 전체 <span>{count(null)}</span>
           </button>
         )}
         {participants

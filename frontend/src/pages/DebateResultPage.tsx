@@ -1,5 +1,4 @@
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Bot, NotebookPen } from "lucide-react";
 import SummaryBoard from "../features/discussion/SummaryBoard";
 import { PHASE_ORDER } from "../features/game/phases";
 import { roleName } from "../features/roles/roleName";
@@ -30,7 +29,7 @@ export default function DebateResultPage() {
     <main className="teacher-room history-result" data-testid="history-result">
       <header className="teacher-top">
         <Link to="/teacher/history" className="button ghost small">
-          <ArrowLeft size={15} /> 진행된 토론
+          진행된 토론 목록
         </Link>
         <span className="tag">지난 토론 결과</span>
         <span className="topic-chip" title={d.topic.title}>
@@ -42,26 +41,25 @@ export default function DebateResultPage() {
           </span>
         )}
         {d.practice && (
-          <span className="practice-tag">
-            <Bot size={14} aria-hidden /> 연습
-          </span>
+          <span className="practice-tag">연습</span>
         )}
       </header>
 
       <div className="teacher-grid">
         <div className="teacher-main">
-          <section className="panel phase-header history-head">
+          <section className="history-head">
             <span className="eyebrow">
               {fmtDay(d.endedAt)} · {fmtTime(d.createdAt) === fmtTime(d.endedAt) ? fmtTime(d.endedAt) : `${fmtTime(d.createdAt)}~${fmtTime(d.endedAt)}`}
             </span>
-            <h1>정체 · 투표 결과 공개</h1>
+            <h1>{d.topic.shortTitle}</h1>
             <p className="muted">
               {d.participants.length}명 참여 · 발언 {d.transcript.length}개{outcome ? ` · ${outcome.label}` : ""}
             </p>
           </section>
 
           {d.reveal ? (
-            <section className="panel">
+            <section className="panel result-panel">
+              <h3>결과</h3>
               <RevealView reveal={d.reveal} participants={d.participants} topic={d.topic} />
             </section>
           ) : (
@@ -87,9 +85,7 @@ export default function DebateResultPage() {
           </section>
           <GameSummary participants={d.participants} rounds={{ transcript: d.transcript, reveal: d.reveal }} />
           <section className="panel">
-            <h3 className="history-notes-title">
-              <NotebookPen size={16} aria-hidden /> 단계별 메모
-            </h3>
+            <h3>단계별 메모</h3>
             {notes.length ? (
               notes.map((p) => <MemoList key={p} entries={d.notes[p]!} participants={d.participants} phase={p} />)
             ) : (

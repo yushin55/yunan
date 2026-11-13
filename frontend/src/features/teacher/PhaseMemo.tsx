@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { NotebookPen, Plus, X } from "lucide-react";
 import type { Participant, Phase } from "../../types/game";
 import { PHASE_ORDER, PHASE_SHORT } from "../game/phases";
 import { loadNotes, saveNotes, type MemoEntry, type PhaseNotes } from "./teacherStorage";
@@ -46,11 +45,11 @@ export function MemoList({ entries, participants, phase, onRemove }: { entries: 
         <li key={e.id} className="memo-entry" data-testid="memo-entry">
           <div className="memo-entry-head">
             {phase && <span className="phase-memo-phase">{PHASE_SHORT[phase]}</span>}
-            {e.uid ? <span className="memo-who">{name(e.uid)}</span> : <span className="memo-who general">전체</span>}
+            {e.uid ? <span className="memo-who">{name(e.uid)}</span> : <span className="memo-who general">반 전체</span>}
             {e.at > 0 && <span className="memo-time">{time(e.at)}</span>}
             {onRemove && (
-              <button className="memo-remove" aria-label="메모 지우기" title="지우기" onClick={() => onRemove(e.id)}>
-                <X size={13} />
+              <button className="memo-remove" aria-label="메모 지우기" onClick={() => onRemove(e.id)}>
+                지우기
               </button>
             )}
           </div>
@@ -88,10 +87,8 @@ export default function PhaseMemo({
   return (
     <section className="panel phase-memo" data-testid="phase-memo">
       <div className="phase-memo-head">
-        <NotebookPen size={15} aria-hidden />
-        <span>메모</span>
-        <span className="phase-memo-phase">{PHASE_SHORT[phase]}</span>
-        {here.length > 0 && <span className="phase-memo-count">{here.length}개</span>}
+        <h3>{PHASE_SHORT[phase]} 단계</h3>
+        {here.length > 0 && <span className="muted small">{here.length}개</span>}
       </div>
       {here.length > 0 && <MemoList entries={here} participants={participants} onRemove={(id) => onRemove(phase, id)} />}
       <form
@@ -102,7 +99,7 @@ export default function PhaseMemo({
         }}
       >
         <select value={uid} onChange={(e) => setUid(e.target.value)} aria-label="메모할 학생" data-testid="memo-student">
-          <option value="">선택 없음 (전체)</option>
+          <option value="">반 전체에 대한 메모</option>
           {participants.map((p) => (
             <option key={p.uid} value={p.uid}>
               {p.nickname}
@@ -124,7 +121,7 @@ export default function PhaseMemo({
           }}
         />
         <button className="button secondary small" type="submit" data-testid="memo-add" disabled={!text.trim()}>
-          <Plus size={15} /> 메모 남기기
+          메모 남기기
         </button>
       </form>
       {others.length > 0 && (

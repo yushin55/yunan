@@ -51,7 +51,8 @@ export default function TranscriptFeed({
       {turns.length === 0 && <p className="muted empty">{emptyText}</p>}
       {turns.length > 0 && (
         <div className="transcript-columns">
-          {SPEAKING.map((phase) => {
+          {/* Rebuttal is no longer a phase; its column only shows for old records that have one. */}
+          {SPEAKING.filter((phase) => phase !== "rebuttal" || turns.some((turn) => turn.phase === phase)).map((phase) => {
             const said = turns.filter((turn) => turn.phase === phase);
             return (
               <section key={phase} className={`transcript-column${said.length ? "" : " vacant"}`} data-phase={phase}>

@@ -24,6 +24,35 @@ async function check() {
   const continueUri = new URL(origin).origin;
   if (!/^https?:/.test(continueUri)) throw new Error("The app origin must use http or https.");
 
+  // Popup sign-in validates /v1/projects in the SDK. createAuthUri alone can
+  // succeed even when the browser's hostname is not authorized for sign-in.
+  const configResponse = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/projects?key=${encodeURIComponent(apiKey)}`,
+    { signal: AbortSignal.timeout(15000) },
+  );
+  const config = await configResponse.json();
+  if (!configResponse.ok) {
+    const code = String(config.error?.message || `HTTP_${configResponse.status}`).split(" : ")[0];
+    console.error(`Firebase project configuration failed: ${code}`);
+    process.exitCode = 1;
+    return;
+  }
+  const hostname = new URL(continueUri).hostname.toLowerCase();
+  const authorized = (config.authorizedDomains || []).some((entry) => {
+    const domain = entry.toLowerCase();
+    // Match Firebase's domain/subdomain rules; IP addresses require an exact match.
+    return hostname === domain ||
+      (!/^\d{1,3}(\.\d{1,3}){3}$/.test(domain) && hostname.endsWith(`.${domain}`));
+  });
+  if (!authorized) {
+    console.error(`Google sign-in configuration failed: UNAUTHORIZED_DOMAIN (${hostname})`);
+    console.error(`Add ${hostname} to Firebase Authentication > Settings > Authorized domains (hostname only, without protocol or port).`);
+    console.error(`Firebase console: https://console.firebase.google.com/project/${encodeURIComponent(project)}/authentication/settings`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`Sign-in hostname is authorized: ${hostname}.`);
+
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${encodeURIComponent(apiKey)}`,
     {

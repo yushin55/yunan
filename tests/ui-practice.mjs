@@ -109,6 +109,7 @@ async function play(label, options) {
   await expect(page.getByTestId('teacher-practice-note')).toBeVisible();
   await expect(page.getByTestId('participant-row')).toHaveCount(6);
   await expect(page.getByTestId('room-code')).toHaveCount(0);
+  await page.getByRole('tab', { name: '주제와 설정' }).click(); // Topic and settings have their own section.
   await expect(page.getByRole('button', { name: '주제 바꾸기' })).toBeDisabled();
   await expect(page.getByRole('spinbutton').first()).toBeDisabled();
   await page.screenshot({ path: `artifacts/practice-${label}-teacher-lobby.png` });

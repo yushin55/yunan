@@ -11,6 +11,7 @@ import "./styles/home.css";
 import "./styles/teacher-report.css";
 import "./styles/navigation.css";
 import "./styles/login.css";
+import "./styles/teacher-room.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <BrowserRouter>
