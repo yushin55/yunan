@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import RoleAvatar from "../features/roles/RoleAvatar";
 import { ArrowRight, BookOpen, Check, EyeOff, Maximize2, Minimize2, Search, VenetianMask, X } from "lucide-react";
 import EventCard from "../components/EventCard";
 import GameBar from "../components/GameBar";
 import PauseOverlay from "../components/PauseOverlay";
+import PhaseBanner from "../components/PhaseBanner";
 import RoleCard from "../components/RoleCard";
 import Sheet from "../components/Sheet";
 import IssueBriefing from "../features/briefing/IssueBriefing";
@@ -25,6 +27,9 @@ import RevealView from "../features/voting/RevealView";
 import VotePanel, { togglePick } from "../features/voting/VotePanel";
 import { roleName } from "../features/roles/roleName";
 import type { Me, Participant, Reveal, Role, Room, Rounds } from "../types/game";
+
+/** Where a practice player is before the game (0 briefing, 1 rules, 2 roles), for the classroom screen. */
+export const lobbyStepKey = (room: Room) => `bridge.lobbyStep.${room.roomId}.${room.createdAt}`;
 
 function stored(key: string, fallback: boolean) {
   try {
@@ -62,6 +67,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const [votePicked, setVotePicked] = useState<string[]>([]);
   const [show3d, setShow3d] = useState(() => stored("bridge.table3d", true));
   const [memoOpen, setMemoOpen] = useState(true);
+  const [voteCardsOpen, setVoteCardsOpen] = useState(false);
   const self = participants.find((p) => p.uid === me.uid);
   const myRole = room.topic.roles.find((r) => r.id === me.roleId);
   const others = participants.filter((p) => p.uid !== me.uid);
@@ -79,6 +85,8 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   // The camera follows each speaker during the statements; during questions it stays put.
   const talking = phase === "statement" && room.turn?.stage !== "qa" ? room.turn?.uid : undefined;
   const autoFocus = talking !== me.uid ? talking : undefined;
+  // A new speaker (or a new section) clears whoever I had zoomed in on.
+  useEffect(() => setFocus(""), [talking, phase]);
 
   // Pointing at someone picks them, and every full pick goes in as my vote right away. The server
   // keeps the latest one until time runs out.
@@ -86,6 +94,8 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
     if (room.paused) return;
     const next = togglePick(picked, uid, count);
     setVotePicked(next);
+    // Folding the cards keeps the pointing hand in view.
+    setVoteCardsOpen(false);
     if (next.length === count) void action("vote", { targets: next });
   };
   const selectAtTable = (uid: string) => {
@@ -130,6 +140,12 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
       {phase === "vote" && (
         <section className="panel float-pop vote-pop">
           <VotePanel atTable={show3d} candidates={others} count={count} myVote={me.vote} picked={picked} onPick={pick} disabled={room.paused} />
+          {show3d && (
+            <button className="button secondary full vote-cards-toggle" type="button" aria-expanded={voteCardsOpen} onClick={() => setVoteCardsOpen((open) => !open)}>
+              {voteCardsOpen ? <X size={17} aria-hidden /> : <BookOpen size={17} aria-hidden />}
+              {voteCardsOpen ? "카드 접기" : "발언 카드 보기"}
+            </button>
+          )}
         </section>
       )}
       {/* From the role card to the result: the same memo the whole game, open unless closed. */}
@@ -167,11 +183,12 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
               participants={participants}
               rounds={rounds}
               selfUid={me.uid}
-              focusUid={autoFocus ?? (focus || undefined)}
+              focusUid={talking === me.uid ? undefined : (autoFocus ?? (focus || undefined))}
               onSelect={selectAtTable}
               offset={offset}
               hand={ownHand(room, me)}
               pointAt={pointAt}
+              voteCardsOpen={voteCardsOpen}
             />
             {fullStage && (
               <>
@@ -209,7 +226,9 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
         {room.paused && <PauseOverlay />}
       </div>
 
-      {phase === "event" && room.event && <EventPopup room={room} />}
+      {/* Everyone reads the event card before the questions open; then the questions are announced. */}
+      {phase === "event" && room.event && room.reading && <EventPopup room={room} participants={participants} read={Boolean(self?.submitted.includes("event"))} busy={busy} onRead={() => void action("read-event")} />}
+      <PhaseBanner room={room} offset={offset} />
       {roleOpen && myRole && (
         <Sheet title="나의 역할" onClose={() => setRoleOpen(false)}>
           <p className="privacy-line">이 화면은 나에게만 보여요.</p>
@@ -245,6 +264,15 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
   // Practice rooms have no `intro` and go at the student's own pace.
   const led = room.intro;
   const step = led ? { waiting: 0, briefing: 0, rules: 1, roles: 2 }[led.step] : !briefed ? 0 : !rulesRead ? 1 : 2;
+  // Practice has no teacher-led step: leave mine where the classroom screen can follow it.
+  useEffect(() => {
+    if (led) return;
+    try {
+      sessionStorage.setItem(lobbyStepKey(room), String(step));
+    } catch {
+      /* The classroom screen then stays on the briefing. */
+    }
+  }, [led, step, room]);
   // The teacher moving on pulls everyone back in, even someone who stepped out.
   useEffect(() => {
     if (led) setAway(false);
@@ -293,11 +321,11 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
 
   const action = led ? null : step === 0 && !videoDone ? (
       <button className="button primary large" data-testid="briefing-done" disabled>
-        브리핑을 끝까지 보면 다음으로 넘어갈 수 있어요
+        브리핑을 끝까지 보면 넘어가요
       </button>
     ) : step === 1 && !rulesWatched ? (
       <button className="button primary large" data-testid="rules-done" disabled>
-        규칙 영상을 끝까지 보면 역할을 고를 수 있어요
+        규칙 영상을 끝까지 보면 넘어가요
       </button>
     ) : null;
 
@@ -305,10 +333,6 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
     <FlowOverlay step={step} action={action} onExit={() => setAway(true)}>
       {step === 0 && (
         <>
-          <div className="flow-heading">
-            <span className="eyebrow">오늘의 주제</span>
-            <h2>{room.topic.title}</h2>
-          </div>
           {led?.step === "waiting" ? (
             <div className="intro-waiting" data-testid="intro-waiting">
               <strong>선생님이 영상을 시작하면 다 함께 봐요</strong>
@@ -330,10 +354,7 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
       {step === 1 && (
         <>
           <div className="flow-heading">
-            <span className="eyebrow">
-              <BookOpen size={14} aria-hidden /> 게임 규칙
-            </span>
-            <h2>테이블에서는 이렇게 진행돼요</h2>
+            <h2>게임 규칙</h2>
           </div>
           {led ? (
             <RulesVideo key={led.startedAt} startAt={introElapsed(led, offset)} />
@@ -354,8 +375,7 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
       {step === 2 && (
         <>
           <div className="flow-heading">
-            <span className="eyebrow">역할 고르기</span>
-            <h2>{room.topic.shortTitle} · 내 생각과 가까운 역할은?</h2>
+            <h2>내 생각과 가까운 역할은?</h2>
           </div>
           <PreferencePicker
             roles={room.topic.roles}
@@ -387,7 +407,8 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
     };
   }, []);
   const steps = ["이슈 브리핑", "게임 규칙", "역할 고르기"];
-  return (
+  // At the page root: inside the table's own layer it could never rise above the game bar.
+  return createPortal(
     <div className="flow-overlay" role="dialog" aria-modal="true" aria-label="게임 시작 전 준비" data-testid="flow-overlay">
       <header className="flow-top">
         <span className="brand-mark">
@@ -422,54 +443,53 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
       </header>
       <div className="flow-body">{children}</div>
       {action && <footer className="flow-action">{action}</footer>}
-    </div>
+    </div>,
+    // The app shell keeps the page navigation's offset (`.with-navigation .flow-overlay`).
+    document.querySelector(".app-shell") ?? document.body,
   );
 }
 
-/** My role and who I am: the two cards in my hand, held up close. Only on my own screen. */
+/** My role and who I am, as one readable sheet. Only on my own screen. */
 function RoleZoom({ me, role, roles, confirmed, disabled, onConfirm }: { me: Me; role: Role; roles: Role[]; confirmed: boolean; disabled: boolean; onConfirm: () => void }) {
   const switcher = Boolean(me.isSwitcher);
   return (
-    <section className="panel role-zoom" role="dialog" aria-label="나의 역할 카드" data-testid="role-zoom">
+    <section className="panel role-sheet" role="dialog" aria-label="나의 역할" data-testid="role-zoom">
       <p className="privacy-line">
-        <EyeOff size={15} aria-hidden /> 나에게만 보이는 카드예요
+        <EyeOff size={15} aria-hidden /> 나에게만 보여요
       </p>
-      <div className="zoom-cards">
-        <article className="game-card role" aria-label={`나의 역할: ${role.name}`}>
-          <header className="game-card-top">
-            <span>나의 역할</span>
-          </header>
-          <div className="game-card-art">
-            <RoleAvatar name={role.name} index={roles.findIndex((r) => r.id === role.id)} />
-          </div>
-          <h3 className="game-card-name">{role.name}</h3>
-          <div className="game-card-text">
-            <p className="game-card-intro">{role.intro}</p>
-            <p>
-              <b>목표</b> {role.goal}
-            </p>
-            <p>
-              <b>걱정</b> {role.concerns.join(" ")}
-            </p>
-          </div>
-        </article>
-        <article className={`game-card id-card${switcher ? " switcher" : ""}`} data-testid="identity" aria-label={switcher ? "역할 전환자" : "일반 참가자"}>
-          <header className="game-card-top">
-            <span>나만 아는 정체</span>
-          </header>
-          <div className="game-card-art">{switcher ? <VenetianMask size={96} strokeWidth={1.4} aria-hidden /> : <Search size={96} strokeWidth={1.4} aria-hidden />}</div>
-          <h3 className="game-card-name">{switcher ? "역할 전환자" : "일반 참가자"}</h3>
-          <div className="game-card-text">
-            <p>{switcher ? "내가 고르지 않은 역할이에요. 들키지 않게 자연스럽게 말해요." : "누가 역할 전환자인지 찾아보세요."}</p>
-          </div>
-        </article>
+      <div className={`role-sheet-id${switcher ? " switcher" : ""}`} data-testid="identity">
+        {switcher ? <VenetianMask size={30} aria-hidden /> : <Search size={30} aria-hidden />}
+        <div>
+          <strong>{switcher ? "나는 역할 전환자예요" : "나는 일반 참가자예요"}</strong>
+          <p>{switcher ? "내가 고르지 않은 역할이에요. 들키지 않게 이 역할처럼 말해요." : "역할 전환자가 누구인지 찾아보세요."}</p>
+        </div>
       </div>
+      <div className="role-sheet-head">
+        <RoleAvatar name={role.name} index={roles.findIndex((r) => r.id === role.id)} />
+        <div>
+          <span className="eyebrow">나의 역할</span>
+          <h2>{role.name}</h2>
+          <p>{role.intro}</p>
+        </div>
+      </div>
+      <dl className="role-sheet-body">
+        <dt>목표</dt>
+        <dd className="role-sheet-goal">{role.goal}</dd>
+        <dt>걱정하는 점</dt>
+        <dd>
+          <ul>
+            {role.concerns.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </dd>
+      </dl>
       {confirmed ? (
         <p className="success-line role-zoom-done">
           <Check size={18} aria-hidden /> 확인했어요
         </p>
       ) : (
-        <button className="button primary large" disabled={disabled} onClick={onConfirm}>
+        <button className="button primary large full" disabled={disabled} onClick={onConfirm}>
           역할을 확인했어요
         </button>
       )}
@@ -489,38 +509,26 @@ function MicPopup({ room, me, api, micEngine, allowTyping }: { room: Room; me: M
   );
 }
 
-/** Just the event card, once, when it happens. Only its × (or Esc) closes it, so a stray click does not. */
-function EventPopup({ room }: { room: Room }) {
-  const key = `bridge.eventSeen.${room.roomId}.${room.createdAt}`;
-  const [open, setOpen] = useState(() => {
-    try {
-      return sessionStorage.getItem(key) !== "1";
-    } catch {
-      return true;
-    }
-  });
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-  if (!open || !room.event) return null;
-  function close() {
-    setOpen(false);
-    try {
-      sessionStorage.setItem(key, "1");
-    } catch {
-      /* It may show once more after a reload. */
-    }
-  }
+/**
+ * The event card, over everything, until every student has read it. "다 읽었어요" counts me in;
+ * then it waits for the others, so nobody gets a head start on the questions.
+ */
+function EventPopup({ room, participants, read, busy, onRead }: { room: Room; participants: Participant[]; read: boolean; busy: boolean; onRead: () => void }) {
+  if (!room.event) return null;
+  const done = participants.filter((p) => p.submitted.includes("event")).length;
   return (
     <div className="event-pop" role="dialog" aria-modal="true" aria-label={`사건 카드: ${room.event.title}`} data-testid="event-popup">
       <div className="event-pop-card">
         <EventCard event={room.event} />
-        <button className="icon-button event-pop-close" aria-label="닫기" data-testid="event-popup-close" autoFocus onClick={close}>
-          <X size={18} />
-        </button>
+        {read ? (
+          <p className="event-pop-wait" role="status">
+            <span className="spinner" aria-hidden /> 친구들이 읽고 있어요 · {done}/{participants.length}명
+          </p>
+        ) : (
+          <button className="button primary large full event-pop-read" data-testid="event-read" autoFocus disabled={busy} onClick={onRead}>
+            <Check size={18} aria-hidden /> 다 읽었어요
+          </button>
+        )}
       </div>
     </div>
   );

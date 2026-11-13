@@ -11,13 +11,13 @@ from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
 from app.services.student_report import build_student_reports
 from app.services.moderation import Moderator, Verdict, check_rate, rule_check, validate_text_fields
-from app.services.phase_engine import MAX_TURNS, OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.phase_engine import MAX_TURNS, OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, everyone_read, open_questions, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
 logger = logging.getLogger(__name__)
 
-HOST_ACTIONS = {"settings", "intro", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete"}
-STUDENT_ACTIONS = {"preferences", "confirm-role", "end-turn", "mic-on", "mic-off", "vote"}
+HOST_ACTIONS = {"settings", "intro", "kick", "start", "pause", "resume", "next", "skip-phase", "speaker", "extend", "end", "review", "line-edit", "line-delete", "open-questions"}
+STUDENT_ACTIONS = {"preferences", "confirm-role", "read-event", "end-turn", "mic-on", "mic-off", "vote"}
 MAX_LINES = 300
 MAX_LOG = 100
 MAX_FLOORS = 300  # The log of who spoke lives in the room document, which has a size limit.
@@ -457,6 +457,10 @@ class GameService:
         turn["order"] = turn["order"][:index + 1] + [target] + [u for u in turn["order"][index + 1:] if u != target]
         next_turn(state, now)
 
+    def _host_open_questions(self, state, data, now):
+        """Someone is still reading (or has left their screen): the teacher opens the questions anyway."""
+        open_questions(state, now)
+
     def _host_extend(self, state, data, now):
         room = state["room"]
         if room["phase"] not in TIMED_PHASES:
@@ -520,6 +524,12 @@ class GameService:
             if floor and floor["uid"] == uid and data.get("phaseVersion") in (None, floor["version"]):
                 room.update(floor=None, updatedAt=now)
             return None  # The time limit or a pause may already have switched it off.
+        if action == "read-event":
+            if room["phase"] == "event" and "event" not in participant["submitted"]:
+                participant["submitted"].append("event")
+                if everyone_read(state):
+                    open_questions(state, now)
+            return None
         if room["paused"]:
             return "선생님이 진행을 잠시 멈췄어요. 다시 시작하면 이어서 할 수 있어요."
         if action == "confirm-role":
@@ -562,6 +572,10 @@ class GameService:
         room = state["room"]
         if kind not in mic_kinds(room):
             return "지금은 이 버튼으로 마이크를 켤 수 없어요."
+        if room.get("reading"):
+            return "모두 사건 카드를 읽으면 질문할 수 있어요."
+        if now < (room.get("holdUntil") or 0):
+            return "곧 시작해요. 잠시만 기다려 주세요."
         floor = room.get("floor")
         if floor and floor["endsAt"] > now:
             if floor["uid"] == uid and floor["kind"] == kind:

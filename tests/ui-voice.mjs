@@ -78,7 +78,8 @@ try {
   await page.waitForURL(/\/room\//);
   // The teacher skips straight to role picking; seat one, so this student speaks first.
   await post(teacher, `/api/rooms/${roomId}/intro`, { step: 'roles' });
-  for (const i of [0, 1]) await page.getByTestId('role-card').nth(i).locator('xpath=..').getByTestId(`pick-${i + 1}`).click();
+  // The first card tapped is 1순위, the next 2순위.
+  for (const i of [0, 1]) await page.getByTestId('role-card').nth(i).click();
   await page.getByTestId('wardrobe-submit').click();
   const others = [];
   for (let i = 0; i < 5; i++) {

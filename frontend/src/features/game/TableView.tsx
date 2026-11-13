@@ -1,5 +1,4 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BookOpen, X } from "lucide-react";
 import type { TablePlayer } from "../../components/scene/TableScene";
 import { SEAT_COLORS } from "../../components/scene/palette";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
@@ -33,7 +32,7 @@ function status(room: Room, p: Participant, rounds: Rounds, floor: Floor | null)
     case "event":
     case "rebuttal":
       if (floor?.uid === p.uid) return { label: floor.kind === "statement" ? "말하는 중" : `${KIND_LABEL[floor.kind]} 중`, tone: "done" };
-      return room.turn?.uid === p.uid ? { label: room.turn.stage === "qa" ? "질문 받는 중" : "차례", tone: "waiting" } : undefined;
+      return room.turn?.uid === p.uid && room.turn.stage !== "qa" ? { label: "차례", tone: "waiting" } : undefined;
     case "vote":
       return done("vote", "투표 완료", "고민 중");
     case "reveal":
@@ -61,6 +60,7 @@ export default function TableView({
   hand,
   pointAt,
   overview = false,
+  voteCardsOpen = false,
 }: {
   room: Room;
   participants: Participant[];
@@ -74,10 +74,10 @@ export default function TableView({
   pointAt?: string;
   /** The classroom screen: the whole table from above, no seat and no cards. */
   overview?: boolean;
+  /** During voting the cards stay folded until the vote panel's "발언 카드 보기" opens them. */
+  voteCardsOpen?: boolean;
 }) {
   const now = useNow(1000) + offset;
-  const [voteCardsOpen, setVoteCardsOpen] = useState(false);
-  useEffect(() => setVoteCardsOpen(false), [room.phase, pointAt]);
   const floor = activeFloor(room, now);
   const narrow = typeof window !== "undefined" && window.innerWidth < 700;
   const players: TablePlayer[] = participants.map((p) => ({
@@ -90,13 +90,20 @@ export default function TableView({
   }));
   // Once the event happens its card comes first.
   const eventCard: TableCard[] = room.event ? [{ uid: "event", name: room.event.title, role: "사건 발생", text: room.event.description, state: "done", tone: "event" }] : [];
+  const nameOf = (uid: string) => (uid === selfUid ? "나" : (participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자"));
   const record = (uid: string) => {
     const rows: NonNullable<TableCard["record"]> = [];
+    // The question last asked before each answer: that is what the answer is about.
+    let question = null as { key: number; uid: string; text: string } | null;
     for (const line of rounds.transcript) {
+      if (line.kind === "question") {
+        if (question?.key === line.turn) question.text += ` ${line.text}`;
+        else question = { key: line.turn, uid: line.uid, text: line.text };
+      }
       if (line.uid !== uid) continue;
       const last = rows.at(-1);
       if (last?.key === line.turn) last.text += ` ${line.text}`;
-      else rows.push({ key: line.turn, kind: KIND_LABEL[line.kind], text: line.text });
+      else rows.push({ key: line.turn, kind: KIND_LABEL[line.kind], text: line.text, about: line.kind === "answer" && question ? `${nameOf(question.uid)}: ${question.text}` : undefined });
     }
     return rows;
   };
@@ -104,7 +111,7 @@ export default function TableView({
   // The card holds only the AI's one-line summary; every word is one press away.
   const summaryOf = (uid: string) => rounds.summary?.statements?.find((s) => s.uid === uid)?.text ?? "";
   const statements = () =>
-    statementCards(room, participants, rounds, selfUid).map((c) => {
+    statementCards(room, participants, rounds, selfUid, floor?.uid).map((c) => {
       const lines = record(c.uid);
       return { ...c, text: summaryOf(c.uid), record: lines, summarizing: lines.some((l) => l.kind === KIND_LABEL.statement), color: seatColor(c.uid) };
     });
@@ -124,12 +131,6 @@ export default function TableView({
         <TableScene players={players} selfUid={selfUid} focusPlayerUid={focusUid} onPlayerSelect={onSelect} pointAt={pointAt} overview={overview} phase={room.phase} quality={narrow ? "low" : "high"} />
       </Suspense>
       </div>
-      {voting && cards?.length ? (
-        <button className="button secondary vote-cards-toggle" type="button" aria-expanded={voteCardsOpen} onClick={() => setVoteCardsOpen((open) => !open)}>
-          {voteCardsOpen ? <X size={17} aria-hidden /> : <BookOpen size={17} aria-hidden />}
-          {voteCardsOpen ? "카드 접고 투표하기" : "발언 카드 보기"}
-        </button>
-      ) : null}
       {showCards && cards ? <CardStrip key={room.phase} cards={cards} /> : null}
     </div>
   );

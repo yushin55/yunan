@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BookOpen, FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
-import type { Participant, Room, Rounds } from "../types/game";
+import type { IntroStep, Participant, Role, Room, Rounds } from "../types/game";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import EventCard from "../components/EventCard";
 import PhaseHeader from "../components/PhaseHeader";
@@ -13,7 +13,12 @@ import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../fea
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import IssueBriefing from "../features/briefing/IssueBriefing";
-import IntroControl from "../features/teacher/IntroControl";
+import RulesVideo from "../features/briefing/RulesVideo";
+import { introElapsed } from "../features/briefing/intro";
+import PhaseBanner from "../components/PhaseBanner";
+import RoleAvatar from "../features/roles/RoleAvatar";
+import IntroControl, { NEXT } from "../features/teacher/IntroControl";
+import { lobbyStepKey } from "./StudentRoomPage";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
 import LobbySettings from "../features/teacher/LobbySettings";
@@ -50,7 +55,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const speaking = SPEAKING.includes(phase);
   const turn = room.turn;
   const { floor, seconds: floorSeconds } = useFloor(room, offset);
-  const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
+  const speaker = participants.find((p) => p.uid === (floor?.uid ?? (turn?.stage !== "qa" ? turn?.uid : undefined)));
   const upcoming = turn && turn.index + 1 < turn.order.length ? participants.find((p) => p.uid === turn.order[turn.index + 1]) : undefined;
   const toReview = host.moderation.filter((e) => e.status === "flagged" || e.status === "pending_review").length;
   // Keeps the one-line statement summaries coming.
@@ -107,7 +112,8 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
 
   return (
     <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}`}>
-      {present && <ClassScreen room={room} participants={participants} rounds={rounds} offset={offset} onClose={closePresent} />}
+      {present && <ClassScreen room={room} participants={participants} rounds={rounds} offset={offset} onClose={closePresent} busy={busy} onIntroStep={(step) => void action("intro", { step })} />}
+      {!present && <PhaseBanner room={room} offset={offset} />}
       <StartCountdown left={countdown} />
       <header className="teacher-top">
         <span className="brand-mark">
@@ -121,11 +127,9 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
           방 코드 <strong>{room.code}</strong>
         </span>
         {toReview > 0 && <span className="teacher-attention" data-testid="review-badge">확인할 발언 {toReview}</span>}
-        {phase !== "lobby" && (
-          <button className="button ghost small" data-testid="present-toggle" onClick={openPresent}>
-            <Maximize2 size={15} /> 교실 화면 (전체 화면)
-          </button>
-        )}
+        <button className="button ghost small" data-testid="present-toggle" onClick={openPresent}>
+          <Maximize2 size={15} /> 교실 화면 (전체 화면)
+        </button>
         {barControls && <div className="teacher-practice-controls">{barControls}</div>}
         <span className={`net ${online ? "on" : "off"}`}>{online ? <Wifi size={16} aria-label="연결됨" /> : <WifiOff size={16} aria-label="연결 끊김" />}</span>
       </header>
@@ -134,8 +138,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
         <div className="teacher-main">
           {practice && (
             <p className="banner" data-testid="teacher-practice-note">
-              연습용 선생님 화면이에요. 참여 현황과 발언 정리를 보며 진행을 조작하고, 게임 화면은 ‘교실 화면’으로 띄워요. 학생 입장·주제 및 설정 변경·발언 검토는 실제 방에서 사용할 수 있어요.
-              {phase === "lobby" && waiting > 0 && " 학생 화면에서 브리핑을 보고 선호 역할을 고르면 시작할 수 있어요."}
+              연습용 선생님 화면이에요. 학생 입장·설정 변경·발언 검토는 실제 방에서만 돼요.
             </p>
           )}
           <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} hideTimer={Boolean(turn)} />
@@ -178,6 +181,16 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                   <button className="button ghost" disabled={busy} onClick={() => void action("extend", { seconds: 60 })}>
                     <Plus size={17} /> 1분 연장
                   </button>
+                )}
+                {phase === "event" && room.reading && (
+                  <>
+                    <span className="reading-count" data-testid="reading-count">
+                      사건 카드 읽는 중 {participants.filter((p) => p.submitted.includes("event")).length}/{count}명
+                    </span>
+                    <button className="button secondary" data-testid="open-questions" disabled={busy} onClick={() => void action("open-questions")}>
+                      기다리지 않고 질문 시작
+                    </button>
+                  </>
                 )}
                 {turn && (
                   <button className="button ghost" data-testid="next-phase" disabled={busy} onClick={() => void action("skip-phase", { phaseVersion: room.phaseVersion })}>
@@ -228,13 +241,19 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                 )}
               </section>
               {room.intro ? (
-                <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} />
+                <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} onPresent={openPresent} hideVideo={present} />
               ) : (
-                <section className="panel">
-                  <h3>이슈 브리핑</h3>
-                  <p className="muted small">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
-                  <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
-                </section>
+                !present && (
+                  <section className="panel">
+                    <div className="panel-head">
+                      <h3>이슈 브리핑 · 게임 규칙</h3>
+                      <button className="button primary small" onClick={openPresent}>
+                        <Maximize2 size={15} /> 크게 틀기
+                      </button>
+                    </div>
+                    <IntroVideos room={room} />
+                  </section>
+                )
               )}
               <section className="panel">
                 <h3>진행 설정</h3>
@@ -361,32 +380,156 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
 }
 
 /**
- * What the class sees on the projector: the table, whose turn it is and the time, and at the end
- * who the switcher was. Only public game information, never the teacher's own panels.
+ * What the class sees on the projector, made for students who are watching rather than playing:
+ * the table and whose turn it is, the roles and who plays them, the event card, and at the end the
+ * result. Only public game information, never the teacher's own panels.
  */
-function ClassScreen({ room, participants, rounds, offset, onClose }: { room: Room; participants: Participant[]; rounds: Rounds; offset: number; onClose: () => void }) {
+function ClassScreen({ room, participants, rounds, offset, onClose, busy, onIntroStep }: { room: Room; participants: Participant[]; rounds: Rounds; offset: number; onClose: () => void; busy: boolean; onIntroStep: (step: IntroStep) => void }) {
   const timer = usePhaseTimer(room, offset);
   const reveal = (room.phase === "reveal" || room.phase === "ended") && rounds.reveal;
+  const intro = room.phase === "lobby" ? room.intro : null;
+  // The same step the students are on: the teacher's in a real room, the player's own in practice.
+  const step = room.phase !== "lobby" ? null : intro ? intro.step : (["briefing", "rules", "roles"] as const)[practiceStep(room)];
+  const lobbyVideo = step === "briefing" || step === "rules";
+  const title = step ? { waiting: room.topic.title, briefing: "이슈 브리핑", rules: "게임 규칙", roles: "역할 고르기" }[step] : PHASE_LABELS[room.phase];
+  const next = intro ? NEXT[intro.step] : null;
   return (
     <div className="class-screen" data-testid="class-screen">
+      <PhaseBanner room={room} offset={offset} />
       <header className="class-screen-top">
-        <strong>{PHASE_LABELS[room.phase]}</strong>
-        {timer.label && <span className="bar-timer">{timer.label}</span>}
+        <strong>{title}</strong>
+        {timer.label && !room.reading && <span className="bar-timer">{timer.label}</span>}
+        <span className="class-screen-topic">{room.topic.shortTitle}</span>
         <span className="bar-spacer" />
+        {next && (
+          <button className="button primary small" data-testid="class-intro-next" disabled={busy} onClick={() => onIntroStep(next.step)}>
+            {next.label}
+          </button>
+        )}
         <button className="button ghost small" onClick={onClose}>
           <Minimize2 size={15} /> 나가기
         </button>
       </header>
-      {SPEAKING.includes(room.phase) && <SpeakerStage room={room} participants={participants} offset={offset} />}
-      <div className="class-screen-table">
-        <TableView room={room} participants={participants} rounds={rounds} offset={offset} overview />
-        {room.paused && <PauseOverlay />}
-        {reveal && (
-          <section className="panel class-screen-result">
-            <RevealSummary reveal={reveal} participants={participants} topic={room.topic} />
-          </section>
-        )}
-      </div>
+      {lobbyVideo ? (
+        <div className="class-screen-video">
+          <IntroVideos room={room} offset={offset} step={step} />
+        </div>
+      ) : room.phase === "lobby" ? (
+        <div className="class-screen-roles-full">
+          <h2>{room.topic.title}</h2>
+          <RoleCards roles={room.topic.roles} />
+        </div>
+      ) : (
+        <>
+          {SPEAKING.includes(room.phase) && <SpeakerStage room={room} participants={participants} offset={offset} />}
+          <div className="class-screen-body">
+            <div className="class-screen-table">
+              <TableView room={room} participants={participants} rounds={rounds} offset={offset} overview />
+              {room.paused && <PauseOverlay />}
+              {room.reading && room.event && (
+                <section className="class-screen-event" data-testid="class-event">
+                  <EventCard event={room.event} />
+                  <p className="class-screen-reading">
+                    사건 카드를 읽는 중이에요 · {participants.filter((p) => p.submitted.includes("event")).length}/{participants.length}명
+                  </p>
+                </section>
+              )}
+              {reveal && (
+                <section className="panel class-screen-result">
+                  <RevealSummary reveal={reveal} participants={participants} topic={room.topic} />
+                </section>
+              )}
+            </div>
+            <aside className="class-screen-side" aria-label="역할과 사건">
+              {room.event && !room.reading && <EventCard event={room.event} />}
+              <RoleList room={room} participants={participants} />
+            </aside>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+/** The role cards the students pick from, the same look without the picking: for the class to read along. */
+function RoleCards({ roles }: { roles: Role[] }) {
+  return (
+    <div className="role-cards class-role-cards" data-testid="class-role-cards">
+      {roles.map((role, i) => (
+        <article key={role.id} className="role-tap">
+          <RoleAvatar name={role.name} index={i} />
+          <strong>{role.name}</strong>
+          <span className="role-tap-goal">{role.goal}</span>
+          <ul className="role-tap-worries">
+            {role.concerns.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+/** A practice player's own pre-game step (0 briefing, 1 rules, 2 roles); see the student screen. */
+function practiceStep(room: Room) {
+  try {
+    return Math.min(2, Math.max(0, Number(sessionStorage.getItem(lobbyStepKey(room))) || 0));
+  } catch {
+    return 0;
+  }
+}
+
+/** Every role in this topic: what it wants, what it worries about, and (once roles are dealt) who plays it. */
+function RoleList({ room, participants }: { room: Room; participants: Participant[] }) {
+  return (
+    <ul className="class-roles" data-testid="class-roles">
+      {room.topic.roles.map((role, i) => {
+        const players = participants.filter((p) => p.roleId === role.id);
+        return (
+          <li key={role.id} className="class-role">
+            <RoleAvatar name={role.name} index={i} />
+            <div>
+              <h3>
+                {role.name}
+                {players.length > 0 && <span className="class-role-players">{players.map((p) => p.nickname).join(", ")}</span>}
+              </h3>
+              <p className="class-role-goal">{role.goal}</p>
+              <ul className="class-role-worries">
+                {role.concerns.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * The briefing or the rules video. Teacher-led rooms play whichever the teacher started, in step with
+ * every student; practice rooms (no `intro`) let the teacher pick and play freely.
+ */
+function IntroVideos({ room, offset = 0, step }: { room: Room; offset?: number; step?: IntroStep | null }) {
+  const [which, setWhich] = useState<"briefing" | "rules">("briefing");
+  const led = room.intro;
+  if (!led && step === "briefing") return <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />;
+  if (!led && step === "rules") return <RulesVideo />;
+  if (led?.step === "briefing") return <IssueBriefing key={led.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} />;
+  if (led?.step === "rules") return <RulesVideo key={led.startedAt} startAt={introElapsed(led, offset)} />;
+  if (led) return null;
+  return (
+    <>
+      <div className="segmented" role="tablist" aria-label="영상 고르기">
+        {(["briefing", "rules"] as const).map((v) => (
+          <button key={v} role="tab" aria-selected={which === v} className={`button small ${which === v ? "primary" : "ghost"}`} onClick={() => setWhich(v)}>
+            {v === "briefing" ? "이슈 브리핑" : "게임 규칙"}
+          </button>
+        ))}
+      </div>
+      {which === "briefing" ? <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} /> : <RulesVideo />}
+    </>
   );
 }
