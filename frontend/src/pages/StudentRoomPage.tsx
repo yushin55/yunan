@@ -391,7 +391,7 @@ function FlowOverlay({ step, action, onExit, children }: { step: number; action:
     <div className="flow-overlay" role="dialog" aria-modal="true" aria-label="게임 시작 전 준비" data-testid="flow-overlay">
       <header className="flow-top">
         <span className="brand-mark">
-          브릿지<span>.</span>
+          whose side<span>?</span>
         </span>
         <ol className="lobby-steps" aria-label="시작 전 준비">
           {steps.map((label, i) => (

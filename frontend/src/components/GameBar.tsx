@@ -37,7 +37,7 @@ export default function GameBar({
     <header className="game-bar">
       <div className="game-bar-row">
         <span className="brand-mark game-bar-brand">
-          브릿지<span>.</span>
+          whose side<span>?</span>
         </span>
         <span className="phase-pill" data-testid="phase-pill">
           {room.phase !== "lobby" && room.phase !== "ended" && <em>{index}/{STEPS.length - 1}</em>}

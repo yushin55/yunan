@@ -41,7 +41,6 @@
 .vote-instruction p { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; line-height: 1.5; word-break: keep-all; }
 .vote-cards-toggle { position: absolute; z-index: 6; bottom: 56px; left: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
 .table-view.with-cards .vote-cards-toggle { bottom: calc(var(--deck-h, 300px) + 12px); }
-.stage:has(.vote-cards-toggle[aria-expanded="true"]) .stage-panels { max-height: calc(100% - var(--deck-h, 300px) - 84px); }
 
 /* ── Lobby: briefing → rules → roles ───────────────────────────── */
 .lobby-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 12px; }
