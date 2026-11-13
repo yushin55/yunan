@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path
 
 from app.api.dependencies import game_service
-from app.core.auth import current_uid
+from app.core.auth import current_teacher, current_uid
 from app.models.requests import CreateRoom, JoinRoom, Sync
 from app.services.game import GameService
 
@@ -12,8 +12,8 @@ RoomId = Annotated[str, Path(pattern=r"^[a-f0-9]{32}$")]
 
 
 @router.post("")
-def create(data: CreateRoom, uid: str = Depends(current_uid), service: GameService = Depends(game_service)):
-    """The signed-in (anonymous) creator becomes the room's teacher."""
+def create(data: CreateRoom, uid: str = Depends(current_teacher), service: GameService = Depends(game_service)):
+    """The creator, signed in with Google or Kakao, becomes the room's teacher. Students join anonymously."""
     return service.create(uid, data.model_dump())
 
 

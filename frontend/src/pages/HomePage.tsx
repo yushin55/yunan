@@ -57,7 +57,7 @@ export default function HomePage() {
       </div>
 
       <footer className="title-footer">
-        <span>6–8명 · 약 15분 · 회원가입 없음</span>
+        <span>6–8명 · 약 15분 · 학생은 로그인 없이 참여</span>
         <span>팀 브릿지 · TECH FOR IMPACT 2026</span>
       </footer>
     </main>

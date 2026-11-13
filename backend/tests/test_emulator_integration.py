@@ -28,11 +28,24 @@ def sign_up():
     return auth.json()["idToken"], auth.json()["localId"]
 
 
+def teacher_sign_in():
+    """A Google account in the Auth emulator, which accepts an unsigned JSON ID token."""
+    import json
+
+    id_token = json.dumps({"sub": "integration-teacher", "email": "teacher@example.com", "email_verified": True})
+    auth = httpx.post(
+        "http://" + os.environ["FIREBASE_AUTH_EMULATOR_HOST"] + "/identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=fake-key",
+        json={"postBody": f"id_token={id_token}&providerId=google.com", "requestUri": "http://localhost", "returnSecureToken": True},
+    )
+    assert auth.status_code == 200, auth.text
+    return auth.json()["idToken"], auth.json()["localId"]
+
+
 def test_teacher_and_six_students_complete_a_game_in_firestore():
     db = firestore_client()
     service = GameService(FirestoreRoomRepository(db), moderator=Moderator(mode="rules"), rng=random.SystemRandom(), transcriber=lambda audio, mime: "제 역할의 입장을 말합니다.")
     app.dependency_overrides[game_service] = lambda: service
-    teacher_token, teacher_uid = sign_up()
+    teacher_token, teacher_uid = teacher_sign_in()
     students = [sign_up() for _ in range(6)]
     try:
         with TestClient(app) as api:
@@ -45,6 +58,8 @@ def test_teacher_and_six_students_complete_a_game_in_firestore():
                 with ThreadPoolExecutor(max_workers=6) as executor:
                     return list(executor.map(lambda i: post(students[i][0], path, payload(i)), range(6)))
 
+            # Students are anonymous and may not open a room.
+            post(students[0][0], "/api/rooms", {"topicId": "school_cctv"}, status=403)
             created = post(teacher_token, "/api/rooms", {"topicId": "school_cctv"})
             rid, code = created["room"]["roomId"], created["room"]["code"]
             base = f"/api/rooms/{rid}/"

@@ -20,6 +20,9 @@ class Settings:
     vertex_model: str = os.getenv("VERTEX_MODEL", "gemini-3.1-pro-preview")
     # "ai": rules + AI; when AI cannot answer, the teacher reviews. "rules": rules only (local development).
     moderation_mode: str = os.getenv("MODERATION_MODE", "ai")
+    # Kakao Login for teachers: the app's REST API key and (if enabled in Kakao Developers) client secret.
+    kakao_rest_api_key: str = os.getenv("KAKAO_REST_API_KEY", "")
+    kakao_client_secret: str = os.getenv("KAKAO_CLIENT_SECRET", "")
     allowed_origins: tuple[str, ...] = tuple(
         x.strip() for x in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",") if x.strip()
     )
