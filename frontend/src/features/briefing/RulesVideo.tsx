@@ -194,7 +194,7 @@ export default function RulesVideo({ onFinish, onNext, nextLabel, startAt }: { o
           <div className="news-voices-bg">
             <Diagram id="welcome" />
           </div>
-          <EndCard title="규칙 영상이 끝났어요" note={led ? "선생님이 역할 고르기를 시작할 때까지 기다려 주세요." : undefined} onReplay={led ? undefined : player.restart} onNext={onNext} nextLabel={nextLabel} />
+          <EndCard title="규칙 영상이 끝났어요" note={led && !onNext ? "선생님이 역할 고르기를 시작할 때까지 기다려 주세요." : undefined} onReplay={led ? undefined : player.restart} onNext={onNext} nextLabel={nextLabel} />
         </div>
       </div>
     );

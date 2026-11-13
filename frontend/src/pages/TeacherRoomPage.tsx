@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { Participant, Room, Rounds } from "../types/game";
+import type { Intro, IntroStep, Participant, Room, Rounds } from "../types/game";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import EventCard from "../components/EventCard";
 import Tabs from "../components/Tabs";
@@ -9,7 +9,6 @@ import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_LABELS, PHASE_ORDER, PHASE_SHORT, SPEAKING, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
-import IssueBriefing from "../features/briefing/IssueBriefing";
 import IntroControl from "../features/teacher/IntroControl";
 import RoomCode from "../features/room/RoomCode";
 import type { RoomApi } from "../features/room/useRoom";
@@ -55,6 +54,10 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const [present, setPresent] = useState(false);
   const [lobbyView, setLobbyView] = useState<LobbyView>("join");
   const [doneView, setDoneView] = useState<DoneView>("result");
+  // Practice rooms have no `intro`: the preview walks through the same steps on this screen alone.
+  const [localIntro, setLocalIntro] = useState<Intro>({ step: "waiting", startedAt: null });
+  const intro = room.intro ?? localIntro;
+  const stepIntro = (step: IntroStep) => (room.intro ? void action("intro", { step }) : setLocalIntro({ step, startedAt: Date.now() + offset }));
   const [sideOpen, setSideOpen] = useSidebar();
   const serverNow = useServerNow(offset);
   const phase = room.phase;
@@ -143,7 +146,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
         onChange={setLobbyView}
         items={[
           { id: "join", label: `학생 입장 ${count}명` },
-          { id: "intro", label: room.intro ? `시작 전 영상 · ${INTRO_LABEL[room.intro.step]}` : "이슈 브리핑" },
+          { id: "intro", label: `시작 전 영상 · ${INTRO_LABEL[intro.step]}` },
           { id: "setup", label: "주제와 설정" },
         ]}
       />
@@ -284,18 +287,9 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
             </section>
           )}
 
-          {phase === "lobby" &&
-            lobbyView === "intro" &&
-            (room.intro ? (
-              <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} />
-            ) : (
-              <section className="panel view-fill intro-control">
-                <p className="muted small intro-note">학생들은 각자 화면에서 이 브리핑을 끝까지 본 뒤 역할을 골라요. 교실 화면에 함께 틀어도 좋아요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요.</p>
-                <div className="video-fit">
-                  <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />
-                </div>
-              </section>
-            ))}
+          {phase === "lobby" && lobbyView === "intro" && (
+            <IntroControl intro={intro} room={room} participants={participants} offset={offset} busy={busy} onStep={stepIntro} preview={!room.intro} />
+          )}
 
           {phase === "lobby" && lobbyView === "setup" && (
             <div className="view-split">

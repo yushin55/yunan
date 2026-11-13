@@ -89,7 +89,7 @@ export default function IssueBriefing({
           </div>
           <EndCard
             title="브리핑이 끝났어요"
-            note={led ? "선생님이 다음으로 넘길 때까지 기다려 주세요." : undefined}
+            note={led && !onNext ? "선생님이 다음으로 넘길 때까지 기다려 주세요." : undefined}
             onReplay={
               led
                 ? undefined
