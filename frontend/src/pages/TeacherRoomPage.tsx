@@ -111,7 +111,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
       <StartCountdown left={countdown} />
       <header className="teacher-top">
         <span className="brand-mark">
-          브릿지<span>.</span>
+          whose side<span>?</span>
         </span>
         <span className="tag">선생님 진행 화면</span>
         <span className="topic-chip" title={room.topic.title}>

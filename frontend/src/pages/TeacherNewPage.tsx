@@ -38,7 +38,7 @@ export default function TeacherNewPage() {
       </Link>
       <span className="eyebrow">선생님 · 게임 방 만들기</span>
       <h1>오늘 수업의 주제를 골라 주세요</h1>
-      <p className="muted">브릿지가 미리 검토한 사회 문제 6개 중에서 고르거나, 무작위로 정할 수 있어요. 방을 연 뒤 대기실에서도 바꿀 수 있어요.</p>
+      <p className="muted">whose side가 미리 검토한 사회 문제 6개 중에서 고르거나, 무작위로 정할 수 있어요. 방을 연 뒤 대기실에서도 바꿀 수 있어요.</p>
       {loadError && <p className="error-box">{loadError}</p>}
       {!catalog && !loadError && (
         <p className="page-loading">

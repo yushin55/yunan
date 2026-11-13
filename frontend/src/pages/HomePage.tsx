@@ -27,7 +27,6 @@ export default function HomePage() {
 
       <div className="title-content">
         <div className="title-logo">
-          <span className="title-sup">BRIDGE</span>
           <h1>
             WHOSE <span>SIDE?</span>
           </h1>
@@ -58,7 +57,6 @@ export default function HomePage() {
 
       <footer className="title-footer">
         <span>6–8명 · 약 15분 · 학생은 로그인 없이 참여</span>
-        <span>팀 브릿지 · TECH FOR IMPACT 2026</span>
       </footer>
     </main>
   );
