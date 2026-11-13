@@ -41,9 +41,11 @@ function TeacherLogin() {
     try {
       await signIn();
     } catch (e) {
-      const code = (e as { code?: string }).code;
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request")
-        setError(code === "auth/popup-blocked" ? "팝업이 차단되었어요. 브라우저에서 팝업을 허용해 주세요." : "로그인하지 못했어요. 잠시 후 다시 시도해 주세요.");
+      const code = (e as { code?: string }).code ?? "";
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        console.error("Teacher sign-in failed", e);
+        setError(loginErrorMessage(code));
+      }
       setBusy(false);
     }
   };
@@ -77,6 +79,22 @@ function TeacherLogin() {
       </section>
     </main>
   );
+}
+
+// Sign-in failures caused by the Firebase project's settings, not by the teacher: retrying will not help.
+const SETUP_ERRORS = ["auth/operation-not-allowed", "auth/configuration-not-found", "auth/unauthorized-domain", "auth/invalid-api-key", "auth/api-key-not-valid"];
+
+/** What the teacher sees, with the Firebase code appended so whoever runs the site can tell the cause. */
+function loginErrorMessage(code: string) {
+  const text =
+    code === "auth/popup-blocked"
+      ? "팝업이 차단되었어요. 브라우저에서 팝업을 허용해 주세요."
+      : code === "auth/network-request-failed"
+        ? "인터넷 연결을 확인하고 다시 시도해 주세요."
+        : SETUP_ERRORS.includes(code)
+          ? "이 사이트에서 지금은 구글 로그인을 쓸 수 없어요. 사이트 관리자에게 알려 주세요."
+          : "로그인하지 못했어요. 잠시 후 다시 시도해 주세요.";
+  return code && code !== "auth/popup-blocked" ? `${text} (${code})` : text;
 }
 
 const GoogleMark = () => (
