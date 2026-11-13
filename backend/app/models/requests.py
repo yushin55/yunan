@@ -42,8 +42,18 @@ class CreateRoom(Settings):
 
 
 class Intro(Input):
-    """Where the whole class is before the game: waiting, a video, or picking roles."""
+    """Where the whole class is before the game: waiting, a video, or picking roles.
+    Without `at` the step starts from the top. With `at` the teacher moved within the video that is
+    playing (seek, scene jump, skip, pause): every screen goes to that second, paused or playing."""
     step: Literal["waiting", "briefing", "rules", "roles"]
+    at: float | None = Field(default=None, ge=0, le=3600)
+    paused: bool = False
+
+    @model_validator(mode="after")
+    def video_only(self):
+        if self.at is not None and self.step not in ("briefing", "rules"):
+            raise ValueError("영상 단계에서만 재생 위치를 옮길 수 있어요.")
+        return self
 
 
 class JoinRoom(Input):

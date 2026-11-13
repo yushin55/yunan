@@ -45,6 +45,9 @@ async function teacherRunsIntro(teacher, students) {
     await expect(student.page.getByTestId('briefing-headline')).toBeVisible({ timeout: 10000 });
     await expect(student.page.getByTestId('video-skip')).toHaveCount(0);
   }
+  // The teacher keeps the controls; skipping ends the video on every screen.
+  await teacher.page.getByTestId('briefing').getByTestId('video-skip').click();
+  for (const student of students) await expect(student.page.getByTestId('video-end')).toBeVisible();
   await teacher.page.getByTestId('intro-next').click(); // Rules.
   for (const student of students) await expect(student.page.getByTestId('rules-video')).toBeVisible();
   await teacher.page.getByTestId('intro-next').click(); // Role picking.

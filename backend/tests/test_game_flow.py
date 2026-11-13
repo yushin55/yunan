@@ -276,6 +276,20 @@ def test_teacher_moves_the_whole_class_through_the_videos(game, client):
     http, actor = client
     actor[0] = TEACHER
     assert http.post(f"/api/rooms/{rid}/intro", json={"step": "skip"}).status_code == 422
+    # The teacher seeks, pauses or skips within the video: every screen goes to the same second.
+    started = clock[0]
+    clock[0] += 4000
+    moved = service.action(rid, TEACHER, "intro", {"step": "briefing", "at": 30.5, "paused": False})["room"]["intro"]
+    assert moved == {"step": "briefing", "startedAt": clock[0] - 30500, "run": started, "pausedAt": None}
+    paused = service.action(rid, TEACHER, "intro", {"step": "briefing", "at": 31, "paused": True})["room"]["intro"]
+    assert paused["pausedAt"] == 31 and paused["run"] == started  # The teacher's own player keeps going.
+    with pytest.raises(HTTPException) as stale:
+        service.action(rid, TEACHER, "intro", {"step": "rules", "at": 3, "paused": False})
+    assert stale.value.status_code == 409  # A seek from a video that is no longer on.
+    assert http.post(f"/api/rooms/{rid}/intro", json={"step": "roles", "at": 3}).status_code == 422
+    assert http.post(f"/api/rooms/{rid}/intro", json={"step": "briefing", "at": -1}).status_code == 422
+    restarted = service.action(rid, TEACHER, "intro", {"step": "briefing"})["room"]["intro"]
+    assert restarted == {"step": "briefing", "startedAt": clock[0]}  # Starting a step again plays it from the top.
     clock[0] += 5000
     assert service.action(rid, TEACHER, "intro", {"step": "roles"})["room"]["intro"]["step"] == "roles"
     # A new topic means a new briefing: back to waiting.

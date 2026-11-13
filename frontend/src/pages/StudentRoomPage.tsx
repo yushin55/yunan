@@ -9,7 +9,7 @@ import RoleCard from "../components/RoleCard";
 import Sheet from "../components/Sheet";
 import IssueBriefing from "../features/briefing/IssueBriefing";
 import RulesVideo from "../features/briefing/RulesVideo";
-import { introElapsed } from "../features/briefing/intro";
+import { introElapsed, introKey } from "../features/briefing/intro";
 import { MemoPad, QuestionList, StatementList } from "../features/discussion/DiscussionNotes";
 import { useFloor } from "../features/discussion/floor";
 import MicControls from "../features/discussion/MicControls";
@@ -314,7 +314,7 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
               <strong>선생님이 영상을 시작하면 다 함께 봐요</strong>
             </div>
           ) : led ? (
-            <IssueBriefing key={led.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} />
+            <IssueBriefing key={introKey(led)} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} startPaused={led.pausedAt != null} />
           ) : (
             <IssueBriefing
               briefing={room.topic.briefing}
@@ -336,7 +336,7 @@ function LobbyFlow({ room, me, participants, busy, offset, onPrefs, bare }: { ro
             <h2>테이블에서는 이렇게 진행돼요</h2>
           </div>
           {led ? (
-            <RulesVideo key={led.startedAt} startAt={introElapsed(led, offset)} />
+            <RulesVideo key={introKey(led)} startAt={introElapsed(led, offset)} startPaused={led.pausedAt != null} />
           ) : (
             <RulesVideo onFinish={() => setRulesWatched(true)} onNext={() => setRulesRead(true)} nextLabel="역할 고르러 가기" />
           )}

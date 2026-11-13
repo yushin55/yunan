@@ -97,8 +97,12 @@ export interface Room {
 export type IntroStep = "waiting" | "briefing" | "rules" | "roles";
 export interface Intro {
   step: IntroStep;
-  /** Server time the teacher started this step; every screen plays the video from it. */
+  /** Server time the video's 0:00 falls on; every screen plays from it. A teacher's seek moves it. */
   startedAt: number | null;
+  /** When the teacher paused: the second every screen holds at. */
+  pausedAt?: number | null;
+  /** When the teacher (re)started this step; seeks and pauses keep it. */
+  run?: number;
 }
 
 export interface Participant {

@@ -29,6 +29,8 @@ export default function IssueBriefing({
   onNext,
   nextLabel,
   startAt,
+  startPaused,
+  onControl,
 }: {
   briefing: Briefing;
   topicId?: string;
@@ -37,13 +39,16 @@ export default function IssueBriefing({
   /** Shown on the last frame next to "다시 보기" (e.g. moving on to the rules). */
   onNext?: () => void;
   nextLabel?: string;
-  /** Teacher-led: everyone watches together from this point, with no skipping or seeking. */
+  /** Teacher-led: everyone watches together from this point. Students cannot skip or seek. */
   startAt?: number;
+  startPaused?: boolean;
+  /** The teacher's copy: full controls, and every move is passed on to the class. */
+  onControl?: (at: number, paused: boolean) => void;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   const scenes = briefing.scenes;
-  const led = startAt !== undefined;
-  const player = useScenePlayer({ audioKey: topicId ?? "", scenes, introSeconds: INTRO_SECONDS, onFinish, startAt });
+  const locked = startAt !== undefined && !onControl;
+  const player = useScenePlayer({ audioKey: topicId ?? "", scenes, introSeconds: INTRO_SECONDS, onFinish, startAt, startPaused, onControl });
   const { scene, line, text, mouth, intro, playing, sound, elapsed, totalSeconds } = player;
   const current = scenes[scene];
   const quoted = text.startsWith("“");
@@ -89,9 +94,9 @@ export default function IssueBriefing({
           </div>
           <EndCard
             title="브리핑이 끝났어요"
-            note={led && !onNext ? "선생님이 다음으로 넘길 때까지 기다려 주세요." : undefined}
+            note={locked ? "선생님이 다음으로 넘길 때까지 기다려 주세요." : undefined}
             onReplay={
-              led
+              locked
                 ? undefined
                 : () => {
                     player.restart();
@@ -184,7 +189,7 @@ export default function IssueBriefing({
           </div>
         </div>
       </div>
-      <PlayerControls player={player} frame={frame} note="실제 보도 요약 · AI 합성 음성 · 출처는 끝에" elapsed={elapsed} total={totalSeconds} playing={playing} locked={led} />
+      <PlayerControls player={player} frame={frame} note="실제 보도 요약 · AI 합성 음성 · 출처는 끝에" elapsed={elapsed} total={totalSeconds} playing={playing} locked={locked} />
     </div>
   );
 }
@@ -222,7 +227,7 @@ export function PlayerControls({
           <span className="news-time">
             {clock(elapsed)} / {clock(total)}
           </span>
-          <span className="muted small news-note">선생님이 진행하는 영상이에요 · {note}</span>
+          <span className="muted small news-note">{playing ? `선생님이 진행하는 영상이에요 · ${note}` : "선생님이 영상을 잠시 멈췄어요"}</span>
           <button className="icon-button" onClick={() => void frame.current?.requestFullscreen?.()} aria-label="전체 화면" title="전체 화면">
             <Maximize2 size={17} />
           </button>

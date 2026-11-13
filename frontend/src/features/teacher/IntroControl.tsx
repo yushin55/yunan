@@ -1,6 +1,6 @@
 import IssueBriefing from "../briefing/IssueBriefing";
 import RulesVideo from "../briefing/RulesVideo";
-import { introElapsed } from "../briefing/intro";
+import { introElapsed, introRun } from "../briefing/intro";
 import type { Intro, IntroStep, Participant, Room } from "../../types/game";
 
 const STEPS: { step: IntroStep; label: string }[] = [
@@ -20,9 +20,29 @@ const NEXT: Record<IntroStep, { step: IntroStep; label: string } | null> = {
  * Before the game the teacher runs the videos for the whole class: every student's screen plays the
  * same video from the same moment, and nobody moves on until the teacher does. The teacher's own
  * copy plays in step, so it can go on the projector too; its end card moves the class on, even in full screen.
+ * The teacher's copy keeps every control (seek, scenes, pause, skip) and each move takes the class's screens along.
  * `preview`: practice, where only this screen follows the steps and the student screen keeps its own pace.
  */
-export default function IntroControl({ intro, room, participants, offset, busy, onStep, preview = false }: { intro: Intro; room: Room; participants: Participant[]; offset: number; busy: boolean; onStep: (step: IntroStep) => void; preview?: boolean }) {
+export default function IntroControl({
+  intro,
+  room,
+  participants,
+  offset,
+  busy,
+  onStep,
+  onMove,
+  preview = false,
+}: {
+  intro: Intro;
+  room: Room;
+  participants: Participant[];
+  offset: number;
+  busy: boolean;
+  onStep: (step: IntroStep) => void;
+  /** The teacher moved within the playing video: seconds in, and whether it is paused. */
+  onMove: (at: number, paused: boolean) => void;
+  preview?: boolean;
+}) {
   const next = NEXT[intro.step];
   const picked = participants.filter((p) => p.prefsDone).length;
   const go = (step: IntroStep) => {
@@ -55,17 +75,27 @@ export default function IntroControl({ intro, room, participants, offset, busy, 
       </div>
       <p className="muted small intro-note">
         {preview
-          ? "연습용 미리보기예요. 실제 방에서는 학생 화면이 선생님이 고른 단계를 함께 보여 주고, 학생은 영상을 건너뛸 수 없어요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요."
-          : "학생 화면은 선생님이 고른 단계를 함께 보여 줘요. 영상은 모두 같은 장면부터 재생되고, 학생은 건너뛸 수 없어요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요."}
+          ? "연습용 미리보기예요. 실제 방에서는 선생님이 영상을 넘기거나 멈추면 학생 화면도 같이 따라가고, 학생은 영상을 건너뛸 수 없어요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요."
+          : "선생님이 영상을 건너뛰거나 원하는 지점으로 옮기거나 멈추면 학생 화면도 같은 장면으로 따라가요. 학생은 건너뛸 수 없어요. 실제 보도 요약이니 수업 전에 출처를 확인해 주세요."}
       </p>
       {intro.step === "briefing" && (
         <div className="video-fit">
-          <IssueBriefing key={intro.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(intro, offset)} onNext={() => go("rules")} nextLabel="게임 규칙 영상 시작" />
+          <IssueBriefing
+            key={introRun(intro)}
+            briefing={room.topic.briefing}
+            topicId={room.topicId}
+            headline={room.topic.shortTitle}
+            startAt={introElapsed(intro, offset)}
+            startPaused={intro.pausedAt != null}
+            onControl={onMove}
+            onNext={() => go("rules")}
+            nextLabel="게임 규칙 영상 시작"
+          />
         </div>
       )}
       {intro.step === "rules" && (
         <div className="video-fit">
-          <RulesVideo key={intro.startedAt} startAt={introElapsed(intro, offset)} onNext={() => go("roles")} nextLabel="역할 고르기 시작" />
+          <RulesVideo key={introRun(intro)} startAt={introElapsed(intro, offset)} startPaused={intro.pausedAt != null} onControl={onMove} onNext={() => go("roles")} nextLabel="역할 고르기 시작" />
         </div>
       )}
       {intro.step === "waiting" && <p className="intro-state">학생들은 대기 화면에 있어요. 모두 들어오면 위의 ‘이슈 브리핑 영상 시작’을 눌러 주세요.</p>}

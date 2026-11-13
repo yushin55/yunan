@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Intro, IntroStep, Participant, Room, Rounds } from "../types/game";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import EventCard from "../components/EventCard";
@@ -58,6 +58,18 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const [localIntro, setLocalIntro] = useState<Intro>({ step: "waiting", startedAt: null });
   const intro = room.intro ?? localIntro;
   const stepIntro = (step: IntroStep) => (room.intro ? void action("intro", { step }) : setLocalIntro({ step, startedAt: Date.now() + offset }));
+  // A seek, scene jump, skip or pause on the teacher's video: the students' videos go to the same second.
+  // One request at a time, and only the latest of any that pile up, so the class ends where the teacher did.
+  const moves = useRef<{ queue: Promise<unknown>; latest: number }>({ queue: Promise.resolve(), latest: 0 });
+  const moveIntro = (at: number, paused: boolean) => {
+    if (!room.intro) {
+      setLocalIntro((cur) => ({ ...cur, startedAt: Date.now() + offset - at * 1000, pausedAt: paused ? at : null, run: cur.run ?? cur.startedAt ?? undefined }));
+      return;
+    }
+    const id = ++moves.current.latest;
+    const step = intro.step;
+    moves.current.queue = moves.current.queue.then(() => (id === moves.current.latest ? action("intro", { step, at, paused }) : null));
+  };
   const [sideOpen, setSideOpen] = useSidebar();
   const serverNow = useServerNow(offset);
   const phase = room.phase;
@@ -288,7 +300,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
           )}
 
           {phase === "lobby" && lobbyView === "intro" && (
-            <IntroControl intro={intro} room={room} participants={participants} offset={offset} busy={busy} onStep={stepIntro} preview={!room.intro} />
+            <IntroControl intro={intro} room={room} participants={participants} offset={offset} busy={busy} onStep={stepIntro} onMove={moveIntro} preview={!room.intro} />
           )}
 
           {phase === "lobby" && lobbyView === "setup" && (

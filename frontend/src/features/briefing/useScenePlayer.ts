@@ -44,6 +44,8 @@ export function useScenePlayer({
   introSeconds = 0,
   onFinish,
   startAt,
+  startPaused = false,
+  onControl,
 }: {
   audioKey: string;
   scenes: PlayerScene[];
@@ -51,6 +53,10 @@ export function useScenePlayer({
   onFinish?: () => void;
   /** Teacher-led: plays by itself from this many seconds in, so every screen in the class is at the same spot. */
   startAt?: number;
+  /** Teacher-led: the teacher has paused the video at `startAt`. */
+  startPaused?: boolean;
+  /** The teacher's copy: every move they make (seconds in, paused or not) is passed on to the class. */
+  onControl?: (at: number, paused: boolean) => void;
 }) {
   const [started, setStarted] = useState(false);
   const [intro, setIntro] = useState(introSeconds > 0);
@@ -65,6 +71,8 @@ export function useScenePlayer({
   // Parents pass a fresh callback each render; keep playback from restarting because of it.
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
+  const onControlRef = useRef(onControl);
+  onControlRef.current = onControl;
   const audio = useRef<HTMLAudioElement | null>(null);
   // Where the current scene resumes: 0 for a new scene, the paused position after a pause.
   const resumeAt = useRef(0);
@@ -162,7 +170,8 @@ export function useScenePlayer({
   }, [sound]);
   useEffect(() => () => audio.current?.pause(), []);
 
-  const seek = (seconds: number) => {
+  /** Go to a moment on the overall timeline, then play or hold there. */
+  const place = (seconds: number, play: boolean) => {
     audio.current?.pause();
     let rest = Math.max(0, seconds - introSeconds);
     let index = 0;
@@ -176,9 +185,11 @@ export function useScenePlayer({
     setEnded(false);
     setScene(index);
     setT(rest);
-    setPlaying(true);
+    setPlaying(play);
     setSeekCount((n) => n + 1);
   };
+  const sceneStart = (index: number) => introSeconds + lengths.slice(0, index).reduce((a, b) => a + b, 0);
+  const report = (at: number, paused: boolean) => onControlRef.current?.(Math.min(totalSeconds, Math.max(0, at)), paused);
 
   // Joined by the teacher's signal (or late): start at once, from where the class is.
   const autoStarted = useRef(false);
@@ -187,8 +198,8 @@ export function useScenePlayer({
     autoStarted.current = true;
     setStarted(true);
     if (startAt >= totalSeconds) finish();
-    else if (startAt < 1) setPlaying(true);
-    else seek(startAt);
+    else if (startAt < 1 && !startPaused) setPlaying(true);
+    else place(startAt, !startPaused);
     // Once, on mount: a new start time from the teacher mounts a new player.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,11 +219,22 @@ export function useScenePlayer({
     setSound,
     elapsed,
     totalSeconds,
-    goScene,
+    /** Jump to the start of a scene (past the last one: the end screen); a pause holds. */
+    goScene: (next: number) => {
+      goScene(next);
+      if (next >= scenes.length) report(totalSeconds, false);
+      else report(sceneStart(Math.max(0, next)), !playing);
+    },
     /** Jump to the end screen; counts as watched. */
-    skip: finish,
+    skip: () => {
+      finish();
+      report(totalSeconds, false);
+    },
     /** Jump to a moment on the overall timeline (seconds from the very start). */
-    seek,
+    seek: (seconds: number) => {
+      place(seconds, true);
+      report(seconds, false);
+    },
     start: () => {
       setStarted(true);
       setPlaying(true);
@@ -220,6 +242,7 @@ export function useScenePlayer({
     togglePlay: () => {
       if (playing) resumeAt.current = tRef.current;
       setPlaying(!playing);
+      report(elapsed, playing);
     },
     restart: () => {
       finished.current = true; // Already counted as watched.
@@ -229,6 +252,7 @@ export function useScenePlayer({
       setScene(0);
       setT(0);
       setPlaying(true);
+      report(0, false);
     },
   };
 }

@@ -353,7 +353,19 @@ class GameService:
         room = state["room"]
         if room["phase"] != "lobby":
             raise HTTPException(409, "영상과 역할 고르기는 게임 시작 전에만 진행할 수 있어요.")
-        room.update(intro={"step": data["step"], "startedAt": now}, updatedAt=now)
+        at = data.get("at")
+        if at is None:
+            room.update(intro={"step": data["step"], "startedAt": now}, updatedAt=now)
+            return
+        current = room.get("intro") or {}
+        if current.get("step") != data["step"]:
+            raise HTTPException(409, "그 영상은 이미 끝났어요. 지금 단계에서 다시 시도해 주세요.")
+        # The teacher moved within the video: shift its start so every screen's clock lands on `at`.
+        # `run` stays put, so the teacher's own player carries on instead of starting over.
+        room.update(
+            intro={"step": data["step"], "startedAt": now - round(at * 1000), "run": current.get("run") or current.get("startedAt") or now, "pausedAt": at if data.get("paused") else None},
+            updatedAt=now,
+        )
 
     def _host_kick(self, state, data, now):
         room = state["room"]

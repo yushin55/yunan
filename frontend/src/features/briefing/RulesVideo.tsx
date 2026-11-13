@@ -160,10 +160,25 @@ const Diagram = memo(function Diagram({ id }: { id: string }) {
 });
 
 /** The game rules as a short narrated video around the table, like the earlier rule briefing. */
-export default function RulesVideo({ onFinish, onNext, nextLabel, startAt }: { onFinish?: () => void; onNext?: () => void; nextLabel?: string; /** Teacher-led: see IssueBriefing. */ startAt?: number }) {
+export default function RulesVideo({
+  onFinish,
+  onNext,
+  nextLabel,
+  startAt,
+  startPaused,
+  onControl,
+}: {
+  onFinish?: () => void;
+  onNext?: () => void;
+  nextLabel?: string;
+  /** Teacher-led: see IssueBriefing. */
+  startAt?: number;
+  startPaused?: boolean;
+  onControl?: (at: number, paused: boolean) => void;
+}) {
   const frame = useRef<HTMLDivElement>(null);
-  const led = startAt !== undefined;
-  const player = useScenePlayer({ audioKey: "_rules", scenes: SCENES, onFinish, startAt });
+  const locked = startAt !== undefined && !onControl;
+  const player = useScenePlayer({ audioKey: "_rules", scenes: SCENES, onFinish, startAt, startPaused, onControl });
   const { scene, line, text, mouth, playing, sound, elapsed, totalSeconds } = player;
   const current = SCENES[scene];
 
@@ -194,7 +209,7 @@ export default function RulesVideo({ onFinish, onNext, nextLabel, startAt }: { o
           <div className="news-voices-bg">
             <Diagram id="welcome" />
           </div>
-          <EndCard title="규칙 영상이 끝났어요" note={led && !onNext ? "선생님이 역할 고르기를 시작할 때까지 기다려 주세요." : undefined} onReplay={led ? undefined : player.restart} onNext={onNext} nextLabel={nextLabel} />
+          <EndCard title="규칙 영상이 끝났어요" note={locked ? "선생님이 역할 고르기를 시작할 때까지 기다려 주세요." : undefined} onReplay={locked ? undefined : player.restart} onNext={onNext} nextLabel={nextLabel} />
         </div>
       </div>
     );
@@ -219,7 +234,7 @@ export default function RulesVideo({ onFinish, onNext, nextLabel, startAt }: { o
           </div>
         </div>
       </div>
-      <PlayerControls player={player} frame={frame} note="게임 규칙 안내" elapsed={elapsed} total={totalSeconds} playing={playing} locked={led} />
+      <PlayerControls player={player} frame={frame} note="게임 규칙 안내" elapsed={elapsed} total={totalSeconds} playing={playing} locked={locked} />
     </div>
   );
 }
