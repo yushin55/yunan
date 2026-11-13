@@ -20,6 +20,13 @@ def no_ai(topic, lines):
 STUDENTS = [f"s{i}" for i in range(8)]
 
 
+@pytest.fixture(autouse=True)
+def no_section_hold(monkeypatch, request):
+    """Most tests talk the moment a section starts; the hold itself has its own tests (marked `hold`)."""
+    if "hold" not in request.keywords:
+        monkeypatch.setattr("app.services.phase_engine.HOLD_MS", 0)
+
+
 @pytest.fixture
 def game():
     clock = [1_800_000_000_000]
@@ -73,3 +80,7 @@ def expire(service, clock, rid):
 def to_phase(service, rid, phase):
     while service.repository.read(rid)["room"]["phase"] != phase:
         service.action(rid, TEACHER, "next", {})
+    if phase == "event":
+        # Questions open once everyone has read the event card.
+        for uid in service.repository.read(rid)["participants"]:
+            service.action(rid, uid, "read-event", {})

@@ -36,8 +36,7 @@ export default function VotePanel({
       <div className="vote-instruction" role="status">
         <MousePointer2 size={24} aria-hidden />
         <div>
-          <strong>의심되는 상대를 클릭해 투표해 주세요.</strong>
-          <p>{count}명을 고르면 자동으로 투표돼요. 시간이 끝나기 전까지 바꿀 수 있어요.</p>
+          <strong>{count > 1 ? `의심되는 상대 ${count}명을 눌러 주세요` : "의심되는 상대를 눌러 주세요"}</strong>
         </div>
       </div>
       <p className="vote-pointed" data-testid="vote-pointed">

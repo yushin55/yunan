@@ -75,8 +75,8 @@
 .teacher-room.discussing .teacher-main > .banner { margin: 0 0 12px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 0.88rem; }
 .teacher-room.discussing .phase-header { margin-bottom: 16px; padding: 0; border: 0; background: none; }
 .teacher-room.discussing .phase-title-row .eyebrow { display: none; }
-.teacher-room.discussing .phase-title-row h2 { font-family: inherit; font-size: 1.05rem; font-weight: 700; }
-.teacher-room.discussing .todo:not(.paused-note) { margin: 2px 0 0; padding: 0; background: none; color: var(--muted); font-size: 0.92rem; }
+.teacher-room.discussing .phase-title-row h2 { font-family: inherit; font-size: 1.3rem; font-weight: 800; }
+.teacher-room.discussing .todo:not(.paused-note) { margin: 2px 0 0; padding: 0; background: none; color: var(--muted); font-size: 1rem; }
 .teacher-room.discussing .todo:not(.paused-note) strong { display: none; }
 .teacher-room.discussing .run-row { align-items: center; padding: 12px 0; border-block: 1px solid var(--line); }
 .teacher-room.discussing .run-row .button { min-height: 40px; padding: 7px 14px; font-size: 0.94rem; }
@@ -412,3 +412,121 @@ details.float-pop[open] > summary { margin-bottom: 8px; }
 .teacher-line-pick select { flex: 1 1 160px; width: auto; min-width: 0; padding: 6px 10px; font-size: 0.9rem; }
 .teacher-line-row { display: flex; gap: 6px; }
 .teacher-line-row input { flex: 1; min-width: 0; }
+
+/* A section starts: its name across the screen for a moment. */
+.phase-banner { position: fixed; inset: 0; z-index: 96; display: grid; place-items: center; background: rgba(6, 10, 9, 0.62); animation: banner-life 2200ms ease forwards; cursor: pointer; }
+.phase-banner > div { display: grid; justify-items: center; gap: 6px; width: 100%; padding: 28px 16px; background: linear-gradient(90deg, transparent, rgba(10, 16, 14, 0.95) 20%, rgba(10, 16, 14, 0.95) 80%, transparent); border-block: 2px solid var(--gold); text-align: center; }
+.phase-banner small { color: var(--muted); font-size: clamp(0.95rem, 2.4vw, 1.2rem); font-weight: 700; }
+.phase-banner strong { font-family: var(--serif); font-size: clamp(2.4rem, 9vw, 4.6rem); color: var(--gold); letter-spacing: 0.08em; }
+@keyframes banner-life { 0% { opacity: 0; } 12% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .phase-banner { animation: none; } }
+
+.segmented { display: flex; gap: 6px; margin-bottom: 8px; }
+
+/* Teacher screen: larger, calmer text for reading at a glance. */
+.teacher-room .statement-list { gap: 14px; }
+.teacher-room .statement-list li { padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.teacher-room .statement-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.teacher-room .statement-who strong { font-size: 1.05rem; }
+.teacher-room .statement-text { font-size: 1.02rem; line-height: 1.6; }
+.teacher-room .question summary { font-size: 1rem; line-height: 1.6; }
+.teacher-room .memo-title { font-size: 1.1rem; }
+
+/* ── Classroom screen: for the students watching on the projector ─────────────────── */
+.class-screen-topic { color: var(--muted); font-size: 1rem; }
+/* The video is sized from the height left over, so it never needs scrolling. */
+.class-screen-video { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 12px 16px; overflow: hidden; container-type: size; }
+.class-screen-video > * { flex: none; }
+.class-screen-video .segmented { margin: 0; }
+.class-screen-video .news { --chrome: 72px; width: min(100cqw, calc((100cqh - var(--chrome)) * 16 / 9)); margin: 0; }
+.class-screen-video:has(.segmented) .news { --chrome: 120px; }
+.class-screen-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(320px, 28vw, 440px); }
+.class-screen-side { min-height: 0; overflow-y: auto; display: grid; align-content: start; gap: 12px; padding: 14px; border-left: 1px solid var(--line); background: #0e1714; scrollbar-width: thin; }
+.class-screen-side .event-card { margin: 0; }
+.class-screen-event { position: absolute; z-index: 4; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; background: rgba(6, 10, 9, 0.6); }
+.class-screen-event .event-card { width: min(760px, 100%); margin: 0; font-size: 1.2rem; }
+.class-screen-event .event-card h3 { font-size: 1.8rem; }
+.class-screen-reading { margin: 0; padding: 6px 14px; border-radius: 99px; background: rgba(10, 16, 14, 0.9); font-weight: 700; }
+.class-screen-roles-full { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 20px clamp(16px, 4vw, 48px); }
+.class-screen-roles-full h2 { margin: 0 0 16px; font-family: var(--serif); font-size: clamp(1.4rem, 3vw, 2.2rem); text-align: center; }
+.class-screen-roles-full .class-roles { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.class-roles { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.class-role { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); }
+.class-role .role-avatar { width: 56px; height: auto; }
+.class-role h3 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0 0 4px; font-family: var(--serif); font-size: 1.15rem; }
+.class-role-players { padding: 1px 8px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-family: inherit; font-size: 0.82rem; font-weight: 700; }
+.class-role-goal { margin: 0 0 4px; font-weight: 800; line-height: 1.5; word-break: keep-all; }
+.class-role-worries { margin: 0; padding-left: 1.1em; color: var(--muted); font-size: 0.9rem; line-height: 1.5; word-break: keep-all; }
+@media (max-width: 900px) {
+  .class-screen-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; }
+  .class-screen-side { max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
+}
+
+/* Event card: one sentence per line, quoted words and the last sentence in bold. */
+.event-text { display: grid; gap: 6px; margin: 8px 0 10px; }
+.event-text p { margin: 0; line-height: 1.65; word-break: keep-all; }
+.event-text strong { font-weight: 800; }
+.event-text .event-key { margin-top: 4px; padding: 8px 12px; border-radius: 8px; background: rgba(178, 59, 39, 0.1); font-weight: 800; }
+.event-card.collapsible .event-text .event-key { background: rgba(231, 115, 95, 0.12); }
+.event-pop-card { display: grid; gap: 12px; }
+.event-pop-read { margin: 0; }
+.event-pop-wait { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0; padding: 12px; border-radius: 12px; background: rgba(10, 16, 14, 0.92); font-weight: 700; }
+.reading-count { padding: 6px 12px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-weight: 700; }
+
+/* Role card on my screen: the goal in bold, worries as a list. */
+.game-card-goal { display: grid; gap: 2px; }
+.game-card-goal strong { font-weight: 800; line-height: 1.5; }
+.game-card-worries ul { margin: 2px 0 0; padding-left: 1.1em; }
+.game-card-worries li { line-height: 1.5; }
+
+/* The result, big: did we find them (or, for a switcher, did I hide)? */
+.reveal-headline { margin: 0 0 12px; padding: 14px 12px; border-radius: 14px; text-align: center; font-family: var(--serif); font-size: clamp(1.7rem, 5vw, 2.6rem); font-weight: 900; line-height: 1.25; word-break: keep-all; }
+.reveal-headline.win { color: var(--gold); background: var(--gold-soft); border: 2px solid var(--gold); }
+.reveal-headline.lose { color: #f0a493; background: rgba(231, 115, 95, 0.12); border: 2px solid var(--red); }
+.class-screen .speaker-stage { padding: 10px 20px; }
+.class-screen .speaker-now h2 { font-size: clamp(1.6rem, 3.4vw, 2.6rem); }
+.result-popup .reveal-headline { font-size: clamp(1.5rem, 4vw, 2.1rem); }
+
+/* My role, as one sheet: who I am on top, then the role in full sentences. Nothing is cut off. */
+.role-sheet { display: grid; gap: 14px; width: min(620px, 100%); max-height: 100%; margin: 0; padding: 20px 22px; overflow-y: auto; box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); word-break: keep-all; overflow-wrap: anywhere; }
+.role-sheet .privacy-line { margin: 0; justify-self: center; }
+.role-sheet-id { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; align-items: center; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg-2); }
+.role-sheet-id > svg { color: var(--green); }
+.role-sheet-id.switcher { border-color: var(--red); background: rgba(231, 115, 95, 0.12); }
+.role-sheet-id.switcher > svg { color: var(--red); }
+.role-sheet-id strong { font-size: 1.1rem; }
+.role-sheet-id p { margin: 2px 0 0; color: var(--muted); line-height: 1.5; }
+.role-sheet-head { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: center; }
+.role-sheet-head .role-avatar { width: 84px; height: auto; }
+.role-sheet-head h2 { margin: 0; font-family: var(--serif); font-size: 1.7rem; }
+.role-sheet-head p { margin: 4px 0 0; color: var(--muted); line-height: 1.5; }
+.role-sheet-body { display: grid; gap: 6px; margin: 0; padding: 14px 16px; border-radius: 12px; background: var(--paper); color: var(--paper-ink); }
+.role-sheet-body dt { color: #a0742a; font-size: 0.85rem; font-weight: 800; }
+.role-sheet-body dd { margin: 0 0 6px; line-height: 1.6; }
+.role-sheet-goal { font-size: 1.08rem; font-weight: 800; }
+.role-sheet-body ul { margin: 0; padding-left: 1.2em; }
+.role-sheet .button { margin: 0; }
+
+/* An answer in the card detail: the question it answers, above it. */
+.card-detail-about { margin: 0 0 4px; padding: 6px 10px; border-left: 3px solid #d9b25a; border-radius: 4px; background: #f6efdf; color: #5b4a2c; font-size: 0.9rem; line-height: 1.5; }
+.card-detail-about b { color: #a0742a; margin-right: 2px; }
+
+/* Classroom screen while students pick roles: the same cards, bigger, with the worries for the watchers. */
+.class-role-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.class-role-cards .role-tap { cursor: default; padding: 16px 14px 18px; }
+.class-role-cards .role-tap:hover { border-color: var(--line); }
+.class-role-cards .role-tap .role-avatar { height: 130px; }
+.class-role-cards .role-tap strong { font-size: 1.35rem; }
+.class-role-cards .role-tap-goal { font-size: 1.02rem; font-weight: 800; color: var(--text); }
+.role-tap-worries { margin: 4px 0 0; padding-left: 1.1em; color: var(--muted); font-size: 0.92rem; line-height: 1.5; text-align: left; word-break: keep-all; }
+
+/* Smaller microphone, more room for the questions and their answers. */
+.stage-panels .mic-popup { padding: 8px; }
+.stage-panels .mic-popup .mic-buttons .button { padding: 6px 8px; font-size: 0.86rem; }
+.stage-panels .mic-popup .mic-button kbd { min-width: 20px; height: 20px; font-size: 0.75rem; }
+.stage-panels .question-list { max-height: 44vh; }
+.stage-panels .question summary { padding: 7px 10px; font-size: 0.95rem; }
+.stage-panels .question-replies { padding: 6px 10px 8px 18px; font-size: 0.9rem; }
+/* The result reads without frames: no box around the headline or the switcher. */
+.reveal-headline.win, .reveal-headline.lose { border: 0; background: none; padding: 4px 0; }
+.reveal-hero { border: 0; }

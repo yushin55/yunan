@@ -26,12 +26,9 @@ async function brief(page) {
   await page.getByTestId('video-next').click();
 }
 
-// Dressing-room picker: show a role from the rack, put it in the next slot, then confirm.
+// Tap a card for 1순위, another for 2순위, then confirm.
 async function pickRoles(page, indices) {
-  for (const i of indices) {
-    await page.locator('.rack-item').nth(i).click();
-    await page.getByTestId('wardrobe-add').click();
-  }
+  for (const i of indices) await page.getByTestId('role-card').nth(i).click();
   await page.getByTestId('wardrobe-submit').click();
 }
 
@@ -204,6 +201,10 @@ async function play(label, options) {
 
   await expect(title).toContainText('사건·질문', { timeout: 60000 });
   await expect(page.locator('.event-card')).toBeVisible();
+  // Questions wait until everyone (the partners too) has read the event card.
+  await expect(page.getByTestId('mic-question')).toBeDisabled();
+  await page.getByTestId('event-read').click();
+  await expect(page.getByTestId('event-popup')).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByTestId('end-turn')).toHaveCount(0); // Nobody's turn any more.
   await expect(page.getByTestId('mic-answer')).toBeVisible();
 

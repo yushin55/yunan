@@ -39,9 +39,7 @@
 .vote-instruction > svg { flex: none; margin-top: 2px; }
 .vote-instruction strong { display: block; line-height: 1.5; word-break: keep-all; }
 .vote-instruction p { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; line-height: 1.5; word-break: keep-all; }
-.vote-cards-toggle { position: absolute; z-index: 6; bottom: 56px; left: 12px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4); }
-.table-view.with-cards .vote-cards-toggle { bottom: calc(var(--deck-h, 300px) + 12px); }
-.stage:has(.vote-cards-toggle[aria-expanded="true"]) .stage-panels { max-height: calc(100% - var(--deck-h, 300px) - 84px); }
+.vote-cards-toggle { margin: 10px 0 0; }
 
 /* ── Lobby: briefing → rules → roles ───────────────────────────── */
 .lobby-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 12px; }
@@ -192,37 +190,18 @@
 
 /* ── Role selection: flip cards dragged into two slots ───────────────────────────── */
 .role-deck { display: grid; gap: 14px; margin-top: 6px; }
-.role-deck-hint { margin: 0; text-align: center; }
 .wardrobe-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .wardrobe-slot { position: relative; display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 140px; padding: 26px 8px 10px; border-radius: 14px; border: 2px dashed var(--line); background: var(--bg-2); color: var(--muted); text-align: center; transition: border-color 0.15s, transform 0.15s; }
 .wardrobe-slot.filled { border-style: solid; border-color: var(--gold); background: var(--gold-soft); color: var(--text); }
-.wardrobe-slot.over { border-color: var(--gold); transform: scale(1.03); }
 .wardrobe-slot .role-avatar { height: 92px; width: auto; }
 .wardrobe-slots.done .wardrobe-slot .role-avatar { height: 120px; }
 .slot-rank { position: absolute; top: 6px; left: 8px; padding: 1px 8px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-weight: 900; font-size: 0.78rem; }
 .slot-remove { position: absolute; top: 4px; right: 4px; width: 28px; height: 28px; }
 
 .role-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.role-flip { position: relative; aspect-ratio: 3 / 4; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; perspective: 900px; cursor: grab; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
-.role-flip:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 14px; }
-.role-flip.dragging { opacity: 0.4; }
-.role-flip-inner { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
-.role-flip.flipped .role-flip-inner { transform: rotateY(180deg); }
-.role-face { position: absolute; inset: 0; display: grid; border-radius: 14px; border: 2px solid var(--line); backface-visibility: hidden; -webkit-backface-visibility: hidden; overflow: hidden; }
-.role-face.front { grid-template-rows: 1fr auto; justify-items: center; padding: 10px 8px 12px; background: radial-gradient(120% 90% at 50% 0%, #2c4a40 0%, #0f1a17 75%); }
-.role-face.front .role-avatar { height: 100%; width: auto; min-height: 0; filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.5)); }
-.role-face.front strong { font-family: var(--serif); font-size: 1.05rem; word-break: keep-all; text-align: center; }
-.role-face.back { transform: rotateY(180deg); align-content: start; gap: 6px; padding: 12px; background: var(--bg-2); font-size: 0.82rem; line-height: 1.4; overflow-y: auto; }
-.role-face.back strong { font-family: var(--serif); font-size: 1rem; }
-.role-face.back .label { color: var(--gold); margin-right: 4px; }
-.role-flip.picked .role-face { border-color: var(--gold); }
-.role-flip-rank { position: absolute; z-index: 2; top: 8px; right: 8px; padding: 2px 10px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-style: normal; font-weight: 900; font-size: 0.8rem; pointer-events: none; }
-.role-drag-ghost { position: fixed; z-index: 80; display: grid; justify-items: center; gap: 2px; width: 110px; padding: 8px; border-radius: 12px; border: 2px solid var(--gold); background: var(--bg-2); transform: translate(-50%, -60%) rotate(-4deg); box-shadow: 0 16px 30px rgba(0, 0, 0, 0.5); pointer-events: none; font-size: 0.85rem; text-align: center; }
-.role-drag-ghost .role-avatar { height: 80px; width: auto; }
 .role-avatar .avatar-eyes { transform-origin: 120px 66px; transform-box: view-box; animation: blink 4.6s infinite; }
 @media (prefers-reduced-motion: reduce) {
   .role-avatar .avatar-eyes { animation: none; }
-  .role-flip-inner { transition: none; }
 }
 
 /* ── In-game desk: one short instruction, then the work for this phase ───────────────────────────── */
@@ -233,7 +212,11 @@
 .bar-extra { display: flex; align-items: center; gap: 6px; }
 .practice-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-size: 0.78rem; font-weight: 800; cursor: help; }
 .teacher-practice-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
-.teacher-room:has(.teacher-practice-controls) .teacher-top { flex-wrap: wrap; }
+/* One row: the practice buttons keep their size and the topic title gives way. */
+.teacher-practice-controls { flex: none; flex-wrap: nowrap; }
+.teacher-practice-controls .practice-phase-jump { width: auto; min-height: 34px; }
+.teacher-room:has(.teacher-practice-controls) .teacher-top .tag { display: none; }
+@media (max-width: 1100px) { .teacher-room:has(.teacher-practice-controls) .teacher-top { flex-wrap: wrap; } }
 .practice-settings-preview { margin: 0; padding: 0; border: 0; min-width: 0; }
 .practice-settings-preview:disabled { opacity: 0.65; }
 @media (max-width: 640px) {
@@ -280,9 +263,6 @@
 .practice-phase-jump { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line, #ccc); background: var(--panel, #fff); color: inherit; font: inherit; font-size: 0.85rem; font-weight: 700; }
 
 /* Role cards: "1순위로 · 2순위로" under each card, for touch screens where dragging is awkward. */
-.role-pick { display: grid; gap: 6px; min-width: 0; }
-.role-pick-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.role-pick-buttons .button { min-height: 40px; margin: 0; padding: 6px 4px; font-size: 0.86rem; }
 /* Teacher-led videos before the game. */
 .intro-waiting { display: grid; place-content: center; gap: 8px; min-height: 40vh; padding: 24px; border: 1px solid var(--line); border-radius: 14px; text-align: center; }
 .intro-waiting strong { font-size: 1.2rem; }
@@ -295,3 +275,21 @@
 .intro-step { padding: 6px 12px; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--muted); font: inherit; font-size: 0.88rem; cursor: pointer; }
 .intro-step.current { border-color: var(--gold); color: var(--gold); font-weight: 700; }
 .intro-state { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--bg-2); }
+
+/* Role picking by tap: the card says what the role wants, a tap gives it the next rank. */
+.wardrobe-slots.compact .wardrobe-slot { min-height: 56px; padding: 8px 40px 8px 64px; justify-items: start; }
+.wardrobe-slots.compact .slot-rank { top: 50%; transform: translateY(-50%); }
+.wardrobe-slots.compact .wardrobe-slot strong { font-family: var(--serif); font-size: 1.1rem; }
+.role-tap { position: relative; display: grid; grid-template-rows: auto auto 1fr; justify-items: center; gap: 6px; min-width: 0; padding: 12px 10px 14px; border-radius: 14px; border: 2px solid var(--line); background: radial-gradient(120% 70% at 50% 0%, #2c4a40 0%, #0f1a17 75%); color: inherit; font: inherit; text-align: center; cursor: pointer; transition: border-color 0.15s, transform 0.15s; }
+.role-tap:hover { border-color: var(--gold); }
+.role-tap:active { transform: scale(0.98); }
+.role-tap:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+.role-tap.picked { border-color: var(--gold); background: radial-gradient(120% 70% at 50% 0%, #4a4325 0%, #15160f 80%); }
+.role-tap .role-avatar { height: 110px; width: auto; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)); }
+.role-tap strong { font-family: var(--serif); font-size: 1.1rem; word-break: keep-all; }
+.role-tap-goal { color: #d7e2dc; font-size: 0.88rem; line-height: 1.45; word-break: keep-all; }
+@media (max-width: 560px) {
+  .role-cards { grid-template-columns: 1fr 1fr; }
+  .role-tap .role-avatar { height: 80px; }
+}
+.role-flip-rank { position: absolute; z-index: 2; top: 8px; right: 8px; padding: 2px 10px; border-radius: 99px; background: var(--gold); color: var(--gold-ink); font-style: normal; font-weight: 900; font-size: 0.8rem; pointer-events: none; }

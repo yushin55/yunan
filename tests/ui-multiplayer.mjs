@@ -51,7 +51,8 @@ async function teacherRunsIntro(teacher, students) {
 
 // Role cards: the "1순위로" / "2순위로" buttons under each card, then confirm.
 async function pickRoles(page, indices) {
-  for (const [slot, i] of indices.entries()) await page.getByTestId('role-card').nth(i).locator('xpath=..').getByTestId(`pick-${slot + 1}`).click();
+  // The first card tapped is 1순위, the next 2순위.
+  for (const i of indices) await page.getByTestId('role-card').nth(i).click();
   await page.getByTestId('wardrobe-submit').click();
 }
 
@@ -178,8 +179,16 @@ try {
     if (i < 5) await expect(teacher.page.getByTestId('current-speaker')).toHaveText(students[i + 1].nickname);
   }
 
-  step('event card; the floor is open and there is one microphone');
+  step('event card; everyone reads it, then the floor is open and there is one microphone');
   for (const who of [teacher, ...students]) await expect(who.page.locator('.event-card')).toBeVisible();
+  // Nobody can ask while someone is still reading.
+  await students[0].page.getByTestId('event-read').click();
+  await expect(students[0].page.getByTestId('mic-question')).toBeDisabled();
+  await expect(teacher.page.getByTestId('reading-count')).toContainText('1/6');
+  for (const student of students.slice(1)) await student.page.getByTestId('event-read').click();
+  for (const student of students) await expect(student.page.getByTestId('event-popup')).toHaveCount(0);
+  await expect(students[0].page.getByTestId('phase-banner')).toContainText('질문');
+  await expect(students[0].page.getByTestId('phase-banner')).toHaveCount(0, { timeout: 10000 });
   await micFree();
   await expect(teacher.page.getByTestId('call-speaker')).toHaveCount(0);
   await expect(teacher.page.getByTestId('teacher-line-input')).toBeVisible(); // The teacher can still write down anyone's question or answer.

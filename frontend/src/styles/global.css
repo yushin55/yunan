@@ -19,7 +19,7 @@
   --paper: #f7f0e1;
   --paper-ink: #2a2218;
   --radius: 14px;
-  --serif: "Noto Serif KR", "Noto Sans KR", serif;
+  --serif: "Noto Sans KR", system-ui, sans-serif; /* Titles: the same readable sans as the body, only bolder. */
   color-scheme: dark;
   font-family: "Noto Sans KR", system-ui, sans-serif;
   font-size: 16px;

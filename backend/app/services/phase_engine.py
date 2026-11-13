@@ -28,6 +28,9 @@ SPEAKING_PHASES = ("statement", "event")
 MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer")}
 OPEN_KINDS = ("question", "answer")  # Statement Q&A uses the event phase's buttons.
 MAX_TURNS = 40
+# Each section opens with its title on every screen; nobody can talk and no clock runs until it is gone.
+HOLD_MS = 3000
+HELD_PHASES = ("statement", "vote")
 
 
 def now_ms():
@@ -58,8 +61,12 @@ def _log_turn(state: dict) -> None:
 def start_phase(state: dict, phase: str, now: int) -> None:
     room = state["room"]
     seconds = room["settings"]["phaseSeconds"].get(phase) if phase in TIMED_PHASES else None
-    room.update(phase=phase, phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + seconds * 1000 if seconds else None,
-                paused=False, pausedRemainingMs=None, updatedAt=now, turn=None, floor=None)
+    hold = HOLD_MS if phase in HELD_PHASES else 0
+    room.update(phase=phase, phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + hold + seconds * 1000 if seconds else None,
+                paused=False, pausedRemainingMs=None, updatedAt=now, turn=None, floor=None,
+                holdUntil=now + hold if hold else None,
+                # The event card first: questions open once every student has read it (or the teacher opens them).
+                reading=phase == "event")
     if phase == "statement" and state["participants"]:
         order = seated(state)
         room["turn"] = {"order": order, "index": 0, "uid": order[0], "stage": "speech"}
@@ -80,8 +87,25 @@ def start_qa(state: dict, now: int) -> None:
     """Everyone has made their statement: anyone can now ask about them."""
     room = state["room"]
     room["turn"].update(stage="qa", uid=None)
-    room.update(phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + load_game_config()["qaSeconds"] * 1000,
-                paused=False, pausedRemainingMs=None, updatedAt=now, floor=None)
+    room.update(phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + HOLD_MS + load_game_config()["qaSeconds"] * 1000,
+                paused=False, pausedRemainingMs=None, updatedAt=now, floor=None, holdUntil=now + HOLD_MS)
+
+
+def open_questions(state: dict, now: int) -> None:
+    """Everyone has read the event card: announce the questions, then run the event clock from the start."""
+    room = state["room"]
+    if room["phase"] != "event" or not room.get("reading"):
+        return
+    seconds = room["settings"]["phaseSeconds"]["event"]
+    room.update(reading=False, holdUntil=now + HOLD_MS, updatedAt=now)
+    if room["paused"]:
+        room["pausedRemainingMs"] = HOLD_MS + seconds * 1000
+    else:
+        room["phaseEndsAt"] = now + HOLD_MS + seconds * 1000
+
+
+def everyone_read(state: dict) -> bool:
+    return all("event" in p["submitted"] for p in state["participants"].values())
 
 
 def next_turn(state: dict, now: int) -> bool:

@@ -12,7 +12,7 @@ export interface TableCard {
   /** What the card shows: the summary if there is one, otherwise what was said. */
   text: string;
   /** Everything this person said, in order, shown when the card is opened. */
-  record?: { key: number; kind: string; text: string }[];
+  record?: { key: number; kind: string; text: string; /** For an answer: the question it answers. */ about?: string }[];
   state: "waiting" | "speaking" | "done";
   tone?: "event";
   /** They have spoken but the AI summary is not back yet. */
@@ -91,6 +91,11 @@ export default function CardStrip({ cards }: { cards: TableCard[] }) {
                       {card.record.map((r) => (
                         <li key={r.key}>
                           <span className="card-detail-kind">{r.kind}</span>
+                          {r.about && (
+                            <p className="card-detail-about">
+                              <b>Q.</b> {r.about}
+                            </p>
+                          )}
                           <p>{r.text}</p>
                         </li>
                       ))}

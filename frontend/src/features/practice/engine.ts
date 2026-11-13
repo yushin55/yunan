@@ -9,7 +9,9 @@ interface FullTopic extends Topic {
   events: EventCard[];
   teacherGuide: HostState["teacherGuide"];
 }
-type BotAction = "confirm" | "speak" | "finish" | "vote" | "floor" | "release";
+type BotAction = "confirm" | "speak" | "finish" | "vote" | "floor" | "release" | "read";
+/** As on the server: each section opens with its title for this long before anyone can talk. */
+const HOLD_MS = 3000;
 
 export interface PracticeState {
   version: 5;
@@ -122,28 +124,46 @@ function planFloor(s: PracticeState, at: number, left: number) {
 function startPhase(s: PracticeState, phase: Phase, now: number) {
   const room = s.snapshot.room;
   const seconds = room.settings.phaseSeconds[phase as keyof typeof SECONDS];
-  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + seconds * 1000 : null, paused: false, pausedRemainingMs: null, turn: null, floor: null });
+  const hold = phase === "statement" || phase === "vote" ? HOLD_MS : 0;
+  Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + hold + seconds * 1000 : null, paused: false, pausedRemainingMs: null, turn: null, floor: null, holdUntil: hold ? now + hold : null, reading: phase === "event" });
   if (phase === "ended") room.endedAt = now;
   const v = room.phaseVersion;
   const plan = (uid: string, action: BotAction, at: number) => s.schedule.push({ uid, action, at: now + at, phaseVersion: v });
   for (const uid of bots(s)) {
     if (phase === "role") plan(uid, "confirm", between(2, 6));
-    if (phase === "vote") plan(uid, "vote", between(3, 14));
+    if (phase === "vote") plan(uid, "vote", hold + between(3, 14));
+    if (phase === "event") plan(uid, "read", between(3, 8));
   }
   if (phase === "statement") {
     const order = s.snapshot.participants.map((p) => p.uid);
     room.turn = { order, index: 0, uid: order[0] };
-    planTurn(s, now);
+    planTurn(s, now + hold);
   }
-  if (phase === "event") planFloor(s, now + between(3, 5), BOT_FLOORS);
+}
+
+/** Everyone has read the event card: announce the questions and start the event clock over. */
+function openQuestions(s: PracticeState, now: number) {
+  const room = s.snapshot.room;
+  if (room.phase !== "event" || !room.reading) return;
+  const ms = HOLD_MS + room.settings.phaseSeconds.event * 1000;
+  Object.assign(room, { reading: false, holdUntil: now + HOLD_MS });
+  if (room.paused) room.pausedRemainingMs = ms;
+  else room.phaseEndsAt = now + ms;
+  planFloor(s, now + HOLD_MS + between(3, 5), BOT_FLOORS);
+}
+
+function markRead(s: PracticeState, uid: string, now: number) {
+  if (s.snapshot.room.phase !== "event") return;
+  mark(s, uid, "event");
+  if (s.snapshot.participants.every((p) => p.submitted.includes("event"))) openQuestions(s, now);
 }
 
 /** Everyone has spoken: open the floor for questions about the statements. */
 function startQa(s: PracticeState, now: number) {
   const room = s.snapshot.room;
   room.turn!.stage = "qa";
-  Object.assign(room, { phaseVersion: room.phaseVersion + 1, phaseEndsAt: now + QA_SECONDS * 1000, floor: null });
-  s.schedule.push({ uid: "", action: "floor", at: now + between(3, 5), phaseVersion: room.phaseVersion, phase: room.phase, left: 5 });
+  Object.assign(room, { phaseVersion: room.phaseVersion + 1, phaseEndsAt: now + HOLD_MS + QA_SECONDS * 1000, floor: null, holdUntil: now + HOLD_MS });
+  s.schedule.push({ uid: "", action: "floor", at: now + HOLD_MS + between(3, 5), phaseVersion: room.phaseVersion, phase: room.phase, left: 5 });
 }
 
 function nextTurn(s: PracticeState, now: number) {
@@ -240,6 +260,7 @@ function runBot(s: PracticeState, job: PracticeState["schedule"][number], now: n
   const { uid } = job;
   const switcher = s.assigned[uid]?.isSwitcher ?? false;
   if (job.action === "confirm") mark(s, uid, "role");
+  if (job.action === "read") markRead(s, uid, now);
   if (job.action === "speak") {
     const text = botLine(s, job);
     if (text) addLine(s, job.phaseVersion, text, "voice", now);
@@ -347,6 +368,14 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     }
     return { state: s };
   }
+  if (name === "open-questions") {
+    openQuestions(s, now);
+    return { state: s };
+  }
+  if (name === "read-event") {
+    markRead(s, ME, now);
+    return { state: s };
+  }
   if (name === "end") {
     if (room.phase === "reveal") startPhase(s, "ended", now);
     return { state: s };
@@ -426,6 +455,8 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
       if (room.floor.uid === ME && room.floor.kind === kind) return { state: s };
       fail(`${person(s, room.floor.uid).nickname}님이 말하고 있어요. 끝나면 마이크를 켤 수 있어요.`);
     }
+    if (room.reading) fail("모두 사건 카드를 읽으면 질문할 수 있어요.");
+    if (now < (room.holdUntil ?? 0)) fail("곧 시작해요. 잠시만 기다려 주세요.");
     if (!isOpen(room) && room.turn!.uid !== ME) fail("내 차례가 오면 마이크를 켤 수 있어요.");
     takeFloor(s, ME, kind, now);
     return { state: s };
@@ -501,20 +532,25 @@ export function createPracticeAt(nickname: string, topicId: string | null, phase
       s = act(s, "skip-phase", {}, t).state;
       continue;
     }
-    if (room.phase === "statement" && room.turn?.stage !== "qa" && room.turn?.uid === ME && !spoke.has(room.phaseVersion)) {
+    if (room.phase === "event" && room.reading) {
+      s = act(s, "open-questions", {}, t).state;
+      continue;
+    }
+    const held = t < (room.holdUntil ?? 0);
+    if (!held && room.phase === "statement" && room.turn?.stage !== "qa" && room.turn?.uid === ME && !spoke.has(room.phaseVersion)) {
       spoke.add(room.phaseVersion);
       say("statement");
       s = act(s, "end-turn", {}, t).state;
       continue;
     }
-    if ((room.phase === "event" || room.phase === "rebuttal") && !spoke.has(-ORDER.indexOf(room.phase)) && !(room.floor && room.floor.endsAt > t)) {
+    if (!held && (room.phase === "event" || room.phase === "rebuttal") && !spoke.has(-ORDER.indexOf(room.phase)) && !(room.floor && room.floor.endsAt > t)) {
       spoke.add(-ORDER.indexOf(room.phase));
       say(room.phase === "event" ? "question" : "rebuttal");
       s = act(s, "mic-off", {}, t).state;
       continue;
     }
     // Jump the clock to whatever happens next: a partner's move or the deadline.
-    const next = Math.min(...s.schedule.map((j) => j.at), room.phaseEndsAt ?? Infinity);
+    const next = Math.min(...s.schedule.map((j) => j.at), room.phaseEndsAt ?? Infinity, held ? room.holdUntil! : Infinity);
     t = Number.isFinite(next) ? Math.max(t, next) : t + 1000;
     s = tick(s, t) ?? s;
   }
@@ -523,6 +559,7 @@ export function createPracticeAt(nickname: string, topicId: string | null, phase
   const room = s.snapshot.room;
   if (room.phaseEndsAt !== null) room.phaseEndsAt += shift;
   if (room.floor) room.floor.endsAt += shift;
+  if (room.holdUntil) room.holdUntil += shift;
   if (room.endedAt) room.endedAt = now;
   for (const job of s.schedule) job.at += shift;
   for (const line of s.snapshot.rounds.transcript) line.at += shift;

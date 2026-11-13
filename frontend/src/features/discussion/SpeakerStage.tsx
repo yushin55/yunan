@@ -9,18 +9,22 @@ import { useFloor } from "./floor";
 export default function SpeakerStage({ room, participants, offset, busy, onCall }: { room: Room; participants: Participant[]; offset: number; busy?: boolean; onCall?: (uid: string) => void }) {
   const timer = usePhaseTimer(room, offset);
   const { floor, seconds } = useFloor(room, offset);
-  const turn = room.turn;
+  // The Q&A after the statements is an open floor like the event phase: the last speaker no longer holds it.
+  const turn = room.turn?.stage === "qa" ? null : room.turn;
   const person = (uid: string) => participants.find((p) => p.uid === uid);
   const speaker = person(floor?.uid ?? turn?.uid ?? "");
   // A turn runs on the turn's clock. On the open floor the phase clock is in the header, and this one is the speaker's.
-  const clock = turn ? timer.label : floor ? formatSeconds(seconds) : "";
-  const left = turn ? timer.remaining : seconds;
+  const qa = room.turn?.stage === "qa";
+  // The Q&A runs on the turn clock, which the header hides while a turn exists; show it here while the microphone is free.
+  const onTurnClock = Boolean(turn) || (qa && !floor);
+  const clock = onTurnClock ? timer.label : floor ? formatSeconds(seconds) : "";
+  const left = onTurnClock ? timer.remaining : seconds;
   const urgent = !timer.paused && left !== null && left <= 10;
   return (
     <section className="speaker-stage" data-testid="speaker-stage">
       <div className="speaker-now">
         <span className="eyebrow" data-testid="speaker-eyebrow">
-          {turn ? `입장 발표 · ${turn.index + 1}/${turn.order.length}번째${floor ? " · 마이크 켜짐" : ""}` : floor ? `지금 말하는 사람 · ${KIND_LABEL[floor.kind]}` : "마이크가 비어 있어요"}
+          {turn ? `입장 발표 · ${turn.index + 1}/${turn.order.length}번째${floor ? " · 마이크 켜짐" : ""}` : floor ? `지금 말하는 사람 · ${KIND_LABEL[floor.kind]}` : qa ? "질문 시간 · 마이크가 비어 있어요" : "마이크가 비어 있어요"}
         </span>
         <h2 data-testid="current-speaker">{speaker?.nickname ?? (turn ? "나간 참가자" : "먼저 누르는 사람이 말해요")}</h2>
         {speaker?.roleId && <p className="speaker-role">{roleName(room.topic, speaker.roleId)}</p>}
