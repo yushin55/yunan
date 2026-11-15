@@ -6,7 +6,7 @@ const MEMO_LIMIT = 500;
 
 /** Each person's statement, boiled down: the same text as the cards in hand on the 3D table. */
 export function StatementList({ room, participants, rounds, myUid }: { room: Room; participants: Participant[]; rounds: Rounds; myUid?: string }) {
-  const cards = statementCards(room, participants, rounds, myUid);
+  const cards = statementCards(room, participants, rounds, myUid, room.floor?.uid);
   return (
     <ol className="statement-list" data-testid="statement-list">
       {cards.map((card) => (
@@ -44,7 +44,7 @@ export function QuestionList({ room, participants, rounds, floor, myUid }: { roo
       {groups.map(({ head, replies }, i) => (
         <div key={head.key} className="question-group">
           {grouped && (i === 0 || groups[i - 1].head.phase !== head.phase) && <p className="question-about">{head.phase === "statement" ? "입장 발표에 대한 질문" : "사건에 대한 질문"}</p>}
-          <details className={`question kind-${head.kind}`} data-testid="question">
+          <details className={`question kind-${head.kind}`} data-testid="question" open>
             <summary>
               <b>{head.kind === "question" ? "Q." : head.kind === "rebuttal" ? "반론." : "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
               <small className="muted">

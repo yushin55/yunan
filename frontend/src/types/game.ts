@@ -77,6 +77,10 @@ export interface Room {
   phase: Phase;
   phaseVersion: number;
   phaseEndsAt: number | null;
+  /** A section just started: its title is on every screen and nobody can talk until this time. */
+  holdUntil?: number | null;
+  /** Event phase: the event card is being read; questions open when everyone has read it. */
+  reading?: boolean;
   paused: boolean;
   pausedRemainingMs: number | null;
   participantCount: number;

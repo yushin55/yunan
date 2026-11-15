@@ -1070,7 +1070,7 @@ export default function TableScene({
       )}
       {!attract && (
       <div className="immersive-scene__controls">
-        <span className="immersive-scene__hint">{phase === "vote" ? "의심되는 상대를 클릭해 투표해 주세요" : "드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요"}</span>
+        {phase !== "vote" && <span className="immersive-scene__hint">드래그해서 둘러보기 · 사람을 누르면 그쪽을 봐요</span>}
         <button
           className="immersive-scene__reset"
           type="button"

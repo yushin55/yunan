@@ -5,12 +5,12 @@ export const PHASE_ORDER: Phase[] = ["lobby", "role", "statement", "event", "vot
 
 export const PHASE_LABELS: Record<Phase, string> = {
   lobby: "대기실",
-  role: "비밀 역할 확인",
+  role: "역할 확인",
   statement: "입장 발표",
-  event: "사건 공개 · 질문과 답변",
+  event: "사건 발생",
   rebuttal: "반론",
-  vote: "역할 전환자 투표",
-  reveal: "정체 · 투표 결과 공개",
+  vote: "투표",
+  reveal: "결과",
   ended: "게임 종료",
 };
 
@@ -18,7 +18,7 @@ export const PHASE_SHORT: Record<Phase, string> = {
   lobby: "대기실",
   role: "역할 확인",
   statement: "입장 발표",
-  event: "사건·질문",
+  event: "사건 발생",
   rebuttal: "반론",
   vote: "투표",
   reveal: "결과",
@@ -27,26 +27,26 @@ export const PHASE_SHORT: Record<Phase, string> = {
 
 /** What a student should do right now. */
 export const STUDENT_TODO: Record<Phase, string> = {
-  lobby: "주제와 규칙을 읽고, 내 생각과 가장 가까운 역할을 1순위와 2순위로 골라 주세요.",
-  role: "나에게만 보이는 역할 카드를 확인해 주세요.",
-  statement: "내 차례가 오면 말하기 버튼이나 Z를 누르고, 배정받은 역할의 입장에서 주제에 대한 생각을 말해 주세요.",
-  event: "사건 카드를 읽고, 질문이 있으면 질문 버튼이나 Z, 답하고 싶으면 답변 버튼이나 X를 누르고 말해 주세요.",
+  lobby: "내 생각과 가까운 역할을 1·2순위로 골라요.",
+  role: "내 역할 카드를 확인해요.",
+  statement: "내 차례에 말하기(Z)를 누르고, 내 역할의 입장을 말해요.",
+  event: "사건 카드를 읽고 질문(Z)하거나 답변(X)해요.",
   rebuttal: "곧 투표로 넘어가요.",
-  vote: "역할 전환자라고 생각하는 사람에게 투표해 주세요.",
-  reveal: "역할 전환자의 정체와 투표 결과를 확인해 주세요.",
-  ended: "게임이 끝났어요. 참여해 줘서 고마워요!",
+  vote: "역할 전환자라고 생각하는 사람을 골라요.",
+  reveal: "정체와 투표 결과를 확인해요.",
+  ended: "게임이 끝났어요. 수고했어요!",
 };
 
-export const TEACHER_TODO: Record<Phase, string> = {
-  lobby: "방 코드나 QR로 학생을 모으고, 모두 역할을 고르면 게임을 시작하세요.",
-  role: "학생들이 비밀 역할을 확인하고 있어요. 모두 확인하면 자동으로 넘어가요.",
-  statement: "학생이 차례대로 자기 기기의 마이크를 켜고 말해요. 시간이 끝나면 자동으로 넘어가고, 이름을 누르면 바로 차례를 줄 수 있어요.",
-  event: "사건 카드를 읽어 주세요. 이제 차례 없이, 학생이 마이크를 켜서 질문하고 답해요. 한 번에 한 명만 켤 수 있어요.",
-  rebuttal: "반론 단계는 쓰지 않아요. 바로 투표로 넘어가요.",
-  vote: "학생들이 역할 전환자를 추리해 투표하고 있어요. 시간이 끝나면 공개돼요.",
-  reveal: "역할 전환자의 정체와 투표 결과가 공개됐어요. 결과를 함께 보고 게임을 마치세요.",
-  ended: "게임이 끝났어요. 참여 인원과 단계별 제출 현황을 확인하세요.",
-};
+// The teacher runs the game from the controls; no per-stage explanation.
+export const TEACHER_TODO: Record<Phase, string> = { lobby: "", role: "", statement: "", event: "", rebuttal: "", vote: "", reveal: "", ended: "" };
+
+/** The game's sections, each announced with a full-screen title when it starts. */
+export function phaseSection(room: Room): { id: string; title: string; sub?: string } | null {
+  if (room.phase === "statement") return room.turn?.stage === "qa" ? { id: "statement-qa", title: "질문하기", sub: "입장 발표에 대해 질문해 주세요" } : { id: "statement", title: "입장 발표하기" };
+  if (room.phase === "event") return { id: "event", title: "질문하기", sub: "사건에 대한 질문을 진행해 주세요" };
+  if (room.phase === "vote") return { id: "vote", title: "투표하기" };
+  return null;
+}
 
 export const SPEAKING: Phase[] = ["statement", "event", "rebuttal"];
 

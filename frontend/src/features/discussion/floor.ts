@@ -38,13 +38,14 @@ export interface StatementCard {
  * One card per person: their statement, summed up, with every word they said kept beside it.
  * The list on the desk and the cards in hand both read this.
  */
-export function statementCards(room: Room, participants: Participant[], rounds: Rounds, myUid?: string): StatementCard[] {
-  const turn = room.phase === "statement" ? room.turn : null;
+export function statementCards(room: Room, participants: Participant[], rounds: Rounds, myUid?: string, floorUid?: string): StatementCard[] {
+  // In the Q&A after the statements the turn still names the last speaker; whoever holds the microphone is the one talking.
+  const turn = room.phase === "statement" && room.turn?.stage !== "qa" ? room.turn : null;
   return participants.map((p) => {
     const said = rounds.transcript.filter((l) => l.uid === p.uid && l.kind === "statement");
     const summary = rounds.summary?.statements?.find((s) => s.uid === p.uid)?.text;
     const place = turn ? turn.order.lastIndexOf(p.uid) : -1;
-    const state = turn?.uid === p.uid ? "speaking" : turn && place > turn.index ? "waiting" : "done";
+    const state = (turn ? turn.uid : floorUid) === p.uid ? "speaking" : turn && place > turn.index ? "waiting" : "done";
     return {
       uid: p.uid,
       order: p.seat + 1,

@@ -2,16 +2,14 @@ import { useState } from "react";
 import Tabs from "../../components/Tabs";
 import type { Floor, Participant, Room, Rounds } from "../../types/game";
 import { QuestionList, StatementList } from "../discussion/DiscussionNotes";
-import TranscriptFeed, { TeacherLineInput } from "../discussion/TranscriptFeed";
-import { SPEAKING } from "../game/phases";
+import TranscriptFeed from "../discussion/TranscriptFeed";
 import type { RoomApi } from "../room/useRoom";
 
 type View = "live" | "statements" | "questions";
 
 /**
  * Everything said in the game, in one place: the live record (which the teacher can correct),
- * each statement in short, and the questions with their answers. Writing down what the
- * microphone missed stays under it whichever view is open.
+ * each statement in short, and the questions with their answers.
  */
 export default function DiscussionRecord({
   room,
@@ -31,7 +29,6 @@ export default function DiscussionRecord({
   action: RoomApi["action"];
 }) {
   const [view, setView] = useState<View>("live");
-  const speaking = SPEAKING.includes(room.phase);
   const questions = new Set(rounds.transcript.filter((l) => l.kind === "question").map((l) => l.turn)).size;
   return (
     <section className="panel record-panel" data-testid="transcript-panel">
@@ -43,7 +40,7 @@ export default function DiscussionRecord({
           active={view}
           onChange={setView}
           items={[
-            { id: "live", label: `전체 발언 ${rounds.transcript.length}` },
+            { id: "live", label: "기록 고치기" },
             { id: "statements", label: "입장 발표 요약" },
             { id: "questions", label: `질문과 답변 ${questions}` },
           ]}
@@ -52,7 +49,6 @@ export default function DiscussionRecord({
       <div className="record-body">
         {view === "live" && (
           <>
-            <p className="record-hint muted small">마이크가 잘못 받아쓴 문장은 문장 끝의 연필을 눌러 고치거나 지울 수 있어요.</p>
             <TranscriptFeed
               lines={rounds.transcript}
               participants={participants}
@@ -62,18 +58,13 @@ export default function DiscussionRecord({
               disabled={busy}
               onEdit={(lineId, text) => void action("line-edit", { lineId, text })}
               onDelete={(lineId) => void action("line-delete", { lineId })}
+              questionsNow={room.phase === "event" || room.turn?.stage === "qa"}
             />
           </>
         )}
         {view === "statements" && <StatementList room={room} participants={participants} rounds={rounds} />}
         {view === "questions" && <QuestionList room={room} participants={participants} rounds={rounds} floor={floor} />}
       </div>
-      {speaking && (
-        <div className="record-write">
-          <h4>마이크가 놓친 말 대신 적기</h4>
-          <TeacherLineInput key={room.phase} room={room} participants={participants} floor={floor} speakingUid={speakingUid} disabled={busy} onAdd={(body) => action("line-add", body)} />
-        </div>
-      )}
     </section>
   );
 }

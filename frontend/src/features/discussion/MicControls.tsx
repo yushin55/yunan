@@ -1,3 +1,4 @@
+import { useHoldLeft } from "../../components/PhaseBanner";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic } from "lucide-react";
 import Sheet from "../../components/Sheet";
@@ -69,7 +70,9 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
   const [asking, setAsking] = useState<SpeechKind | null>(null);
   const confirm = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const noticeKey = `bridge.micNotice.${room.roomId}.${room.createdAt}`;
-  const free = !room.paused && !floor && (open || myTurn);
+  // The section's title is still up, or the event card is still being read: nobody talks yet.
+  const notYet = useHoldLeft(room, offset) > 0 || Boolean(room.reading);
+  const free = !room.paused && !notYet && !floor && (open || myTurn);
 
   const claim = useCallback(
     async (kind: SpeechKind) => {

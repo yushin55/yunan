@@ -26,12 +26,9 @@ async function brief(page) {
   await page.getByTestId('video-next').click();
 }
 
-// Dressing-room picker: show a role from the rack, put it in the next slot, then confirm.
+// Tap a card for 1순위, another for 2순위, then confirm.
 async function pickRoles(page, indices) {
-  for (const i of indices) {
-    await page.locator('.rack-item').nth(i).click();
-    await page.getByTestId('wardrobe-add').click();
-  }
+  for (const i of indices) await page.getByTestId('role-card').nth(i).click();
   await page.getByTestId('wardrobe-submit').click();
 }
 
@@ -106,7 +103,6 @@ async function play(label, options) {
   await longTimers(page);
   await expect(page.getByTestId('practice-start')).toBeInViewport();
   await page.getByTestId('practice-view-toggle').click();
-  await expect(page.getByTestId('teacher-practice-note')).toBeVisible();
   await expect(page.getByTestId('participant-row')).toHaveCount(6);
   await expect(page.getByTestId('room-code')).toHaveCount(0);
   await page.getByRole('tab', { name: '주제와 설정' }).click(); // Topic and settings have their own section.
@@ -170,14 +166,15 @@ async function play(label, options) {
   await expect(mic).toHaveAttribute('data-live', 'false');
   await expect(page.locator('#memo-text')).toHaveValue('도윤 말이 조금 이상해z');
 
-  // Only the person whose turn it is can switch on; the teacher can bring a turn forward.
+  // Only the person whose turn it is can switch on; the teacher can move someone up to speak next.
   await page.getByTestId('practice-view-toggle').click();
   const callMe = page.getByTestId('call-speaker').filter({ hasText: '연습생' });
   if (await callMe.count()) await callMe.click();
+  if ((await page.getByTestId('current-speaker').textContent()).trim() !== '연습생') {
+    await expect(page.locator('.speaker-queue li.next')).toContainText('연습생');
+    await page.getByTestId('next-turn').click();
+  }
   await expect(page.getByTestId('current-speaker')).toHaveText('연습생');
-  await page.getByTestId('line-input').fill('마이크가 놓친 말을 적었습니다');
-  await page.getByTestId('line-add').click();
-  await expect(page.locator('.transcript')).toContainText('마이크가 놓친 말을 적었습니다');
   await page.getByTestId('practice-view-toggle').click();
 
   // My turn: press, read the notice once, talk.
@@ -203,8 +200,12 @@ async function play(label, options) {
   await page.evaluate(() => window.__speech.say('마지막 한마디도 제 발표입니다'));
   await expect(page.getByTestId('statement-list')).toContainText('마지막 한마디');
 
-  await expect(title).toContainText('사건·질문', { timeout: 60000 });
+  await expect(title).toContainText('사건 발생', { timeout: 60000 });
   await expect(page.locator('.event-card')).toBeVisible();
+  // Questions wait until everyone (the partners too) has read the event card.
+  await expect(page.getByTestId('mic-question')).toBeDisabled();
+  await page.getByTestId('event-read').click();
+  await expect(page.getByTestId('event-popup')).toHaveCount(0, { timeout: 15000 });
   await expect(page.getByTestId('end-turn')).toHaveCount(0); // Nobody's turn any more.
   await expect(page.getByTestId('mic-answer')).toBeVisible();
 
@@ -300,17 +301,17 @@ async function play(label, options) {
   // The shared screen runs the same discussion.
   await page.getByTestId('practice-view-toggle').click();
   await expect(page.getByTestId('speaker-stage')).toBeVisible();
-  await expect(page.getByTestId('speaker-eyebrow')).toContainText(/마이크가 비어|지금 말하는 사람/);
+  await expect(page.getByTestId('speaker-stage')).toBeVisible();
   await expect(page.getByTestId('call-speaker')).toHaveCount(0); // The floor is open: nobody to call on.
   await expect(page.getByTestId('participant-row')).toHaveCount(6);
   await expect(page.locator('body')).not.toContainText('당신은 역할 전환자');
   await expect(page.getByTestId('transcript-turn').first()).toBeVisible();
   await expect(page.locator('.transcript-phase').first()).toHaveText('입장 발표'); // The record is grouped by phase.
   await expect(page.locator('.transcript .turn-kind').first()).toHaveText(/질문|답변/);
-  // No statement list or discussion summary here; the live board shows who is talking and how far the phase has got.
+  // No statement list, discussion summary, or phase progress strip here.
   await expect(page.getByTestId('summary-board')).toHaveCount(0);
   await expect(page.getByTestId('statement-list')).toHaveCount(0);
-  await expect(page.getByTestId('live-progress')).toContainText(/명 참여/);
+  await expect(page.getByTestId('live-progress')).toHaveCount(0);
   await expect(page.getByTestId('live-status')).toHaveCount(6);
   await page.screenshot({ path: `artifacts/practice-${label}-teacher-event.png`, fullPage: true });
   // Recognition mistakes can be fixed or deleted.

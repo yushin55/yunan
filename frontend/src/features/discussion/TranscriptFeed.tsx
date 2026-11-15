@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
-import type { Floor, Participant, Room, SpeechKind, Topic, TranscriptLine } from "../../types/game";
-import { KIND_LABEL, PHASE_SHORT, SPEAKING } from "../game/phases";
+import type { Participant, Topic, TranscriptLine } from "../../types/game";
+import { KIND_LABEL } from "../game/phases";
 import { roleName } from "../roles/roleName";
 
 const LIMIT = 400;
@@ -20,7 +20,10 @@ export default function TranscriptFeed({
   disabled,
   onEdit,
   onDelete,
+  questionsNow = false,
 }: {
+  /** Questions and answers are going on now: their record is the one shown first. */
+  questionsNow?: boolean;
   lines: TranscriptLine[];
   participants: Participant[];
   topic: Topic;
@@ -33,54 +36,50 @@ export default function TranscriptFeed({
   onDelete?: (lineId: string) => void;
 }) {
   const feed = useRef<HTMLDivElement>(null);
-  // Follow new lines without scrolling the whole page, and leave the other phases where they are.
-  const newestPhase = lines.at(-1)?.phase;
+  // One record at a time: the statements, or every question and answer (after the statements and about the event).
+  const [view, setView] = useState<"statement" | "qa">(questionsNow ? "qa" : "statement");
+  useEffect(() => setView(questionsNow ? "qa" : "statement"), [questionsNow]);
+  // Follow new lines without scrolling the whole page.
   useEffect(() => {
-    const el = feed.current;
-    const column = el?.querySelector(`[data-phase="${newestPhase}"]`);
-    for (const box of [el, column]) box?.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
-  }, [lines.length, newestPhase]);
+    feed.current?.scrollTo({ top: feed.current.scrollHeight, behavior: "smooth" });
+  }, [lines.length, view]);
   const turns: { key: number; uid: string; phase: TranscriptLine["phase"]; kind: TranscriptLine["kind"]; lines: TranscriptLine[] }[] = [];
   for (const line of lines) {
     const last = turns.at(-1);
     if (last && last.key === line.turn) last.lines.push(line);
     else turns.push({ key: line.turn, uid: line.uid, phase: line.phase, kind: line.kind, lines: [line] });
   }
+  const shown = turns.filter((turn) => (view === "statement") === (turn.kind === "statement"));
   return (
-    <div className="transcript" ref={feed} role="log" tabIndex={0} aria-label="발언 기록">
-      {turns.length === 0 && <p className="muted empty">{emptyText}</p>}
-      {turns.length > 0 && (
-        <div className="transcript-columns">
-          {/* Rebuttal is no longer a phase; its column only shows for old records that have one. */}
-          {SPEAKING.filter((phase) => phase !== "rebuttal" || turns.some((turn) => turn.phase === phase)).map((phase) => {
-            const said = turns.filter((turn) => turn.phase === phase);
-            return (
-              <section key={phase} className={`transcript-column${said.length ? "" : " vacant"}`} data-phase={phase}>
-                <h4 className="transcript-phase">{PHASE_SHORT[phase]}</h4>
-                {!said.length && <p className="muted small">아직 발언이 없어요.</p>}
-                {said.map((turn) => {
-                  const speaker = participants.find((p) => p.uid === turn.uid);
-                  const live = turn === turns.at(-1) && turn.uid === speakingUid;
-                  return (
-                    <article key={turn.key} className={`transcript-turn${turn.uid === myUid ? " mine" : ""}${live ? " live" : ""}`} data-testid="transcript-turn">
-                      <header>
-                        <strong>{turn.uid === myUid ? "나" : (speaker?.nickname ?? "나간 참가자")}</strong>
-                        {turn.kind !== "statement" && <span className="turn-kind">{KIND_LABEL[turn.kind]}</span>}
-                        {speaker?.roleId && <span className="turn-role">{roleName(topic, speaker.roleId)}</span>}
-                        {live && <span className="turn-live">말하는 중</span>}
-                      </header>
-                      {turn.lines.map((line) => (
-                        <Line key={line.id} line={line} disabled={disabled} onEdit={onEdit} onDelete={onDelete} />
-                      ))}
-                    </article>
-                  );
-                })}
-              </section>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <>
+      <div className="segmented transcript-tabs" role="tablist" aria-label="기록 고르기">
+        {(["statement", "qa"] as const).map((v) => (
+          <button key={v} role="tab" type="button" aria-selected={view === v} className={`button small ${view === v ? "primary" : "ghost"}`} data-testid={`transcript-tab-${v}`} onClick={() => setView(v)}>
+            {v === "statement" ? "입장 발표" : "질문"}
+          </button>
+        ))}
+      </div>
+      <div className="transcript" ref={feed} role="log" tabIndex={0} aria-label="발언 기록">
+        {shown.length === 0 && <p className="muted empty">{turns.length ? "아직 기록이 없어요." : emptyText}</p>}
+        {shown.map((turn) => {
+          const speaker = participants.find((p) => p.uid === turn.uid);
+          const live = turn === turns.at(-1) && turn.uid === speakingUid;
+          return (
+            <article key={turn.key} className={`transcript-turn${turn.uid === myUid ? " mine" : ""}${live ? " live" : ""}`} data-testid="transcript-turn">
+              <header>
+                <strong>{turn.uid === myUid ? "나" : (speaker?.nickname ?? "나간 참가자")}</strong>
+                {turn.kind !== "statement" && <span className="turn-kind">{KIND_LABEL[turn.kind]}</span>}
+                {speaker?.roleId && <span className="turn-role">{roleName(topic, speaker.roleId)}</span>}
+                {live && <span className="turn-live">말하는 중</span>}
+              </header>
+              {turn.lines.map((line) => (
+                <Line key={line.id} line={line} disabled={disabled} onEdit={onEdit} onDelete={onDelete} />
+              ))}
+            </article>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -164,72 +163,3 @@ export function LineInput({ speaker, disabled, onAdd }: { speaker: string; disab
  * The teacher writes down what a student said when the microphone missed it (or could not turn it
  * into text): pick the student and what kind of words they were. Starts on whoever is speaking now.
  */
-export function TeacherLineInput({
-  room,
-  participants,
-  floor,
-  speakingUid,
-  disabled,
-  onAdd,
-}: {
-  room: Room;
-  participants: Participant[];
-  /** Whoever holds the microphone now: until the teacher picks someone else, the words join their turn. */
-  floor?: Floor | null;
-  speakingUid?: string;
-  disabled?: boolean;
-  onAdd: (body: { text: string; targetUid?: string; kind?: SpeechKind; phaseVersion?: number }) => Promise<unknown>;
-}) {
-  const turn = room.phase === "statement" ? room.turn : null;
-  const qa = turn?.stage === "qa";
-  const kinds: SpeechKind[] = room.phase === "event" ? ["question", "answer"] : qa ? ["question", "answer", "statement"] : ["statement"];
-  // Statements only for someone whose turn has come.
-  const spoke = turn ? turn.order.slice(0, qa ? turn.order.length : turn.index + 1) : [];
-  const [kind, setKind] = useState<SpeechKind | null>(null);
-  const current = kind && kinds.includes(kind) ? kind : floor && kinds.includes(floor.kind) ? floor.kind : kinds[0];
-  const people = current === "statement" ? participants.filter((p) => spoke.includes(p.uid)) : participants;
-  const [chosen, setChosen] = useState("");
-  const target = people.some((p) => p.uid === chosen) ? chosen : people.some((p) => p.uid === speakingUid) ? speakingUid! : (people.at(-1)?.uid ?? "");
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
-  return (
-    <form
-      className="teacher-line-input"
-      data-testid="teacher-line-input"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!text.trim() || !target || sending) return;
-        setSending(true);
-        const live = floor && floor.uid === target && floor.kind === current;
-        const done = await onAdd(live ? { text: text.trim(), phaseVersion: floor.version } : { text: text.trim(), targetUid: target, kind: current });
-        setSending(false);
-        if (done) setText(""); // On an error the words stay, to try again.
-      }}
-    >
-      <div className="teacher-line-pick">
-        <select value={target} aria-label="누구의 발언인지" data-testid="line-target" onChange={(e) => setChosen(e.target.value)}>
-          {people.map((p) => (
-            <option key={p.uid} value={p.uid}>
-              {p.seat + 1}. {p.nickname}
-            </option>
-          ))}
-        </select>
-        {kinds.length > 1 && (
-          <select value={current} aria-label="발언 종류" data-testid="line-kind" onChange={(e) => setKind(e.target.value as SpeechKind)}>
-            {kinds.map((k) => (
-              <option key={k} value={k}>
-                {KIND_LABEL[k]}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
-      <div className="teacher-line-row">
-        <input value={text} maxLength={LIMIT} disabled={disabled || sending} data-testid="line-input" aria-label="발언 직접 입력" placeholder="학생이 한 말을 적고 Enter" onChange={(e) => setText(e.target.value)} />
-        <button className="button secondary small" type="submit" data-testid="line-add" disabled={disabled || sending || !text.trim() || !target}>
-          기록
-        </button>
-      </div>
-    </form>
-  );
-}

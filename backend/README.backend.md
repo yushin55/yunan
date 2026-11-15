@@ -25,6 +25,7 @@ FastAPI + Firebase Admin SDK + Firestore. Vercel 서버리스 함수로 동작�
 | `POST .../start` | 교사 | 6~8명·전원 선호 완료 시 역할 배정 후 시작 (재시도해도 재추첨 없음). 전원이 고르면 로비 `phaseEndsAt`이 3초 뒤로 잡히고, 그때 누구든 `sync`하면 저절로 시작 |
 | `POST .../pause`, `resume`, `extend`, `next`, `end` | 교사 | 일시정지(마이크도 꺼짐)·재개·연장(10~300초)·다음 차례(없으면 다음 단계)·종료 |
 | `POST .../skip-phase` | 교사 | `{phaseVersion?}` 남은 차례를 건너뛰고 다음 단계로 |
+| `POST .../open-questions` | 교사 | 사건 카드를 아직 읽는 학생이 있어도 질문을 시작 |
 | `POST .../speaker` | 교사 | `{targetUid, phaseVersion?}` 입장 발표에서 그 학생에게 바로 차례를 주고 이후 순서는 이어감 |
 | `POST .../speech` | 학생 | `{audio(Base64 WAV), mimeType: "audio/wav", phaseVersion, clip?}` 마이크를 쥔 본인만. 받아써서 그 `phaseVersion`의 발언자·종류로 기록. 음성은 저장하지 않음. 응답 `speech: published\|held\|silent`. 마이크 시간이 끝나고 90초가 지나면 409 |
 | `POST .../line-add` | 교사 | `{text, phaseVersion?}` 지금 말하는 사람의 말을 직접 입력(같은 표현 점검을 거침) |
@@ -33,10 +34,13 @@ FastAPI + Firebase Admin SDK + Firestore. Vercel 서버리스 함수로 동작�
 | `POST .../review` | 교사 | `{entryId, decision: approve|return}` — 확인 대기·걸린 발언 처리 |
 | `POST .../preferences` | 학생 | `{first, second}` (서로 달라야 함, 대기실에서만, 바꾸기 가능) |
 | `POST .../confirm-role` | 학생 | 비밀 역할 확인 |
+| `POST .../read-event` | 학생 | 사건 카드를 다 읽음. 모두 읽으면 질문이 열림 |
 | `POST .../end-turn` | 학생 | `{phaseVersion?}` 자기 차례 끝내기, 마이크도 꺼짐 (다른 학생이 누르면 아무 일 없음) |
 | `POST .../mic-on` | 학생 | `{kind: statement\|question\|answer}` 방에 하나뿐인 마이크 잡기. 입장 발표가 모두 끝나면 같은 단계에서 `turn.stage = "qa"`(90초)가 되고 누구나 `question`/`answer` 가능. 다른 사람이 쥐고 있거나, 입장 발표에서 내 차례가 아니거나, 단계에 맞지 않는 `kind`면 409 |
 | `POST .../mic-off` | 학생 | `{phaseVersion?}` 내 마이크 끄기 (차례는 그대로) |
 | `POST .../vote` | 학생 | `{targets}` — 역할 전환자 수만큼 서로 다른 후보, 자기 자신 불가. 투표 시간 안에는 다시 보내면 바뀜. 투표 단계는 시간이 끝나거나 교사가 넘길 때만 끝남 |
+
+각 구간(입장 발표, 발표 뒤 질의응답, 사건 뒤 질문, 투표)이 시작되면 `room.holdUntil`까지 3초 동안 모든 화면에 구간 제목이 뜨고 마이크를 켤 수 없습니다. 그만큼 마감도 늦춰집니다. 사건 단계는 `room.reading`이 참인 동안(모든 학생이 `read-event`를 보내거나 선생님이 `open-questions`를 누를 때까지) 질문할 수 없고, 열리는 순간 사건 시간이 처음부터 다시 흐릅니다.
 
 `phaseVersion`은 입장 발표의 차례가 바뀔 때와, 질의응답·사건에서 누군가 마이크를 잡을 때마다 올라갑니다. `phaseEndsAt`은 입장 발표에서는 현재 차례의 마감, 질의응답·사건에서는 그 시간 전체의 마감입니다. `room.floor.endsAt`이 지나면 서버와 화면 모두 마이크가 빈 것으로 봅니다. 늦게 도착한 음성도 녹음 당시의 `phaseVersion`으로 발언자와 종류를 찾습니다(`internal/state.turnLog`).
 

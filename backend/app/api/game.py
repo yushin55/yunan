@@ -23,11 +23,11 @@ def action(name):
 
 
 # Teacher (room creator) controls. The service rejects everyone else with 403.
-for name, schema in [("settings", Settings), ("intro", Intro), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("skip-phase", Sync), ("speaker", Speaker), ("extend", Extend), ("end", Empty), ("review", Review), ("line-edit", LineEdit), ("line-delete", LineDelete)]:
+for name, schema in [("settings", Settings), ("intro", Intro), ("kick", Kick), ("start", Empty), ("pause", Empty), ("resume", Empty), ("next", Sync), ("skip-phase", Sync), ("speaker", Speaker), ("extend", Extend), ("end", Empty), ("review", Review), ("line-edit", LineEdit), ("line-delete", LineDelete), ("open-questions", Empty)]:
     register(name, schema, action(name))
 
 # Student actions.
-for name, schema in [("preferences", Preferences), ("confirm-role", Empty), ("end-turn", Sync), ("mic-on", MicOn), ("mic-off", Sync), ("vote", Vote)]:
+for name, schema in [("preferences", Preferences), ("confirm-role", Empty), ("read-event", Empty), ("end-turn", Sync), ("mic-on", MicOn), ("mic-off", Sync), ("vote", Vote)]:
     register(name, schema, action(name))
 
 # The discussion record. Audio is transcribed and dropped; lines are checked before anyone sees them.

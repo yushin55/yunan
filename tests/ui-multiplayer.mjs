@@ -55,7 +55,8 @@ async function teacherRunsIntro(teacher, students) {
 
 // Role cards: the "1순위로" / "2순위로" buttons under each card, then confirm.
 async function pickRoles(page, indices) {
-  for (const [slot, i] of indices.entries()) await page.getByTestId('role-card').nth(i).locator('xpath=..').getByTestId(`pick-${slot + 1}`).click();
+  // The first card tapped is 1순위, the next 2순위.
+  for (const i of indices) await page.getByTestId('role-card').nth(i).click();
   await page.getByTestId('wardrobe-submit').click();
 }
 
@@ -75,7 +76,7 @@ try {
 
   // Generous clocks so a slow machine does not lose the race; one person's microphone is short enough to watch expire.
   await teacher.page.getByRole('tab', { name: '주제와 설정' }).click();
-  for (const [name, seconds] of [[/역할 확인/, 300], [/입장 발표/, 300], [/사건 공개/, 600], [/^반론/, 300], [/역할 전환자 투표/, 300], [/1번 말할 때/, 20]]) await teacher.page.getByRole('spinbutton', { name }).fill(String(seconds));
+  for (const [name, seconds] of [[/역할 확인/, 300], [/입장 발표/, 300], [/사건 발생/, 600], [/^반론/, 300], [/^투표/, 300], [/1번 말할 때/, 20]]) await teacher.page.getByRole('spinbutton', { name }).fill(String(seconds));
   await teacher.page.getByRole('button', { name: '설정 저장' }).click();
   await expect(teacher.page.getByRole('button', { name: '설정 저장' })).toBeDisabled();
   await teacher.page.getByRole('tab', { name: /학생 입장/ }).click();
@@ -141,15 +142,18 @@ try {
     student.noticed = true;
     await expect(student.page.getByTestId(`mic-${kind}`)).toHaveAttribute('aria-pressed', 'true');
   };
-  const say = async (text) => {
-    await teacher.page.getByTestId('line-input').fill(text);
-    await teacher.page.getByTestId('line-add').click();
-  };
+  // No real voices here: the words go in through the server's line-add, as the teacher's screen used to.
+  const say = (text) =>
+    teacher.page.evaluate(async (words) => {
+      const { api } = await import('/src/lib/api.ts');
+      await api(`/api/rooms/${location.pathname.split('/').pop()}/line-add`, { text: words });
+    }, text);
   const speakerNow = async () => {
     const name = (await teacher.page.getByTestId('current-speaker').textContent()).trim();
     return students.find((s) => s.nickname === name);
   };
-  const micFree = () => expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('마이크가 비어');
+  // A free microphone: the teacher's screen names nobody.
+  const micFree = () => expect(teacher.page.getByTestId('current-speaker')).toHaveCount(0);
 
   step('statements: in seat order, only the speaker can switch on');
   for (const student of students) {
@@ -181,24 +185,30 @@ try {
     if (i === 0) {
       // Pressing once starts and pressing again finishes, handing over to the next person.
       await take(speaker, 'statement');
-      await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('마이크 켜짐');
       await expect(speaker.page.getByTestId('end-turn')).toHaveCount(0);
       await speaker.page.getByTestId('mic-statement').click();
     } else await speaker.page.getByTestId('end-turn').click();
     if (i < 5) await expect(teacher.page.getByTestId('current-speaker')).toHaveText(students[i + 1].nickname);
   }
 
-  step('event card; the floor is open and there is one microphone');
+  step('event card; everyone reads it, then the floor is open and there is one microphone');
   for (const who of [teacher, ...students]) await expect(who.page.locator('.event-card')).toBeVisible();
+  // Nobody can ask while someone is still reading.
+  await students[0].page.getByTestId('event-read').click();
+  await expect(students[0].page.getByTestId('mic-question')).toBeDisabled();
+  await expect(teacher.page.getByTestId('reading-count')).toContainText('1/6');
+  for (const student of students.slice(1)) await student.page.getByTestId('event-read').click();
+  for (const student of students) await expect(student.page.getByTestId('event-popup')).toHaveCount(0);
+  await expect(students[0].page.getByTestId('phase-banner')).toContainText('질문');
+  await expect(students[0].page.getByTestId('phase-banner')).toHaveCount(0, { timeout: 10000 });
   await micFree();
   await expect(teacher.page.getByTestId('call-speaker')).toHaveCount(0);
-  await expect(teacher.page.getByTestId('teacher-line-input')).toBeVisible(); // The teacher can still write down anyone's question or answer.
   // Two phones press at the same moment: one gets it and the other is told who did.
   const [a, b, c] = [students[1], students[3], students[5]];
   await Promise.all([a, b].map((s) => s.page.getByTestId('mic-question').click()));
   await Promise.all([a, b].map((s) => s.page.getByTestId('mic-confirm').click()));
   a.noticed = b.noticed = true;
-  await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('지금 말하는 사람 · 질문');
+  await expect(teacher.page.getByTestId('speaker-eyebrow')).toContainText('질문 중');
   const asker = await speakerNow();
   const loser = asker === a ? b : a;
   await expect(asker.page.getByTestId('mic-question')).toHaveAttribute('aria-pressed', 'true');
@@ -219,10 +229,10 @@ try {
   await say('담임 선생님을 통해 연락하면 된다고 봐요.');
   await expect(loser.page.getByTestId('exchange-row').last()).toContainText(`${c.nickname} 답변`);
   await expect(loser.page.getByTestId('exchange-row').last()).toContainText('담임 선생님');
-  await expect(teacher.page.getByTestId('transcript-turn').nth(6)).toContainText(asker.nickname);
-  await expect(teacher.page.getByTestId('transcript-turn').nth(6)).toContainText('질문');
-  await expect(teacher.page.getByTestId('transcript-turn').nth(7)).toContainText(c.nickname);
-  await expect(teacher.page.getByTestId('transcript-turn').nth(7)).toContainText('답변');
+  await expect(teacher.page.getByTestId('transcript-turn').nth(0)).toContainText(asker.nickname);
+  await expect(teacher.page.getByTestId('transcript-turn').nth(0)).toContainText('질문');
+  await expect(teacher.page.getByTestId('transcript-turn').nth(1)).toContainText(c.nickname);
+  await expect(teacher.page.getByTestId('transcript-turn').nth(1)).toContainText('답변');
   await shot(teacher, 'teacher-event');
   await shot(loser, 'student-event');
   await c.page.getByTestId('mic-answer').click();
@@ -249,7 +259,7 @@ try {
 
   step('a student reloads and returns to the same phase and role');
   await students[2].page.reload();
-  await expect(phaseTitle(students[2])).toContainText('사건·질문');
+  await expect(phaseTitle(students[2])).toContainText('사건 발생');
   await expect(students[2].page.getByTestId('role-chip')).toContainText(students[2].roleName);
   await expect(students[2].page.locator('#memo-text')).toBeVisible();
 

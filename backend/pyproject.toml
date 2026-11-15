@@ -27,7 +27,7 @@ app = ["content/*.json", "content/topics/*.json"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-markers = ["emulator: needs running Firebase Auth and Firestore emulators"]
+markers = ["emulator: needs running Firebase Auth and Firestore emulators", "hold: keeps the real pause at the start of each section"]
 
 [tool.vercel]
 entrypoint = "app.main:app"
