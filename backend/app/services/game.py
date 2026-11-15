@@ -11,7 +11,7 @@ from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
 from app.services.student_report import build_student_reports
 from app.services.moderation import Moderator, Verdict, check_rate, rule_check, validate_text_fields
-from app.services.phase_engine import MAX_TURNS, OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, everyone_read, open_questions, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.phase_engine import OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, everyone_read, open_questions, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
 logger = logging.getLogger(__name__)
@@ -441,7 +441,7 @@ class GameService:
         finish_phase(state, now)
 
     def _host_speaker(self, state, data, now):
-        """Give the next statement to someone right now. The queue then carries on."""
+        """Move a student who has not spoken yet up to speak next. The current speaker keeps the floor."""
         room = state["room"]
         turn = room.get("turn")
         target = data["targetUid"]
@@ -451,11 +451,13 @@ class GameService:
             raise HTTPException(404, "이 방의 참가자가 아니에요.")
         if target == turn["uid"] or (data.get("phaseVersion") is not None and data["phaseVersion"] != room["phaseVersion"]):
             return
-        if len(turn["order"]) >= MAX_TURNS:
-            raise HTTPException(409, "이 단계에서 지목할 수 있는 횟수를 넘었어요.")
         index = turn["index"]
-        turn["order"] = turn["order"][:index + 1] + [target] + [u for u in turn["order"][index + 1:] if u != target]
-        next_turn(state, now)
+        waiting = turn["order"][index + 1:]
+        if target not in waiting:
+            raise HTTPException(409, "이미 발표한 학생이에요.")
+        # Nobody is added twice: the order is the same people, with this one moved up.
+        turn["order"] = turn["order"][:index + 1] + [target] + [u for u in waiting if u != target]
+        room["updatedAt"] = now
 
     def _host_open_questions(self, state, data, now):
         """Someone is still reading (or has left their screen): the teacher opens the questions anyway."""

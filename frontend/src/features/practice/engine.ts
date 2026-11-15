@@ -397,11 +397,12 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
   if (name === "speaker") {
     const turn = room.turn;
     const target = String(body.targetUid);
-    if (!turn) return fail("차례대로 말하는 단계에서만 차례를 줄 수 있어요.");
+    if (!turn || turn.stage === "qa") return fail("차례대로 말하는 단계에서만 차례를 줄 수 있어요.");
     if (stale || target === turn.uid) return { state: s };
-    unpauseJobs();
-    turn.order = [...turn.order.slice(0, turn.index + 1), target, ...turn.order.slice(turn.index + 1).filter((u) => u !== target)];
-    nextTurn(s, now);
+    const waiting = turn.order.slice(turn.index + 1);
+    if (!waiting.includes(target)) return fail("이미 발표한 학생이에요.");
+    // As on the server: moved up to speak next; the current speaker carries on.
+    turn.order = [...turn.order.slice(0, turn.index + 1), target, ...waiting.filter((u) => u !== target)];
     return { state: s };
   }
   if (name === "line-add") {

@@ -5,12 +5,12 @@ export const PHASE_ORDER: Phase[] = ["lobby", "role", "statement", "event", "vot
 
 export const PHASE_LABELS: Record<Phase, string> = {
   lobby: "대기실",
-  role: "비밀 역할 확인",
+  role: "역할 확인",
   statement: "입장 발표",
-  event: "사건 공개 · 질문과 답변",
+  event: "사건 발생",
   rebuttal: "반론",
-  vote: "역할 전환자 투표",
-  reveal: "정체 · 투표 결과 공개",
+  vote: "투표",
+  reveal: "결과",
   ended: "게임 종료",
 };
 
@@ -18,7 +18,7 @@ export const PHASE_SHORT: Record<Phase, string> = {
   lobby: "대기실",
   role: "역할 확인",
   statement: "입장 발표",
-  event: "사건·질문",
+  event: "사건 발생",
   rebuttal: "반론",
   vote: "투표",
   reveal: "결과",
@@ -37,22 +37,14 @@ export const STUDENT_TODO: Record<Phase, string> = {
   ended: "게임이 끝났어요. 수고했어요!",
 };
 
-export const TEACHER_TODO: Record<Phase, string> = {
-  lobby: "학생을 모으고, 모두 역할을 고르면 시작하세요.",
-  role: "학생들이 역할을 확인 중이에요. 모두 확인하면 넘어가요.",
-  statement: "차례대로 발표해요. 이름을 누르면 바로 차례를 줄 수 있어요.",
-  event: "사건 카드를 읽어 주세요. 이제 자유롭게 질문하고 답해요.",
-  rebuttal: "바로 투표로 넘어가요.",
-  vote: "학생들이 투표 중이에요. 시간이 끝나면 공개돼요.",
-  reveal: "결과를 함께 보고 게임을 마치세요.",
-  ended: "게임이 끝났어요.",
-};
+// The teacher runs the game from the controls; no per-stage explanation.
+export const TEACHER_TODO: Record<Phase, string> = { lobby: "", role: "", statement: "", event: "", rebuttal: "", vote: "", reveal: "", ended: "" };
 
 /** The game's sections, each announced with a full-screen title when it starts. */
 export function phaseSection(room: Room): { id: string; title: string; sub?: string } | null {
-  if (room.phase === "statement") return room.turn?.stage === "qa" ? { id: "statement-qa", title: "질문", sub: "입장 발표가 끝났어요" } : { id: "statement", title: "입장 발표" };
-  if (room.phase === "event") return { id: "event", title: "질문", sub: "사건이 일어났어요" };
-  if (room.phase === "vote") return { id: "vote", title: "투표" };
+  if (room.phase === "statement") return room.turn?.stage === "qa" ? { id: "statement-qa", title: "질문하기", sub: "입장 발표에 대해 질문해 주세요" } : { id: "statement", title: "입장 발표하기" };
+  if (room.phase === "event") return { id: "event", title: "질문하기", sub: "사건에 대한 질문을 진행해 주세요" };
+  if (room.phase === "vote") return { id: "vote", title: "투표하기" };
   return null;
 }
 

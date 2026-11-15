@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BookOpen, FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
+import { FastForward, Flag, Maximize2, Minimize2, Pause, Play, Plus, SkipForward, Wifi, WifiOff } from "lucide-react";
 import type { IntroStep, Participant, Role, Room, Rounds } from "../types/game";
 import { usePhaseTimer } from "../features/game/usePhaseTimer";
 import EventCard from "../components/EventCard";
@@ -7,7 +7,7 @@ import PhaseHeader from "../components/PhaseHeader";
 import { QuestionList, StatementList } from "../features/discussion/DiscussionNotes";
 import { useFloor } from "../features/discussion/floor";
 import SpeakerStage from "../features/discussion/SpeakerStage";
-import TranscriptFeed, { TeacherLineInput } from "../features/discussion/TranscriptFeed";
+import TranscriptFeed from "../features/discussion/TranscriptFeed";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
 import { PHASE_LABELS, PHASE_ORDER, SPEAKING, TEACHER_TODO, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
@@ -113,7 +113,6 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   return (
     <main className={`teacher-room${speaking || phase === "vote" ? " discussing" : ""}`}>
       {present && <ClassScreen room={room} participants={participants} rounds={rounds} offset={offset} onClose={closePresent} busy={busy} onIntroStep={(step) => void action("intro", { step })} />}
-      {!present && <PhaseBanner room={room} offset={offset} />}
       <StartCountdown left={countdown} />
       <header className="teacher-top">
         <span className="brand-mark">
@@ -136,11 +135,6 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
 
       <div className="teacher-grid">
         <div className="teacher-main">
-          {practice && (
-            <p className="banner" data-testid="teacher-practice-note">
-              연습용 선생님 화면이에요. 학생 입장·설정 변경·발언 검토는 실제 방에서만 돼요.
-            </p>
-          )}
           <PhaseHeader room={room} offset={offset} todo={TEACHER_TODO[phase]} hideTimer={Boolean(turn)} />
           {error && (
             <p className="error-box" role="alert">
@@ -241,20 +235,8 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                 )}
               </section>
               {room.intro ? (
-                <IntroControl intro={room.intro} room={room} participants={participants} offset={offset} busy={busy} onStep={(step) => void action("intro", { step })} onPresent={openPresent} hideVideo={present} />
-              ) : (
-                !present && (
-                  <section className="panel">
-                    <div className="panel-head">
-                      <h3>이슈 브리핑 · 게임 규칙</h3>
-                      <button className="button primary small" onClick={openPresent}>
-                        <Maximize2 size={15} /> 크게 틀기
-                      </button>
-                    </div>
-                    <IntroVideos room={room} />
-                  </section>
-                )
-              )}
+                <IntroControl intro={room.intro} participants={participants} busy={busy} onStep={(step) => void action("intro", { step })} />
+              ) : null}
               <section className="panel">
                 <h3>진행 설정</h3>
                 {(catalog || practice) && (
@@ -274,22 +256,22 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
           )}
 
           {phase !== "lobby" && (
-            <section className="panel" data-testid="participation-panel">
-              <h3>
+            <details className="panel teacher-fold" data-testid="participation-panel" open>
+              <summary>
                 참여 현황 <span className="muted small">{count}명</span>
-              </h3>
+              </summary>
               <ParticipationGrid room={room} participants={participants} rounds={rounds} serverNow={practice ? room.createdAt : serverNow} speakingUid={floor?.uid ?? (turn?.stage !== "qa" ? turn?.uid : undefined)} floor={floor} floorSeconds={floorSeconds} alwaysOnline={practice} />
-            </section>
+            </details>
           )}
 
           {room.event && phase === "event" && <EventCard event={room.event} collapsible defaultOpen={false} />}
 
           {phase !== "lobby" && phase !== "role" && (
             <div className="discussion-grid">
-              <section className="panel">
-                <h3 className="memo-title">학생별 입장 발언</h3>
+              <details className="panel teacher-fold" open>
+                <summary>학생별 입장 발언</summary>
                 <StatementList room={room} participants={participants} rounds={rounds} />
-              </section>
+              </details>
               {(phase !== "statement" || rounds.transcript.some((l) => l.kind !== "statement")) && (
                 <section className="panel">
                   <h3 className="memo-title">질문과 대답</h3>
@@ -301,7 +283,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
 
           {(speaking || rounds.transcript.length > 0) && phase !== "lobby" && (
             <details className="panel" data-testid="transcript-panel" open={speaking}>
-              <summary>발언 기록 고치기 · 대신 적기</summary>
+              <summary>기록 고치기</summary>
               <TranscriptFeed
                 lines={rounds.transcript}
                 participants={participants}
@@ -311,8 +293,8 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                 disabled={busy}
                 onEdit={(lineId, text) => void action("line-edit", { lineId, text })}
                 onDelete={(lineId) => void action("line-delete", { lineId })}
+                questionsNow={phase === "event" || turn?.stage === "qa"}
               />
-              {speaking && <TeacherLineInput key={phase} room={room} participants={participants} floor={floor} speakingUid={speaker?.uid} disabled={busy} onAdd={(body) => action("line-add", body)} />}
             </details>
           )}
           {finished && <TeacherReport topic={room.topic} participants={participants} transcript={rounds.transcript} moderation={host.moderation} notes={notes} at={room.endedAt ?? undefined} editKey={key} roomId={practice ? undefined : room.roomId} />}
@@ -330,7 +312,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
           {phase === "lobby" && (
             <section className="panel">
               <h3>학생 입장</h3>
-              {practice ? <p className="muted">연습용 방에는 다른 학생이 입장할 수 없어요. 실제 방에서는 이곳에 입장 QR과 방 코드가 표시돼요.</p> : <RoomCode code={room.code} large />}
+              {practice ? <p className="muted">연습 방이에요.</p> : <RoomCode code={room.code} large />}
             </section>
           )}
           {phase === "lobby" && (
@@ -355,24 +337,6 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
             </section>
           )}
           <ModerationPanel host={host} busy={busy || practice} onReview={(entryId, decision) => void action("review", { entryId, decision })} />
-          <details className="panel guide">
-            <summary>
-              <BookOpen size={17} aria-hidden /> 진행 안내
-            </summary>
-            <p>{host.teacherGuide.summary}</p>
-            <ul>
-              {host.teacherGuide.tips.map((t) => (
-                <li key={t}>{t}</li>
-              ))}
-            </ul>
-            {host.teacherGuide.caution && <p className="banner warn">{host.teacherGuide.caution}</p>}
-            <h4>질문 예시</h4>
-            <ul>
-              {room.topic.questionPrompts.map((q) => (
-                <li key={q}>{q}</li>
-              ))}
-            </ul>
-          </details>
         </aside>
       </div>
     </main>
@@ -508,28 +472,12 @@ function RoleList({ room, participants }: { room: Room; participants: Participan
   );
 }
 
-/**
- * The briefing or the rules video. Teacher-led rooms play whichever the teacher started, in step with
- * every student; practice rooms (no `intro`) let the teacher pick and play freely.
- */
+/** The briefing or the rules video: in step with every student in a real room, freely in practice. */
 function IntroVideos({ room, offset = 0, step }: { room: Room; offset?: number; step?: IntroStep | null }) {
-  const [which, setWhich] = useState<"briefing" | "rules">("briefing");
   const led = room.intro;
-  if (!led && step === "briefing") return <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} />;
-  if (!led && step === "rules") return <RulesVideo />;
-  if (led?.step === "briefing") return <IssueBriefing key={led.startedAt} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={introElapsed(led, offset)} />;
-  if (led?.step === "rules") return <RulesVideo key={led.startedAt} startAt={introElapsed(led, offset)} />;
-  if (led) return null;
-  return (
-    <>
-      <div className="segmented" role="tablist" aria-label="영상 고르기">
-        {(["briefing", "rules"] as const).map((v) => (
-          <button key={v} role="tab" aria-selected={which === v} className={`button small ${which === v ? "primary" : "ghost"}`} onClick={() => setWhich(v)}>
-            {v === "briefing" ? "이슈 브리핑" : "게임 규칙"}
-          </button>
-        ))}
-      </div>
-      {which === "briefing" ? <IssueBriefing key={room.topicId} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} /> : <RulesVideo />}
-    </>
-  );
+  const at = led ? introElapsed(led, offset) : undefined;
+  const key = led?.startedAt ?? room.topicId;
+  if (step === "briefing") return <IssueBriefing key={key} briefing={room.topic.briefing} topicId={room.topicId} headline={room.topic.shortTitle} startAt={at} />;
+  if (step === "rules") return <RulesVideo key={key} startAt={at} />;
+  return null;
 }

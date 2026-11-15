@@ -245,18 +245,23 @@ def test_pause_freezes_the_turn_and_extend_adds_to_it(game):
     assert room["phaseEndsAt"] - clock[0] == remaining + 60_000
 
 
-def test_teacher_can_call_on_someone_and_the_queue_carries_on(game):
+def test_teacher_can_call_someone_up_next_without_cutting_the_speaker_off(game):
     service, _ = game
     rid, uids = in_statement(service)
     version = service.repository.read(rid)["room"]["phaseVersion"]
     service.action(rid, TEACHER, "speaker", {"targetUid": uids[3], "phaseVersion": version})
     turn = floor(service, rid)
-    assert turn["uid"] == uids[3]
-    assert turn["order"] == [uids[0], uids[3], uids[1], uids[2], uids[4], uids[5]]  # Nobody speaks twice by accident.
-    service.action(rid, TEACHER, "speaker", {"targetUid": uids[4], "phaseVersion": version})  # Stale double click.
-    assert floor(service, rid)["uid"] == uids[3]
+    assert turn["uid"] == uids[0]  # The current speaker carries on.
+    assert service.repository.read(rid)["room"]["phaseVersion"] == version
+    assert turn["order"] == [uids[0], uids[3], uids[1], uids[2], uids[4], uids[5]]  # Same people, nobody twice.
+    service.action(rid, TEACHER, "speaker", {"targetUid": uids[5], "phaseVersion": version})  # Changing the mind.
+    assert floor(service, rid)["order"] == [uids[0], uids[5], uids[3], uids[1], uids[2], uids[4]]
     service.action(rid, TEACHER, "next", {})
-    assert floor(service, rid)["uid"] == uids[1]
+    assert floor(service, rid)["uid"] == uids[5]
+    with pytest.raises(HTTPException):  # Already spoke: not called again.
+        service.action(rid, TEACHER, "speaker", {"targetUid": uids[0]})
+    service.action(rid, TEACHER, "next", {})
+    assert floor(service, rid)["uid"] == uids[3]
     with pytest.raises(HTTPException):
         service.action(rid, TEACHER, "speaker", {"targetUid": "stranger"})
     to_phase(service, rid, "event")

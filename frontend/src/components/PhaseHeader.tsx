@@ -37,7 +37,7 @@ export default function PhaseHeader({ room, offset, todo, hideTimer }: { room: R
           <Pause size={16} aria-hidden /> 선생님이 진행을 잠시 멈췄어요. 다시 시작하면 이어서 할 수 있어요.
         </p>
       ) : (
-        <p className="todo">
+        todo && <p className="todo">
           <strong>지금 할 일</strong> {todo}
         </p>
       )}

@@ -82,10 +82,6 @@
 .teacher-room.discussing .run-row .button { min-height: 40px; padding: 7px 14px; font-size: 0.94rem; }
 .teacher-room.discussing .run-row .button.secondary { background: transparent; border-color: var(--line); color: var(--text); }
 .teacher-room.discussing .event-card { margin-bottom: 14px; }
-@media (min-width: 1000px) {
-  /* The side panels are folded most of the time; the discussion gets the width. */
-  .teacher-room.discussing .teacher-grid { grid-template-columns: minmax(0, 1fr) 300px; max-width: 1680px; }
-}
 
 /* The event card, once the discussion is on: as readable as the rest, not a bright sheet. */
 .event-card.collapsible { border: 1px solid var(--line); background: var(--panel); color: var(--text); box-shadow: none; }
@@ -530,3 +526,25 @@ details.float-pop[open] > summary { margin-bottom: 8px; }
 /* The result reads without frames: no box around the headline or the switcher. */
 .reveal-headline.win, .reveal-headline.lose { border: 0; background: none; padding: 4px 0; }
 .reveal-hero { border: 0; }
+
+/* Teacher: panels that fold away, and one record at a time behind two buttons. */
+details.teacher-fold > summary { cursor: pointer; font-size: 1.1rem; font-weight: 800; }
+details.teacher-fold[open] > summary { margin-bottom: 12px; }
+.transcript-tabs { margin: 10px 0 0; }
+.transcript > .transcript-turn + .transcript-turn { margin-top: 14px; }
+.teacher-main > .discussion-grid { margin-bottom: 14px; }
+.transcript-tabs { border: 0; border-radius: 0; overflow: visible; }
+.speaker-queue li.next > span, .speaker-queue li.next > button { border-color: var(--gold); color: var(--gold); }
+.queue-next { margin-left: 2px; font-size: 0.72rem; font-weight: 800; }
+
+/* Teacher's screen: who is talking in one small line; the order buttons and controls lead. */
+.speaker-stage.compact { gap: 8px 14px; }
+.speaker-stage.compact .speaker-now:empty { display: none; }
+.speaker-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0; }
+.speaker-line strong { font-size: 1.6rem; font-weight: 800; }
+.speaker-label { width: 100%; color: var(--muted); font-size: 0.8rem; font-weight: 700; }
+.speaker-line .speaker-role { margin: 0; color: var(--muted); font-size: 1rem; }
+.speaker-kind { padding: 1px 8px; border-radius: 99px; background: var(--gold-soft); color: var(--gold); font-size: 0.8rem; font-weight: 800; }
+.speaker-stage.compact .speaker-timer strong { font-size: 1.6rem; }
+.speaker-stage.compact .speaker-queue li > span, .speaker-stage.compact .speaker-queue li > button { min-height: 38px; padding: 4px 14px; font-size: 0.98rem; }
+.student-card header strong { white-space: nowrap; }

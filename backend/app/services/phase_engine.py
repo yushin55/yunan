@@ -27,7 +27,6 @@ SPEAKING_PHASES = ("statement", "event")
 # What the two microphone buttons say in each speaking phase. The first is Z, the second X.
 MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer")}
 OPEN_KINDS = ("question", "answer")  # Statement Q&A uses the event phase's buttons.
-MAX_TURNS = 40
 # Each section opens with its title on every screen; nobody can talk and no clock runs until it is gone.
 HOLD_MS = 3000
 HELD_PHASES = ("statement", "vote")
