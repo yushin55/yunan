@@ -11,7 +11,7 @@ from app.services.ai import AIUnavailable
 from app.services.discussion import build_summary, transcribe
 from app.services.student_report import build_student_reports
 from app.services.moderation import Moderator, Verdict, check_rate, rule_check, validate_text_fields
-from app.services.phase_engine import OPEN_KINDS, SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, everyone_read, open_questions, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
+from app.services.phase_engine import SPEAKING_PHASES, TIMED_PHASES, advance_if_needed, default_phase_seconds, everyone_read, open_questions, finish_phase, in_qa, mic_kinds, next_turn, now_ms, seated, snapshot, start_phase, transition, viewer
 from app.services.role_assignment import AssignmentError, assign_roles
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,12 @@ def _student(uid, nickname, seat, now):
 def _private():
     # Preferences and switcher status live only here (readable by the student alone) and in the server aggregate.
     return {"preferences": None, "roleId": None, "isSwitcher": None, "preferenceRank": None, "vote": None}
+
+
+def debate_lines(state):
+    """What was said for the roles. The last reasoning (`deduce`) is about who the switcher is, so it
+    never reaches the AI summary or the AI reports, which must not touch who seems suspicious."""
+    return [l for l in state["rounds"].get("transcript", []) if l["phase"] != "deduce"]
 
 
 class GameService:
@@ -220,8 +226,8 @@ class GameService:
         """A question or answer the teacher writes down for a student: its own turn, like a microphone
         press. Whoever holds the microphone keeps it; their audio still finds its turn by its version."""
         room = state["room"]
-        if kind not in OPEN_KINDS or not (in_qa(room) or room["phase"] == "event"):
-            raise HTTPException(409, "질문과 답변은 질의응답이나 사건 단계에서만 넣을 수 있어요.")
+        if kind == "statement" or kind not in mic_kinds(room):
+            raise HTTPException(409, "질문·답변은 질의응답과 사건 단계에서, 의견·답변은 최후 추론 단계에서만 넣을 수 있어요.")
         if len(state["turnLog"]) >= MAX_FLOORS:
             raise HTTPException(409, "이 게임에서 기록할 수 있는 발언 수를 넘었어요.")
         room["phaseVersion"] += 1
@@ -269,7 +275,7 @@ class GameService:
         The AI call runs outside the transaction; a failure leaves the old summary (quiet) or is a 503."""
         revision = state.get("transcriptRev", 0)
         current = state["rounds"].get("summary")
-        lines = state["rounds"].get("transcript", [])
+        lines = debate_lines(state)
         if not lines or (current and current["revision"] >= revision):
             return state  # Nothing new: no AI call.
         people = state["participants"]
@@ -298,7 +304,7 @@ class GameService:
             raise HTTPException(403, "선생님 화면에서만 만들 수 있어요.")
         if state["room"]["phase"] not in ("reveal", "ended"):
             raise HTTPException(409, "학생별 리포트는 결과 공개 뒤에 만들 수 있어요.")
-        lines = state["rounds"].get("transcript", [])
+        lines = debate_lines(state)
         if not lines:
             raise HTTPException(409, "기록된 발언이 없어 리포트를 만들 수 없어요.")
         people = state["participants"]

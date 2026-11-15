@@ -5,12 +5,13 @@
   "defaultSwitcherCount": 1,
   "phaseSeconds": {
     "role": 45,
-    "statement": 30,
+    "statement": 60,
     "event": 420,
+    "deduce": 180,
     "vote": 90
   },
-  "qaSeconds": 90,
-  "micSeconds": 30,
+  "qaSeconds": 180,
+  "micSeconds": 60,
   "phaseSecondsRange": { "min": 20, "max": 900 },
   "textLimits": { "line": 400, "nickname": 12 }
 }

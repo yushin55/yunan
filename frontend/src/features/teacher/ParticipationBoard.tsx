@@ -12,6 +12,7 @@ const COLUMNS: { phase: Phase; label: string }[] = [
   { phase: "role", label: "역할 확인" },
   { phase: "statement", label: "입장 발표" },
   { phase: "event", label: "사건·질문" },
+  { phase: "deduce", label: "최후 추론" },
   { phase: "vote", label: "투표" },
 ];
 
@@ -62,7 +63,7 @@ export default function ParticipationBoard({
     }
     if (phase === "lobby") return p.prefsDone ? { key: "ready", label: "역할 고름" } : { key: "idle", label: "고르는 중" };
     if (phase === "role" || phase === "vote") return p.submitted.includes(phase) ? { key: "ready", label: phase === "role" ? "확인함" : "투표함" } : { key: "idle", label: phase === "role" ? "확인 전" : "투표 전" };
-    if (phase === "event" || phase === "rebuttal" || (phase === "statement" && room.turn?.stage === "qa")) {
+    if (phase === "event" || phase === "rebuttal" || phase === "deduce" || (phase === "statement" && room.turn?.stage === "qa")) {
       const mine = rounds.transcript.filter((l) => l.uid === p.uid && l.phase === phase);
       const last = mine.at(-1);
       if (last && serverNow - last.at < RECENT_MS) return { key: "recent", label: "방금 말함" };
@@ -150,9 +151,9 @@ function ProgressStrip({ room, participants, rounds }: { room: Room; participant
     of = turn.order.length;
     done = turn.index;
     text = `${turn.index + 1}/${of}번째 차례 · ${participants.find((p) => p.uid === turn.uid)?.nickname ?? ""}`;
-  } else if (phase === "event" || phase === "rebuttal" || (phase === "statement" && room.turn?.stage === "qa")) {
+  } else if (phase === "event" || phase === "rebuttal" || phase === "deduce" || (phase === "statement" && room.turn?.stage === "qa")) {
     done = new Set(rounds.transcript.filter((l) => l.phase === phase).map((l) => l.uid)).size;
-    text = `${room.turn?.stage === "qa" ? "발표 뒤 질의응답 · " : ""}${done}/${total}명 참여 · ${turnsSpoken(rounds, phase)}차례 발언`;
+    text = `${room.turn?.stage === "qa" ? "발표 뒤 질의응답 · " : phase === "deduce" ? "최후 추론 · " : ""}${done}/${total}명 참여 · ${turnsSpoken(rounds, phase)}차례 발언`;
   } else {
     done = of;
     text = "모든 단계를 마쳤어요";
@@ -184,6 +185,7 @@ export function GameSummary({ participants, rounds }: { participants: Participan
     ["입장 발표", `${talked("statement")}/${total}명`],
     ["사건 대응·질문·답변", `${talked("event")}/${total}명 · ${turnsSpoken(rounds, "event")}차례`],
     ...(talked("rebuttal") ? [["반론", `${talked("rebuttal")}/${total}명 · ${turnsSpoken(rounds, "rebuttal")}차례`]] : []),
+    ["최후 추론", `${talked("deduce")}/${total}명 · ${turnsSpoken(rounds, "deduce")}차례`],
     ["투표", `${rounds.reveal ? rounds.reveal.ballots.filter((b) => b.voted).length : has("vote")}/${total}명`],
   ];
   return (
@@ -215,15 +217,17 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
     statement: turns(p.uid, "statement"),
     question: turns(p.uid, "question"),
     answer: turns(p.uid, "answer"),
+    opinion: turns(p.uid, "opinion"),
     voted: p.submitted.includes("vote") || Boolean(rounds.reveal?.ballots.find((b) => b.uid === p.uid)?.voted),
   }));
   const total = participants.length;
-  const order = ["role", "statement", "event", "vote", "reveal", "ended"];
+  const order = ["role", "statement", "event", "deduce", "vote", "reveal", "ended"];
   const reached = (phase: string) => order.indexOf(room.phase) >= order.indexOf(phase);
   // Quiet students stand out once there has been a chance to talk.
-  const quiet = reached("event") ? people.filter((x) => x.statement + x.question + x.answer === 0) : [];
+  const quiet = reached("event") ? people.filter((x) => x.statement + x.question + x.answer + x.opinion === 0) : [];
+  const showOpinion = reached("deduce");
   const showVote = reached("vote");
-  const sum = (key: "statement" | "question" | "answer") => people.filter((x) => x[key] > 0).length;
+  const sum = (key: "statement" | "question" | "answer" | "opinion") => people.filter((x) => x[key] > 0).length;
   return (
     <div className="participation-grid" data-testid="participation-grid">
       <ProgressStrip room={room} participants={participants} rounds={rounds} />
@@ -241,12 +245,13 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
               <th scope="col" className="num">발표</th>
               <th scope="col" className="num">질문</th>
               <th scope="col" className="num">답변</th>
+              {showOpinion && <th scope="col" className="num">의견</th>}
               {showVote && <th scope="col" className="num">투표</th>}
               <th scope="col" className="num">연결</th>
             </tr>
           </thead>
           <tbody>
-            {people.map(({ p, statement, question, answer, voted }) => {
+            {people.map(({ p, statement, question, answer, opinion, voted }) => {
               const online = alwaysOnline || serverNow - p.connectedAt < CONNECTED_MS;
               const silent = quiet.some((x) => x.p.uid === p.uid);
               const live = p.uid === floor?.uid;
@@ -260,6 +265,7 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
                 : last && serverNow - last.at < RECENT_MS ? ["now", "방금 말함"]
                 : room.turn?.stage === "qa" ? ["", "질문·답변 대기"]
                 : room.phase === "event" ? (last ? ["", "이번 단계 발언함"] : ["", "질문·답변 전"])
+                : room.phase === "deduce" ? (last ? ["", "이번 단계 발언함"] : ["", "의견 전"])
                 : room.phase === "statement" ? ["", "듣는 중"]
                 : ["", "완료"];
               return (
@@ -276,6 +282,7 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
                   <td className="num">{statement ? "했음" : <span className="no">–</span>}</td>
                   <td className="num">{question || <span className="no">0</span>}</td>
                   <td className="num">{answer || <span className="no">0</span>}</td>
+                  {showOpinion && <td className="num">{opinion || <span className="no">0</span>}</td>}
                   {showVote && <td className="num">{voted ? "했음" : <span className="no">–</span>}</td>}
                   <td className="num">
                     <span className={online ? "online" : "offline"}>{online ? "접속" : "끊김"}</span>
@@ -291,6 +298,7 @@ export function ParticipationGrid({ room, participants, rounds, serverNow, speak
               <td className="num">{sum("statement")}</td>
               <td className="num">{sum("question")}명</td>
               <td className="num">{sum("answer")}명</td>
+              {showOpinion && <td className="num">{sum("opinion")}명</td>}
               {showVote && <td className="num">{people.filter((x) => x.voted).length}</td>}
               <td />
             </tr>

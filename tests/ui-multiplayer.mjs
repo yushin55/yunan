@@ -269,7 +269,7 @@ try {
   await b.page.reload();
   await micFree();
 
-  step('teacher pauses with the microphone on, resumes and moves to rebuttal');
+  step('teacher pauses with the microphone on, resumes and moves to the last reasoning');
   await take(a, 'question');
   await teacher.page.getByRole('button', { name: '일시정지' }).click();
   await expect(students[4].page.locator('.todo-callout.paused')).toBeVisible();
@@ -279,12 +279,12 @@ try {
   await expect(students[4].page.locator('.todo-callout.paused')).toHaveCount(0);
   await micFree();
   await teacher.page.getByTestId('next-phase').click();
-  for (const student of students) await expect(phaseTitle(student)).toContainText('반론');
-  await take(c, 'rebuttal');
-  await say('선생님이 대신 확인하면 사생활 문제가 생길 수 있어요.');
-  await expect(teacher.page.locator('.transcript')).toContainText('사생활 문제');
-  await expect(a.page.getByTestId('exchange-row').last()).toContainText(`${c.nickname} 반론`);
-  await c.page.getByTestId('mic-rebuttal').click();
+  for (const student of students) await expect(phaseTitle(student)).toContainText('최후 추론');
+  await take(c, 'opinion');
+  await say('사건 이야기를 할 때 대답을 미룬 사람이 수상해요.');
+  await expect(teacher.page.locator('.transcript')).toContainText('대답을 미룬 사람');
+  await expect(a.page.getByTestId('exchange-row').last()).toContainText(`${c.nickname} 의견`);
+  await c.page.getByTestId('mic-opinion').click();
   await micFree();
 
   step('classroom display hides the teacher panels');

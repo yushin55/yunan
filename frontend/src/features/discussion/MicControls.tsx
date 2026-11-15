@@ -166,7 +166,9 @@ export default function MicControls({ room, me, api, engine, allowTyping }: { ro
 
   const label = (kind: SpeechKind) => {
     if (kind === "statement") return mine ? "말 끝내기" : "말하기";
-    return `${KIND_LABEL[kind]}${mine && floor?.kind === kind ? " 끝내기" : "하기"}`;
+    const ending = mine && floor?.kind === kind;
+    if (kind === "opinion") return ending ? "의견 끝내기" : "의견 말하기";
+    return `${KIND_LABEL[kind]}${ending ? " 끝내기" : "하기"}`;
   };
   const waiting = claiming ? "마이크 켜는 중…" : room.paused ? "일시정지 중에는 마이크를 켤 수 없어요" : "";
 

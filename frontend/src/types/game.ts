@@ -1,7 +1,7 @@
-export type Phase = "lobby" | "role" | "statement" | "event" | "rebuttal" | "vote" | "reveal" | "ended";
-export type TimedPhase = "role" | "statement" | "event" | "rebuttal" | "vote";
-export type SpeakingPhase = "statement" | "event" | "rebuttal";
-export type SpeechKind = "statement" | "question" | "rebuttal" | "answer";
+export type Phase = "lobby" | "role" | "statement" | "event" | "rebuttal" | "deduce" | "vote" | "reveal" | "ended";
+export type TimedPhase = "role" | "statement" | "event" | "rebuttal" | "deduce" | "vote";
+export type SpeakingPhase = "statement" | "event" | "rebuttal" | "deduce";
+export type SpeechKind = "statement" | "question" | "rebuttal" | "answer" | "opinion";
 export type Viewer = "host" | "student";
 
 export interface Role {
@@ -88,6 +88,7 @@ export interface Room {
   maxStudents: number;
   topicId: string;
   topic: Topic;
+  /** Shared with everyone only from the reveal on. Before that the card is in `me.event` / `host.event`. */
   event: EventCard | null;
   turn: Turn | null;
   floor: Floor | null;
@@ -173,6 +174,8 @@ export interface Me {
   isSwitcher: boolean | null;
   preferenceRank: 1 | 2 | null;
   vote: string[] | null;
+  /** From the event phase: the card, or null for a role switcher, who plays without it. */
+  event?: EventCard | null;
 }
 
 /** A line held back from the shared record until the teacher decides. */
@@ -189,6 +192,8 @@ export interface HostState {
   uid: string;
   teacherGuide: { summary: string; tips: string[]; caution?: string };
   moderation: ModerationEntry[];
+  /** From the event phase on. */
+  event?: EventCard | null;
 }
 
 export interface Snapshot {

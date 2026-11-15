@@ -61,10 +61,10 @@ def test_statements_go_in_seat_order_then_the_floor_opens(game):
     assert spoken == uids
     room = service.repository.read(rid)["room"]
     assert room["phase"] == "statement" and room["turn"]["stage"] == "qa" and room["turn"]["uid"] is None
-    assert room["phaseEndsAt"] == clock[0] + 90_000
+    assert room["phaseEndsAt"] == clock[0] + 180_000
     service.action(rid, TEACHER, "next", {})
     room = service.repository.read(rid)["room"]
-    assert room["phase"] == "event" and room["event"]["title"]
+    assert room["phase"] == "event"
     assert room["turn"] is None and room["floor"] is None  # Nobody's turn now: whoever has a question goes first.
 
 
@@ -137,7 +137,7 @@ def test_the_microphone_never_outlasts_the_phase(game):
     assert service.action(rid, uids[0], "mic-on", {"kind": "question"})["room"]["floor"]["endsAt"] == ends
     clock[0] = ends
     state = service.action(rid, TEACHER, "sync", {})
-    assert state["room"]["phase"] == "vote" and state["room"]["floor"] is None
+    assert state["room"]["phase"] == "deduce" and state["room"]["floor"] is None
 
 
 def test_each_phase_has_its_own_buttons(game):
@@ -147,6 +147,51 @@ def test_each_phase_has_its_own_buttons(game):
     assert refused(service, rid, uids[0], "statement").status_code == 409
     to_phase(service, rid, "vote")
     assert refused(service, rid, uids[1], "answer").status_code == 409
+
+
+def test_last_reasoning_comes_between_the_event_and_the_vote(game):
+    """Anyone says whom they suspect and why (Z), anyone answers (X), until the timer ends the phase."""
+    service, clock = game
+    rid, uids = in_open_floor(service, "deduce")
+    room = service.repository.read(rid)["room"]
+    assert room["phaseEndsAt"] == clock[0] + 180_000 and room["turn"] is None
+    assert refused(service, rid, uids[0], "question").status_code == 409
+    for uid, kind, text in [(uids[2], "opinion", "3번이 사건 얘기를 잘 몰랐어요."), (uids[3], "answer", "저는 처음부터 같은 입장이었어요.")]:
+        room = service.action(rid, uid, "mic-on", {"kind": kind})["room"]
+        assert room["floor"]["endsAt"] == clock[0] + 60_000  # One person holds the microphone for at most a minute.
+        assert clip(service, rid, uid, text, room["phaseVersion"])["speech"] == "published"
+        service.action(rid, uid, "mic-off", {})
+    service.add_line(rid, TEACHER, {"text": "선생님이 받아 적은 의견", "targetUid": uids[4], "kind": "opinion"})
+    lines = service.repository.read(rid)["rounds"]["transcript"]
+    assert [(l["uid"], l["kind"], l["phase"]) for l in lines] == [(uids[2], "opinion", "deduce"), (uids[3], "answer", "deduce"), (uids[4], "opinion", "deduce")]
+    clock[0] = room["phaseEndsAt"]
+    assert service.action(rid, TEACHER, "sync", {})["room"]["phase"] == "vote"
+
+
+def test_rooms_opened_before_the_last_reasoning_still_time_it(game):
+    service, clock = game
+    rid, _ = started_room(service)
+    service.repository.mutate(rid, lambda state: state["room"]["settings"]["phaseSeconds"].pop("deduce"))
+    to_phase(service, rid, "deduce")
+    assert service.repository.read(rid)["room"]["phaseEndsAt"] == clock[0] + 180_000
+
+
+def test_suspicions_never_reach_the_ai_summary(game):
+    service, _ = game
+    rid, uids = in_statement(service)
+    speak(service, rid, "안전이 먼저입니다")
+    to_phase(service, rid, "deduce")
+    room = service.action(rid, uids[1], "mic-on", {"kind": "opinion"})["room"]
+    clip(service, rid, uids[1], "1번이 수상해요", room["phaseVersion"])
+    seen = {}
+
+    def summarizer(topic, lines):
+        seen["texts"] = [l["text"] for l in lines]
+        return {"positions": [{"roleId": topic["roles"][0]["id"], "points": ["안전 우선"]}], "clashes": [], "questions": [], "source": "ai"}
+
+    service.summarizer = summarizer
+    service.summarize(rid, TEACHER)
+    assert seen["texts"] == ["안전이 먼저입니다"]
 
 
 def test_questions_and_answers_are_recorded_under_the_name_and_kind(game):
@@ -273,7 +318,7 @@ def test_skipping_a_phase_jumps_past_the_remaining_turns(game):
     service, _ = game
     rid, uids = in_statement(service)
     room = service.action(rid, TEACHER, "skip-phase", {"phaseVersion": service.repository.read(rid)["room"]["phaseVersion"]})["room"]
-    assert room["phase"] == "event" and room["event"]["title"]
+    assert room["phase"] == "event"
     service.action(rid, TEACHER, "skip-phase", {"phaseVersion": 0})  # Stale click does nothing.
     assert service.repository.read(rid)["room"]["phase"] == "event"
 

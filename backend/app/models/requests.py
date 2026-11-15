@@ -16,6 +16,7 @@ class PhaseSeconds(Input):
     statement: Seconds | None = None
     event: Seconds | None = None
     rebuttal: Seconds | None = None  # No longer a phase; accepted and ignored so older screens still save.
+    deduce: Seconds | None = None
     vote: Seconds | None = None
 
 
@@ -74,7 +75,7 @@ class Preferences(Input):
 
 class MicOn(Input):
     """Ask for the one microphone in the room. Z speaks for the phase, X answers."""
-    kind: Literal["statement", "question", "rebuttal", "answer"]
+    kind: Literal["statement", "question", "rebuttal", "answer", "opinion"]
 
 
 class Speech(Input):
@@ -91,7 +92,7 @@ class LineAdd(Input):
     phaseVersion: int | None = Field(default=None, ge=0)
     # Written down for this student instead of the current speaker; a statement joins their statement turn.
     targetUid: ShortId | None = None
-    kind: Literal["statement", "question", "answer"] | None = None
+    kind: Literal["statement", "question", "answer", "opinion"] | None = None
 
 
 class LineEdit(Input):

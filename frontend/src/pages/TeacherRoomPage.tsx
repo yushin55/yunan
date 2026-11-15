@@ -12,7 +12,7 @@ import Tabs from "../components/Tabs";
 import { useFloor } from "../features/discussion/floor";
 import SpeakerStage from "../features/discussion/SpeakerStage";
 import { useAutoSummary } from "../features/discussion/useAutoSummary";
-import { PHASE_LABELS, PHASE_ORDER, PHASE_SHORT, SPEAKING, TIMED } from "../features/game/phases";
+import { eventFor, PHASE_LABELS, PHASE_ORDER, PHASE_SHORT, SPEAKING, TIMED } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import IntroControl, { NEXT } from "../features/teacher/IntroControl";
@@ -80,6 +80,7 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
   const serverNow = useServerNow(offset);
   const phase = room.phase;
   const speaking = SPEAKING.includes(phase);
+  const { event } = eventFor(state!);
   const turn = room.turn;
   const { floor, seconds: floorSeconds } = useFloor(room, offset);
   const speaker = participants.find((p) => p.uid === (floor?.uid ?? turn?.uid));
@@ -362,7 +363,12 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
                     <SpeakerStage room={room} participants={participants} offset={offset} busy={busy} onCall={(uid) => void action("speaker", { targetUid: uid, phaseVersion: room.phaseVersion })} />
                   </section>
                 )}
-                {room.event && phase === "event" && <EventCard event={room.event} collapsible defaultOpen={false} />}
+                {event && (phase === "event" || phase === "deduce") && (
+                  <>
+                    <EventCard event={event} collapsible defaultOpen={false} />
+                    <p className="muted small event-secret-note">역할 전환자에게는 사건 카드가 보이지 않아요. 소리 내어 읽거나 교실 화면에 띄우지 마세요.</p>
+                  </>
+                )}
                 {roster}
               </div>
               {record}
@@ -400,8 +406,9 @@ export default function TeacherRoomPage({ api, practice = false, barControls, st
 
 /**
  * What the class sees on the projector, made for students who are watching rather than playing:
- * the table and whose turn it is, the roles and who plays them, the event card, and at the end the
- * result. Only public game information, never the teacher's own panels.
+ * the table and whose turn it is, the roles and who plays them, and at the end the result with the
+ * event card. Only public game information, never the teacher's own panels: the event card is not
+ * public until the reveal, since role switchers play without it.
  */
 function ClassScreen({ room, participants, rounds, offset, onClose, busy, onIntroStep }: { room: Room; participants: Participant[]; rounds: Rounds; offset: number; onClose: () => void; busy: boolean; onIntroStep: (step: IntroStep) => void }) {
   const timer = usePhaseTimer(room, offset);
@@ -445,9 +452,10 @@ function ClassScreen({ room, participants, rounds, offset, onClose, busy, onIntr
             <div className="class-screen-table">
               <TableView room={room} participants={participants} rounds={rounds} offset={offset} overview />
               {room.paused && <PauseOverlay />}
-              {room.reading && room.event && (
+              {/* The card itself is only on each student's own screen: a role switcher may be watching this one. */}
+              {room.reading && (
                 <section className="class-screen-event" data-testid="class-event">
-                  <EventCard event={room.event} />
+                  <p className="class-screen-reading">사건 카드는 각자 화면에서만 볼 수 있어요. 역할 전환자에게는 보이지 않아요.</p>
                   <p className="class-screen-reading">
                     사건 카드를 읽는 중이에요 · {participants.filter((p) => p.submitted.includes("event")).length}/{participants.length}명
                   </p>

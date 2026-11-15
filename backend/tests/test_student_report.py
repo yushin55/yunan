@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from app.services.ai import AIUnavailable
 from app.services.student_report import build_student_reports
 from conftest import TEACHER, to_phase
-from test_discussion import in_statement, speak
+from test_discussion import clip, in_statement, speak
 
 
 def talked_and_revealed(service):
@@ -54,6 +54,25 @@ def test_the_ai_sees_seats_and_roles_and_evidence_maps_back_to_lines(game):
     assert second["improvements"][0]["evidence"] == [lines[1]["id"]]
     assert result["source"] == "ai"
     assert "studentReports" not in state["rounds"]  # Not stored: only the teacher's screen keeps a copy.
+
+
+def test_suspicions_in_the_last_reasoning_are_not_evaluated(game):
+    service, _ = game
+    rid, uids = in_statement(service)
+    speak(service, rid, "기사에 따르면 30%가 불편을 겪어요")
+    to_phase(service, rid, "deduce")
+    room = service.action(rid, uids[2], "mic-on", {"kind": "opinion"})["room"]
+    clip(service, rid, uids[2], "1번이 역할 전환자 같아요", room["phaseVersion"])
+    to_phase(service, rid, "reveal")
+    seen = {}
+
+    def reporter(topic, lines):
+        seen["texts"] = [l["text"] for l in lines]
+        return []
+
+    service.reporter = reporter
+    service.student_reports(rid, TEACHER)
+    assert seen["texts"] == ["기사에 따르면 30%가 불편을 겪어요"]
 
 
 def test_ai_failure_is_a_503_not_a_crash(game):

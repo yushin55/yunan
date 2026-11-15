@@ -27,8 +27,11 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
     state = service.repository.read(rid)
     assert state["room"]["phase"] == "event"
     seen.append("event")
-    assert state["room"]["event"]["title"]
+    assert state["host"]["event"]["title"] and state["room"]["event"] is None  # Not on the shared room until the reveal.
     assert [line["uid"] for line in state["rounds"]["transcript"]] == uids  # Seat order.
+    service.action(rid, TEACHER, "next", {})
+    assert service.repository.read(rid)["room"]["phase"] == "deduce"
+    seen.append("deduce")
     service.action(rid, TEACHER, "next", {})
     seen.append("vote")
     state = service.repository.read(rid)
@@ -43,6 +46,7 @@ def test_complete_game_runs_in_order_and_ends_at_the_reveal(game):
     seen.append("reveal")
     reveal = state["rounds"]["reveal"]
     assert reveal["switchers"][0]["uid"] == switcher and reveal["outcome"] == "found"
+    assert state["room"]["event"]["title"]  # Everyone sees the event card with the result.
     service.action(rid, TEACHER, "end", {})
     seen.append("ended")
     assert seen == PHASES

@@ -36,7 +36,7 @@ async function pickRoles(page, indices) {
 async function longTimers(page) {
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('bridge.practice'));
-    state.snapshot.room.settings.phaseSeconds = { role: 900, statement: 900, event: 900, rebuttal: 900, vote: 900 };
+    state.snapshot.room.settings.phaseSeconds = { role: 900, statement: 900, event: 900, rebuttal: 900, deduce: 900, vote: 900 };
     state.snapshot.room.settings.micSeconds = 120;
     localStorage.setItem('bridge.practice', JSON.stringify(state));
   });
@@ -353,8 +353,8 @@ async function play(label, options) {
     await expect(page.getByTestId('table-view')).toBeVisible();
   }
   await page.getByTestId('practice-next').click();
-  await expect(title).toContainText('반론');
-  await expect(page.getByTestId('mic-rebuttal')).toContainText('반론하기');
+  await expect(title).toContainText('최후 추론');
+  await expect(page.getByTestId('mic-opinion')).toContainText('의견 말하기');
   await expect(page.getByTestId('mic-answer')).toContainText('답변하기');
   await page.getByTestId('practice-next').click();
 

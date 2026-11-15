@@ -94,7 +94,7 @@ def test_teacher_and_six_students_complete_a_game_in_firestore():
                     list(executor.map(lambda token: post(token, base + ("end-turn" if token != teacher_token else "next"), {"phaseVersion": version}), [students[i][0], teacher_token]))
                 view = post(teacher_token, base + "sync", {})
                 assert view["room"]["phaseVersion"] == version + 1
-            assert view["room"]["phase"] == "event" and view["room"]["event"]["title"]
+            assert view["room"]["phase"] == "event" and view["host"]["event"]["title"] and view["room"]["event"] is None
             # The open floor: two students race for the one microphone inside a real transaction.
             with ThreadPoolExecutor(max_workers=6) as executor:
                 answers = list(executor.map(lambda token: api.post(base + "mic-on", json={"kind": "question"}, headers={"Authorization": "Bearer " + token}).status_code, [token for token, _ in students]))

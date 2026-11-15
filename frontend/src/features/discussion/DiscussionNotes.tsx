@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Floor, Participant, Room, Rounds } from "../../types/game";
+import type { Floor, Participant, Phase, Room, Rounds, SpeechKind } from "../../types/game";
 import { exchangeRows, statementCards, type ExchangeRow } from "./floor";
 
 const MEMO_LIMIT = 500;
@@ -25,6 +25,9 @@ export function StatementList({ room, participants, rounds, myUid }: { room: Roo
   );
 }
 
+const ABOUT: Partial<Record<Phase, string>> = { statement: "입장 발표에 대한 질문", event: "사건에 대한 질문", deduce: "최후 추론 · 의심 가는 사람" };
+const MARK: Partial<Record<SpeechKind, string>> = { question: "Q.", rebuttal: "반론.", opinion: "의견." };
+
 /**
  * Just the questions ("Q. …"), each opening to the answers given after it — several people can
  * answer the same question. Questions about the statements and about the event are kept apart.
@@ -37,16 +40,18 @@ export function QuestionList({ room, participants, rounds, floor, myUid }: { roo
   }
   const who = (uid: string) => (uid === myUid ? "나" : (participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자"));
   const said = (row: ExchangeRow) => (row.pending ? "말하는 중이에요" : row.text);
+  // During the last reasoning its opinions come first; the earlier questions stay below as evidence.
+  if (room.phase === "deduce") groups.sort((a, b) => Number(b.head.phase === "deduce") - Number(a.head.phase === "deduce"));
   const grouped = groups.some((g) => g.head.phase !== groups[0].head.phase);
   if (!groups.length) return <p className="muted small exchange-empty">아직 질문이 없어요. 궁금한 것이 있으면 먼저 눌러 주세요.</p>;
   return (
     <div className="question-list" data-testid="question-list">
       {groups.map(({ head, replies }, i) => (
         <div key={head.key} className="question-group">
-          {grouped && (i === 0 || groups[i - 1].head.phase !== head.phase) && <p className="question-about">{head.phase === "statement" ? "입장 발표에 대한 질문" : "사건에 대한 질문"}</p>}
+          {grouped && (i === 0 || groups[i - 1].head.phase !== head.phase) && <p className="question-about">{ABOUT[head.phase] ?? "사건에 대한 질문"}</p>}
           <details className={`question kind-${head.kind}`} data-testid="question" open>
             <summary>
-              <b>{head.kind === "question" ? "Q." : head.kind === "rebuttal" ? "반론." : "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
+              <b>{MARK[head.kind] ?? "A."}</b> <span className={head.pending ? "muted" : undefined}>{said(head)}</span>
               <small className="muted">
                 {" "}
                 · {who(head.uid)}

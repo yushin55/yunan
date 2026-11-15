@@ -31,7 +31,7 @@ SUMMARY_PROMPT = (
     "statements: [입장 발표 N번] 줄이 있는 번호마다, 그 번호가 말한 내용만 45자 이내의 한 문장으로 정리한 것.\n"
     '다음 JSON 하나로만 답하세요: {"positions":[{"role":"역할 이름","points":["..."]}],"clashes":["..."],"questions":["..."],"statements":[{"speaker":1,"text":"..."}]}\n'
 )
-KIND_NAMES = {"statement": "입장 발표", "question": "질문", "rebuttal": "반론", "answer": "답변"}
+KIND_NAMES = {"statement": "입장 발표", "question": "질문", "rebuttal": "반론", "answer": "답변", "opinion": "의견"}
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 
 

@@ -90,8 +90,34 @@ def test_event_card_is_hidden_until_event_phase(game):
     rid, uids = started_room(service)
     to_phase(service, rid, "statement")
     assert service.read(rid, uids[0])["room"]["event"] is None
+    assert all("event" not in service.read(rid, uid)["me"] for uid in uids)
     to_phase(service, rid, "event")
-    assert service.read(rid, uids[0])["room"]["event"]["title"]
+    assert service.read(rid, TEACHER)["host"]["event"]["title"]
+
+
+def test_role_switchers_never_receive_the_event_card(game):
+    """The handicap: the card goes only to the other students' own documents and the teacher's."""
+    service, _ = game
+    rid, uids = started_room(service, count=8, switchers=2)
+    state = service.repository.read(rid)
+    switchers = [u for u in uids if state["privatePlayers"][u]["isSwitcher"]]
+    assert len(switchers) == 2
+    title = state["eventCard"]["title"]
+    for phase in ("event", "deduce", "vote"):
+        to_phase(service, rid, phase)
+        state = service.repository.read(rid)
+        for path, doc in projections(state).items():
+            if path == "internal/state":
+                continue
+            # Shared documents never hold it; of the private ones, only non-switchers' do.
+            should_hold = path == "host/state" or (path.startswith("privatePlayers/") and path.split("/")[1] not in switchers)
+            assert (title in json.dumps(doc, ensure_ascii=False)) == should_hold, (phase, path)
+        for uid in uids:
+            me = service.read(rid, uid)
+            assert me["room"]["event"] is None
+            assert (me["me"]["event"] is None) == (uid in switchers)
+    to_phase(service, rid, "reveal")
+    assert service.read(rid, switchers[0])["room"]["event"]["title"] == title  # Out in the open with the result.
 
 
 def test_outsiders_cannot_read_rooms(client, game):

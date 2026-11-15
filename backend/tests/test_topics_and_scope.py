@@ -51,8 +51,14 @@ def test_public_topic_hides_event_cards_and_teacher_guide(client):
 
 
 def test_phases_end_at_reveal_without_real_opinion_steps():
-    assert PHASES == ["lobby", "role", "statement", "event", "vote", "reveal", "ended"]
-    assert set(load_game_config()["phaseSeconds"]) == {"role", "statement", "event", "vote"}
+    assert PHASES == ["lobby", "role", "statement", "event", "deduce", "vote", "reveal", "ended"]
+    assert set(load_game_config()["phaseSeconds"]) == {"role", "statement", "event", "deduce", "vote"}
+
+
+def test_default_times_leave_room_to_talk():
+    config = load_game_config()
+    assert config["phaseSeconds"]["statement"] == 60 and config["phaseSeconds"]["deduce"] == 180
+    assert config["qaSeconds"] == 180 and config["micSeconds"] == 60
 
 
 # The one deliberate exception: teacher-only AI drafts of each student's 수행평가 report after the reveal.

@@ -36,28 +36,30 @@ FastAPI + Firebase Admin SDK + Firestore. Vercel 서버리스 함수로 동작�
 | `POST .../confirm-role` | 학생 | 비밀 역할 확인 |
 | `POST .../read-event` | 학생 | 사건 카드를 다 읽음. 모두 읽으면 질문이 열림 |
 | `POST .../end-turn` | 학생 | `{phaseVersion?}` 자기 차례 끝내기, 마이크도 꺼짐 (다른 학생이 누르면 아무 일 없음) |
-| `POST .../mic-on` | 학생 | `{kind: statement\|question\|answer}` 방에 하나뿐인 마이크 잡기. 입장 발표가 모두 끝나면 같은 단계에서 `turn.stage = "qa"`(90초)가 되고 누구나 `question`/`answer` 가능. 다른 사람이 쥐고 있거나, 입장 발표에서 내 차례가 아니거나, 단계에 맞지 않는 `kind`면 409 |
+| `POST .../mic-on` | 학생 | `{kind: statement\|question\|answer\|opinion}` 방에 하나뿐인 마이크 잡기. 입장 발표가 모두 끝나면 같은 단계에서 `turn.stage = "qa"`(180초)가 되고 누구나 `question`/`answer` 가능. 사건 단계는 `question`/`answer`, 최후 추론(`deduce`) 단계는 `opinion`(의심 가는 사람과 이유)/`answer`. 한 번 잡으면 `micSeconds`(기본 60초)까지. 다른 사람이 쥐고 있거나, 입장 발표에서 내 차례가 아니거나, 단계에 맞지 않는 `kind`면 409 |
 | `POST .../mic-off` | 학생 | `{phaseVersion?}` 내 마이크 끄기 (차례는 그대로) |
 | `POST .../vote` | 학생 | `{targets}` — 역할 전환자 수만큼 서로 다른 후보, 자기 자신 불가. 투표 시간 안에는 다시 보내면 바뀜. 투표 단계는 시간이 끝나거나 교사가 넘길 때만 끝남 |
 
-각 구간(입장 발표, 발표 뒤 질의응답, 사건 뒤 질문, 투표)이 시작되면 `room.holdUntil`까지 3초 동안 모든 화면에 구간 제목이 뜨고 마이크를 켤 수 없습니다. 그만큼 마감도 늦춰집니다. 사건 단계는 `room.reading`이 참인 동안(모든 학생이 `read-event`를 보내거나 선생님이 `open-questions`를 누를 때까지) 질문할 수 없고, 열리는 순간 사건 시간이 처음부터 다시 흐릅니다.
+각 구간(입장 발표, 발표 뒤 질의응답, 사건 뒤 질문, 최후 추론, 투표)이 시작되면 `room.holdUntil`까지 3초 동안 모든 화면에 구간 제목이 뜨고 마이크를 켤 수 없습니다. 그만큼 마감도 늦춰집니다. 사건 단계는 `room.reading`이 참인 동안(모든 학생이 `read-event`를 보내거나 선생님이 `open-questions`를 누를 때까지) 질문할 수 없고, 열리는 순간 사건 시간이 처음부터 다시 흐릅니다. 역할 전환자도 가려진 사건 카드를 보고 `read-event`를 보냅니다.
 
-`phaseVersion`은 입장 발표의 차례가 바뀔 때와, 질의응답·사건에서 누군가 마이크를 잡을 때마다 올라갑니다. `phaseEndsAt`은 입장 발표에서는 현재 차례의 마감, 질의응답·사건에서는 그 시간 전체의 마감입니다. `room.floor.endsAt`이 지나면 서버와 화면 모두 마이크가 빈 것으로 봅니다. 늦게 도착한 음성도 녹음 당시의 `phaseVersion`으로 발언자와 종류를 찾습니다(`internal/state.turnLog`).
+`phaseVersion`은 입장 발표의 차례가 바뀔 때와, 질의응답·사건·최후 추론에서 누군가 마이크를 잡을 때마다 올라갑니다. `phaseEndsAt`은 입장 발표에서는 현재 차례의 마감, 질의응답·사건·최후 추론에서는 그 시간 전체의 마감입니다. 단계 순서는 `lobby → role → statement(→ qa) → event → deduce → vote → reveal → ended`. 기본 시간은 `content/game_config.json`(입장 발표 한 사람 60초, 질의응답 180초, 사건 420초, 최후 추론 180초)이고, 최후 추론이 생기기 전에 연 방은 이 기본 시간을 씁니다. `room.floor.endsAt`이 지나면 서버와 화면 모두 마이크가 빈 것으로 봅니다. 늦게 도착한 음성도 녹음 당시의 `phaseVersion`으로 발언자와 종류를 찾습니다(`internal/state.turnLog`).
 
 ## 데이터
 
 ```text
-rooms/{roomId}                    room: 단계·타이머·차례(turn: order, index, uid)·마이크(floor: uid, kind, version, endsAt)·설정·공개 주제·(사건 단계부터) 사건 카드
+rooms/{roomId}                    room: 단계·타이머·차례(turn: order, index, uid)·마이크(floor: uid, kind, version, endsAt)·설정·공개 주제·(결과 공개부터) 사건 카드
   participants/{uid}              이름(필드명 nickname)·자리·prefsDone·submitted·(역할 확인 뒤) roleId
-  publicRounds/transcript         {items: [{id, uid, phase, kind: statement|question|rebuttal|answer, turn, text, source: voice|typed, at}]}
+  publicRounds/transcript         {items: [{id, uid, phase: statement|event|deduce, kind: statement|question|rebuttal|answer|opinion, turn, text, source: voice|typed, at}]}
   publicRounds/summary            {positions: [{roleId, points}], clashes, questions, statements: [{uid, text}], source, revision, at}
   publicRounds/reveal             투표 뒤: switchers, tally, topVoted, tiedUids, tie, outcome, ballots
-  privatePlayers/{uid}            preferences, roleId, isSwitcher, preferenceRank, vote
-  host/state                      moderation 기록, teacherGuide
+  privatePlayers/{uid}            preferences, roleId, isSwitcher, preferenceRank, vote, (사건 단계부터) event — 역할 전환자는 null
+  host/state                      moderation 기록, teacherGuide, (사건 단계부터) event
   internal/state                  전체 상태 (votes, turnLog, eventCard, assignment 감사 기록, rate)
 roomCodes/{sha256(code)}          방 코드 → roomId
 userLimits/{uid}                  방 생성 횟수 제한
 ```
+
+사건 카드는 역할 전환자의 핸디캡입니다. 사건 단계부터 투표까지는 전환자가 아닌 학생의 `privatePlayers/{uid}.event`와 교사의 `host/state.event`에만 쓰이고, 공용 `rooms/{roomId}.event`에는 결과 공개 때 처음 들어갑니다.
 
 `internal/state.assignment`에는 최다 선택 역할과 동률 역할이 감사용으로 남지만 어느 클라이언트 문서에도 복사되지 않습니다.
 
@@ -65,7 +67,7 @@ userLimits/{uid}                  방 생성 횟수 제한
 
 `MODERATION_MODE=ai`(기본): 규칙 검사 → Gemini 판정(실패 시 1회 재시도) → 그래도 실패하면 교사 확인 대기. `MODERATION_MODE=rules`: 규칙 검사만 사용하며 `ENVIRONMENT=production`에서는 서버가 시작을 거부합니다. AI에는 검사할 문장 하나만 보내고, 다른 학생 정보·역할·선호는 보내지 않습니다. AI가 지목한 문제 부분은 원문에 실제로 있을 때만 교사에게 보여 줍니다.
 
-받아쓰기(`services/discussion.py`)에는 음성 구간 하나만, 토론 정리에는 역할 이름, 자리 번호와 공개된 발언만 보냅니다. 학생 이름·uid·역할 전환 여부·선호는 보내지 않습니다. 카드 요약은 자리 번호로 돌아오고 서버에서 사람과 연결합니다.
+받아쓰기(`services/discussion.py`)에는 음성 구간 하나만, 토론 정리와 학생별 리포트에는 역할 이름, 자리 번호와 공개된 발언만 보냅니다. 최후 추론(`deduce`) 발언은 누가 의심스러운지에 대한 말이라 둘 다 보내지 않습니다. 학생 이름·uid·역할 전환 여부·선호는 보내지 않습니다. 카드 요약은 자리 번호로 돌아오고 서버에서 사람과 연결합니다.
 
 ## 환경 변수
 

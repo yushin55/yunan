@@ -1,8 +1,12 @@
 """Phase order, deadlines and per-viewer snapshots.
 
 lobby (topic, rules, role preferences) → role (secret role) → statement (then questions about the
-statements) → event (event card, questions and answers) → vote → reveal → ended. Nothing after the reveal asks for
-a student's real opinion.
+statements) → event (event card, questions and answers) → deduce (last reasoning: anyone says whom
+they suspect and why, anyone answers) → vote → reveal → ended. Nothing after the reveal asks for a
+student's real opinion.
+
+The event card is a handicap for the role switchers: it is written only into the private documents
+of the other students and the teacher's document, never into the shared room, until the reveal.
 
 Students talk out loud, each into their own device, and only one microphone in the room can be on
 (`room.floor`). Statements go in seat order: `room.turn` says whose turn it is and `phaseEndsAt` is
@@ -21,15 +25,15 @@ from fastapi import HTTPException
 from app.repositories.topics import load_game_config
 from app.services.voting import build_reveal
 
-PHASES = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"]
-TIMED_PHASES = ("role", "statement", "event", "vote")
-SPEAKING_PHASES = ("statement", "event")
+PHASES = ["lobby", "role", "statement", "event", "deduce", "vote", "reveal", "ended"]
+TIMED_PHASES = ("role", "statement", "event", "deduce", "vote")
+SPEAKING_PHASES = ("statement", "event", "deduce")
 # What the two microphone buttons say in each speaking phase. The first is Z, the second X.
-MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer")}
+MIC_KINDS = {"statement": ("statement",), "event": ("question", "answer"), "deduce": ("opinion", "answer")}
 OPEN_KINDS = ("question", "answer")  # Statement Q&A uses the event phase's buttons.
 # Each section opens with its title on every screen; nobody can talk and no clock runs until it is gone.
 HOLD_MS = 3000
-HELD_PHASES = ("statement", "vote")
+HELD_PHASES = ("statement", "deduce", "vote")
 
 
 def now_ms():
@@ -59,12 +63,14 @@ def _log_turn(state: dict) -> None:
 
 def start_phase(state: dict, phase: str, now: int) -> None:
     room = state["room"]
-    seconds = room["settings"]["phaseSeconds"].get(phase) if phase in TIMED_PHASES else None
+    # Rooms opened before a phase existed have no time saved for it: they get the default.
+    seconds = (room["settings"]["phaseSeconds"].get(phase) or default_phase_seconds().get(phase)) if phase in TIMED_PHASES else None
     hold = HOLD_MS if phase in HELD_PHASES else 0
     room.update(phase=phase, phaseVersion=room["phaseVersion"] + 1, phaseEndsAt=now + hold + seconds * 1000 if seconds else None,
                 paused=False, pausedRemainingMs=None, updatedAt=now, turn=None, floor=None,
                 holdUntil=now + hold if hold else None,
                 # The event card first: questions open once every student has read it (or the teacher opens them).
+                # A role switcher "reads" the hidden card, which only says the card is not for them.
                 reading=phase == "event")
     if phase == "statement" and state["participants"]:
         order = seated(state)
@@ -95,7 +101,7 @@ def open_questions(state: dict, now: int) -> None:
     room = state["room"]
     if room["phase"] != "event" or not room.get("reading"):
         return
-    seconds = room["settings"]["phaseSeconds"]["event"]
+    seconds = room["settings"]["phaseSeconds"].get("event") or default_phase_seconds()["event"]
     room.update(reading=False, holdUntil=now + HOLD_MS, updatedAt=now)
     if room["paused"]:
         room["pausedRemainingMs"] = HOLD_MS + seconds * 1000
@@ -121,6 +127,15 @@ def next_turn(state: dict, now: int) -> bool:
     return True
 
 
+def deal_event(state: dict) -> None:
+    """The event card goes to the teacher and to every student who is not a role switcher. A switcher's
+    own document says `event: None`, so their screen can say the card is hidden from them."""
+    card = state["eventCard"]
+    state["host"]["event"] = copy.deepcopy(card)
+    for private in state["privatePlayers"].values():
+        private["event"] = None if private.get("isSwitcher") else copy.deepcopy(card)
+
+
 def finish_phase(state: dict, now: int) -> None:
     room = state["room"]
     phase = room["phase"]
@@ -131,9 +146,10 @@ def finish_phase(state: dict, now: int) -> None:
         for uid in state["participants"]:
             state["participants"][uid]["roleId"] = state["privatePlayers"][uid]["roleId"]
     elif phase == "statement":
-        room["event"] = copy.deepcopy(state["eventCard"])
+        deal_event(state)
     elif phase == "vote":
         state["rounds"]["reveal"] = build_reveal(state)
+        room["event"] = copy.deepcopy(state["eventCard"])  # Everyone, switchers too, sees it with the result.
     start_phase(state, PHASES[PHASES.index(phase) + 1], now)
 
 

@@ -9,7 +9,7 @@ export const practiceStorageKey = () => teacherStorageAccount() === "guest" ? "b
 function load(key: string): PracticeState | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) || "null");
-    return value?.version === 5 ? value : null;
+    return value?.version === 6 ? value : null;
   } catch {
     return null;
   }

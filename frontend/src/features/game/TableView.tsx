@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { TablePlayer } from "../../components/scene/TableScene";
 import { SEAT_COLORS } from "../../components/scene/palette";
-import type { Floor, Participant, Room, Rounds } from "../../types/game";
+import type { EventCard, Floor, Participant, Room, Rounds } from "../../types/game";
 import { activeFloor, statementCards } from "../discussion/floor";
 import { roleName } from "../roles/roleName";
 import CardStrip, { type TableCard } from "./CardStrip";
@@ -9,7 +9,7 @@ import { KIND_LABEL } from "./phases";
 
 const TableScene = lazy(() => import("../../components/scene/TableScene"));
 // During voting the cards start folded so the pointing hand stays visible.
-const CARD_PHASES = ["statement", "event", "vote"];
+const CARD_PHASES = ["statement", "event", "deduce", "vote"];
 
 function useNow(every: number) {
   const [now, setNow] = useState(Date.now());
@@ -31,6 +31,7 @@ function status(room: Room, p: Participant, rounds: Rounds, floor: Floor | null)
     case "statement":
     case "event":
     case "rebuttal":
+    case "deduce":
       if (floor?.uid === p.uid) return { label: floor.kind === "statement" ? "말하는 중" : `${KIND_LABEL[floor.kind]} 중`, tone: "done" };
       return room.turn?.uid === p.uid && room.turn.stage !== "qa" ? { label: "차례", tone: "waiting" } : undefined;
     case "vote":
@@ -61,6 +62,7 @@ export default function TableView({
   pointAt,
   overview = false,
   voteCardsOpen = false,
+  event = null,
 }: {
   room: Room;
   participants: Participant[];
@@ -76,6 +78,8 @@ export default function TableView({
   overview?: boolean;
   /** During voting the cards stay folded until the vote panel's "발언 카드 보기" opens them. */
   voteCardsOpen?: boolean;
+  /** The event card this viewer may see, or the hidden one for a role switcher (see `eventFor`). */
+  event?: EventCard | null;
 }) {
   const now = useNow(1000) + offset;
   const floor = activeFloor(room, now);
@@ -89,14 +93,14 @@ export default function TableView({
     status: status(room, p, rounds, floor),
   }));
   // Once the event happens its card comes first.
-  const eventCard: TableCard[] = room.event ? [{ uid: "event", name: room.event.title, role: "사건 발생", text: room.event.description, state: "done", tone: "event" }] : [];
+  const eventCard: TableCard[] = event ? [{ uid: "event", name: event.title, role: "사건 발생", text: event.description, state: "done", tone: "event" }] : [];
   const nameOf = (uid: string) => (uid === selfUid ? "나" : (participants.find((p) => p.uid === uid)?.nickname ?? "나간 참가자"));
   const record = (uid: string) => {
     const rows: NonNullable<TableCard["record"]> = [];
-    // The question last asked before each answer: that is what the answer is about.
+    // The question (or, in the last reasoning, the opinion) last said before each answer: that is what the answer is about.
     let question = null as { key: number; uid: string; text: string } | null;
     for (const line of rounds.transcript) {
-      if (line.kind === "question") {
+      if (line.kind === "question" || line.kind === "opinion") {
         if (question?.key === line.turn) question.text += ` ${line.text}`;
         else question = { key: line.turn, uid: line.uid, text: line.text };
       }

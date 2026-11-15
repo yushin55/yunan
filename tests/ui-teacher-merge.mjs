@@ -25,7 +25,7 @@ async function contextFor(viewport) {
 }
 
 try {
-  const phases = ['lobby', 'role', 'statement', 'event', 'vote', 'reveal', 'ended'];
+  const phases = ['lobby', 'role', 'statement', 'event', 'deduce', 'vote', 'reveal', 'ended'];
   for (const phase of phases) {
     const context = await contextFor({ width: 1440, height: 900 });
     const page = await context.newPage();
@@ -75,6 +75,8 @@ try {
     await expect(page.getByText('계정에 저장하는 중이에요…', { exact: true })).toBeHidden();
     await page.reload();
     await expect(page.getByTestId('memo-entry')).toContainText('Merge verification');
+    await page.getByTestId('next-phase').click();
+    await expect(page.getByTestId('practice-phase-jump')).toHaveValue('deduce'); // The last reasoning comes before the vote.
     await page.getByTestId('next-phase').click();
     await expect(page.getByTestId('practice-phase-jump')).toHaveValue('vote');
     await page.getByTestId('next-phase').click();

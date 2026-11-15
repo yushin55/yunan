@@ -37,8 +37,9 @@ export function statementGist(role: Role | undefined, switcher: boolean, said: s
 }
 
 export function responseLine(role: Role, event: EventCard, switcher: boolean, rng: Rng) {
+  // A switcher never saw the event card: they can only go along with what others said about it.
   if (switcher)
-    return pick(["저도 다른 분들이랑 비슷하게 생각해요. 신중하게 정하면 좋겠어요.", `‘${event.title}’ 같은 일은 상황마다 달라서… 일단 더 들어 볼게요.`], rng);
+    return pick(["저도 다른 분들이랑 비슷하게 생각해요. 신중하게 정하면 좋겠어요.", "그런 일은 상황마다 달라서… 방금 말씀하신 걸 좀 더 들어 볼게요."], rng);
   const concern = strip(role.concerns[role.concerns.length > 1 ? 1 : 0]);
   return pick(
     [
@@ -47,6 +48,24 @@ export function responseLine(role: Role, event: EventCard, switcher: boolean, rn
     ],
     rng,
   );
+}
+
+/** The last reasoning: whom this partner suspects, and why. */
+export function opinionLine(suspect: string, rng: Rng) {
+  return pick(
+    [
+      `저는 ${suspect}님이 좀 의심돼요. 입장 발표가 너무 두루뭉술했거든요.`,
+      `${suspect}님이 역할 전환자 같아요. 사건 이야기를 할 때 내용을 잘 모르는 것 같았어요.`,
+      `${suspect}님은 자기 역할의 걱정을 한 번도 구체적으로 말하지 않았어요. 그래서 의심돼요.`,
+    ],
+    rng,
+  );
+}
+
+/** Answering a suspicion in the last reasoning. */
+export function defenseLine(role: Role, switcher: boolean, rng: Rng) {
+  if (switcher) return pick(["음… 저도 제 역할대로 말했는데요. 다른 분이 더 수상해 보여요.", "사건 이야기는 다들 비슷하게 하지 않았나요? 저는 아니에요."], rng);
+  return pick([`저는 처음부터 ${role.name} 입장에서 ‘${strip(role.concerns[0])}’를 말했어요. 저는 아니에요.`, `사건 카드를 보고 ${role.name}로서 바로 답했잖아요. 다시 한번 생각해 보세요.`], rng);
 }
 
 export function answerLine(role: Role, switcher: boolean, rng: Rng) {

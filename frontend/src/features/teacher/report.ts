@@ -256,7 +256,8 @@ function recordDraft(nickname: string, roleName: string, f: Record<CriterionId, 
 export function buildReport(topic: Topic, participants: Participant[], transcript: TranscriptLine[], moderation: ModerationEntry[] = []): ClassReport {
   const nicknames = participants.map((p) => p.nickname);
   const students = participants.map((p): StudentReport => {
-    const lines = transcript.filter((l) => l.uid === p.uid);
+    // The last reasoning is about who the switcher is, not about the role: it is not assessed.
+    const lines = transcript.filter((l) => l.uid === p.uid && l.phase !== "deduce");
     const flagged = moderation.filter((m) => m.uid === p.uid && (m.status === "flagged" || m.status === "returned")).length;
     const findings = analyse(lines, topic, p.roleId, nicknames.filter((n) => n !== p.nickname), flagged);
     const score = CRITERIA.reduce((sum, c) => sum + LEVEL_SCORE[findings[c.id].level], 0);

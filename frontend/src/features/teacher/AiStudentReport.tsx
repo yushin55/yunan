@@ -128,7 +128,8 @@ export default function AiStudentReport({
   const original = stored.original.find((r) => r.uid === uid);
   const edited = new Set(stored.current.filter((r) => !same(r, stored.original.find((o) => o.uid === r.uid))).map((r) => r.uid));
   const person = participants.find((p) => p.uid === uid);
-  const ownLines = transcript.filter((l) => l.uid === uid);
+  // Evidence comes from the debate itself; the last reasoning (who seems the switcher) is not assessed.
+  const ownLines = transcript.filter((l) => l.uid === uid && l.phase !== "deduce");
 
   return (
     <div className="ai-report" data-testid="ai-report">

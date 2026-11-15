@@ -2,7 +2,7 @@
 // Mirrors the server's phases, turns and rules; the real game never uses this code.
 import topicData from "../../data/practiceTopics.json";
 import type { DiscussionSummary, EventCard, HostState, ModerationEntry, Participant, Phase, Room, Snapshot, SpeakingPhase, SpeechKind, Topic, TranscriptLine } from "../../types/game";
-import { answerLine, responseLine, statementGist, statementLine } from "./lines";
+import { answerLine, defenseLine, opinionLine, responseLine, statementGist, statementLine } from "./lines";
 import { assignRoles, buildReveal, pick, practiceCheck, shuffle, type Assigned } from "./rules";
 
 interface FullTopic extends Topic {
@@ -14,7 +14,7 @@ type BotAction = "confirm" | "speak" | "finish" | "vote" | "floor" | "release" |
 const HOLD_MS = 3000;
 
 export interface PracticeState {
-  version: 5;
+  version: 6;
   snapshot: Snapshot;
   prefs: Record<string, [string, string]>;
   assigned: Record<string, Assigned>;
@@ -24,21 +24,22 @@ export interface PracticeState {
   seq: number;
   revision: number;
   schedule: { at: number; uid: string; action: BotAction; kind?: SpeechKind; phaseVersion: number; phase?: Phase; left?: number }[];
-  /** Who spoke under each phaseVersion, so late words still go to the right person. */
-  turnLog: Record<string, { uid: string; phase: SpeakingPhase; kind: SpeechKind }>;
+  /** Who spoke under each phaseVersion, so late words still go to the right person. `about`: whom a partner's opinion named. */
+  turnLog: Record<string, { uid: string; phase: SpeakingPhase; kind: SpeechKind; about?: string }>;
 }
 
 export const TOPICS = topicData as FullTopic[];
 export const ME = "me";
 const BOTS = ["하늘", "도윤", "서연", "지우", "민준"];
-// No rebuttal phase: the question-and-answer time is longer instead.
-const ORDER: Phase[] = ["lobby", "role", "statement", "event", "vote", "reveal", "ended"];
-const TIMED = ["role", "statement", "event", "vote"];
-const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"] };
-const SECONDS = { role: 20, statement: 40, event: 210, rebuttal: 20, vote: 20 };
-const MIC_SECONDS = 30;
+// No rebuttal phase: the question-and-answer time is longer instead. Before the vote, the last reasoning.
+const ORDER: Phase[] = ["lobby", "role", "statement", "event", "deduce", "vote", "reveal", "ended"];
+const TIMED = ["role", "statement", "event", "deduce", "vote"];
+const MIC_KINDS: Partial<Record<Phase, SpeechKind[]>> = { statement: ["statement"], event: ["question", "answer"], deduce: ["opinion", "answer"] };
+// Shorter than a real class (partners answer in seconds), but each turn is as long as on the server.
+const SECONDS = { role: 20, statement: 60, event: 210, rebuttal: 20, deduce: 120, vote: 20 };
+const MIC_SECONDS = 60;
 // After all the statements, this long for anyone to ask about them and answer.
-const QA_SECONDS = 90;
+const QA_SECONDS = 120;
 // Partners leave room to get a word in, then go quiet so the player is never crowded out.
 const BOT_FLOORS = 9;
 const rng = Math.random;
@@ -62,7 +63,7 @@ export function createPractice(nickname: string, topicId: string | null, now = D
     settings: { switcherCount: 1, phaseSeconds: SECONDS, micSeconds: MIC_SECONDS }, createdAt: now, endedAt: null,
   };
   return {
-    version: 5,
+    version: 6,
     snapshot: {
       viewer: "student", room,
       participants: seats.map((uid, seat) => participant(uid, name(uid), seat)),
@@ -78,7 +79,9 @@ const topicOf = (s: PracticeState) => TOPICS.find((t) => t.topicId === s.snapsho
 /** Use only the public game state and the teacher's guide in the host preview. */
 export function teacherSnapshot(s: PracticeState): Snapshot {
   const { room, participants, rounds } = s.snapshot;
-  return { viewer: "host", room, participants, rounds, host: { uid: room.hostUid, teacherGuide: topicOf(s).teacherGuide, moderation: s.moderation } };
+  // As on the server, the teacher holds the event card from the event phase on.
+  const event = ORDER.indexOf(room.phase) >= ORDER.indexOf("event") ? s.eventCard : null;
+  return { viewer: "host", room, participants, rounds, host: { uid: room.hostUid, teacherGuide: topicOf(s).teacherGuide, moderation: s.moderation, event } };
 }
 
 const roleOf = (s: PracticeState, uid: string) => s.snapshot.room.topic.roles.find((r) => r.id === s.assigned[uid]?.roleId);
@@ -124,7 +127,7 @@ function planFloor(s: PracticeState, at: number, left: number) {
 function startPhase(s: PracticeState, phase: Phase, now: number) {
   const room = s.snapshot.room;
   const seconds = room.settings.phaseSeconds[phase as keyof typeof SECONDS];
-  const hold = phase === "statement" || phase === "vote" ? HOLD_MS : 0;
+  const hold = phase === "statement" || phase === "deduce" || phase === "vote" ? HOLD_MS : 0;
   Object.assign(room, { phase, phaseVersion: room.phaseVersion + 1, phaseEndsAt: seconds ? now + hold + seconds * 1000 : null, paused: false, pausedRemainingMs: null, turn: null, floor: null, holdUntil: hold ? now + hold : null, reading: phase === "event" });
   if (phase === "ended") room.endedAt = now;
   const v = room.phaseVersion;
@@ -139,13 +142,14 @@ function startPhase(s: PracticeState, phase: Phase, now: number) {
     room.turn = { order, index: 0, uid: order[0] };
     planTurn(s, now + hold);
   }
+  if (phase === "deduce") planFloor(s, now + hold + between(3, 5), 6);
 }
 
 /** Everyone has read the event card: announce the questions and start the event clock over. */
 function openQuestions(s: PracticeState, now: number) {
   const room = s.snapshot.room;
   if (room.phase !== "event" || !room.reading) return;
-  const ms = HOLD_MS + room.settings.phaseSeconds.event * 1000;
+  const ms = HOLD_MS + (room.settings.phaseSeconds.event ?? SECONDS.event) * 1000;
   Object.assign(room, { reading: false, holdUntil: now + HOLD_MS });
   if (room.paused) room.pausedRemainingMs = ms;
   else room.phaseEndsAt = now + ms;
@@ -181,8 +185,12 @@ function nextTurn(s: PracticeState, now: number) {
 function finishPhase(s: PracticeState, now: number) {
   const room = s.snapshot.room;
   if (room.phase === "role") for (const p of s.snapshot.participants) p.roleId = s.assigned[p.uid].roleId;
-  if (room.phase === "statement") room.event = s.eventCard;
-  if (room.phase === "vote") s.snapshot.rounds.reveal = buildReveal(s.snapshot.participants.map((p) => p.uid), s.assigned, s.votes, room.settings.switcherCount);
+  // As on the server: the card goes only to students who are not role switchers, and to everyone at the reveal.
+  if (room.phase === "statement") s.snapshot.me!.event = s.assigned[ME]?.isSwitcher ? null : s.eventCard;
+  if (room.phase === "vote") {
+    s.snapshot.rounds.reveal = buildReveal(s.snapshot.participants.map((p) => p.uid), s.assigned, s.votes, room.settings.switcherCount);
+    room.event = s.eventCard;
+  }
   startPhase(s, ORDER[ORDER.indexOf(room.phase) + 1], now);
 }
 
@@ -234,7 +242,16 @@ function botLine(s: PracticeState, job: PracticeState["schedule"][number]) {
   if (!role) return "";
   if (kind === "statement") return statementLine(role, switcher, rng);
   if (kind === "question") return pick(room.topic.questionPrompts, rng);
+  if (kind === "opinion") return opinionLine(person(s, s.turnLog[job.phaseVersion]?.about ?? suspectOf(s, uid)).nickname, rng);
+  if (room.phase === "deduce") return defenseLine(role, switcher, rng);
   return s.eventCard && rng() < 0.5 ? responseLine(role, s.eventCard, switcher, rng) : answerLine(role, switcher, rng);
+}
+
+/** Whom a partner points at in the last reasoning: decent but not perfect detectives, as in the vote. */
+function suspectOf(s: PracticeState, uid: string) {
+  const others = s.snapshot.participants.map((p) => p.uid).filter((u) => u !== uid);
+  const switchers = others.filter((u) => s.assigned[u]?.isSwitcher);
+  return !s.assigned[uid]?.isSwitcher && switchers.length && rng() < 0.5 ? pick(switchers, rng) : pick(others, rng);
 }
 
 /** A partner takes the free microphone: an answer if the last person asked something, otherwise the phase's own kind of speech. */
@@ -247,10 +264,13 @@ function runFloor(s: PracticeState, job: PracticeState["schedule"][number], now:
   // Statements themselves go in turn; partners only take the open floor.
   if (room.turn && room.turn.stage !== "qa") return;
   const previous = s.turnLog[room.phaseVersion];
-  const answering = previous?.phase === room.phase && previous.kind !== "answer" && previous.kind !== "statement";
+  // In the last reasoning only the person named answers; when that is the player, the answer is theirs to give.
+  const named = room.phase === "deduce" ? previous?.about : undefined;
+  const answering = previous?.phase === room.phase && previous.kind !== "answer" && previous.kind !== "statement" && named !== ME;
   const kind = answering ? "answer" : kindsNow(room)[0];
-  const uid = pick(bots(s).filter((u) => u !== previous?.uid), rng);
+  const uid = answering && named ? named : pick(bots(s).filter((u) => u !== previous?.uid), rng);
   takeFloor(s, uid, kind, now);
+  if (kind === "opinion") s.turnLog[room.phaseVersion].about = suspectOf(s, uid);
   s.schedule.push({ uid, action: "speak", kind, at: now + between(1, 2), phaseVersion: room.phaseVersion });
   s.schedule.push({ uid, action: "release", at: now + between(4, 6), phaseVersion: room.phaseVersion });
   planFloor(s, now + between(8, 13), job.left! - 1);
@@ -411,14 +431,14 @@ export function act(state: PracticeState, name: string, body: Record<string, unk
     if (body.targetUid) {
       const target = String(body.targetUid);
       const kind = (body.kind as SpeechKind | undefined) ?? "statement";
-      if (room.phase !== "statement" && room.phase !== "event") return fail("발언 단계에서만 기록을 넣을 수 있어요.");
+      if (room.phase !== "statement" && room.phase !== "event" && room.phase !== "deduce") return fail("발언 단계에서만 기록을 넣을 수 있어요.");
       let version: number;
       if (kind === "statement") {
         const turns = Object.entries(s.turnLog).filter(([, t]) => t.uid === target && t.kind === "statement").map(([v]) => Number(v));
         if (!turns.length) return fail("이 학생은 아직 입장 발표 차례가 없었어요.");
         version = Math.max(...turns);
       } else {
-        if (!(room.phase === "event" || room.turn?.stage === "qa")) return fail("질문과 답변은 질의응답이나 사건 단계에서만 넣을 수 있어요.");
+        if (!kindsNow(room).includes(kind)) return fail("질문·답변은 질의응답과 사건 단계에서, 의견·답변은 최후 추론 단계에서만 넣을 수 있어요.");
         room.phaseVersion += 1;
         version = room.phaseVersion;
         s.turnLog[version] = { uid: target, phase: room.phase as SpeakingPhase, kind };
@@ -493,6 +513,7 @@ function previewLine(s: PracticeState, phase: SpeakingPhase) {
   if (phase === "statement")
     return `저는 ${role.name}입니다. 최근 기사에 따르면 이 문제로 불편을 겪는 학생이 30% 정도라고 해요. 왜냐하면 ‘${strip(role.concerns[0])}’라는 문제가 있기 때문이에요. 그래서 ‘${strip(role.goal)}’ 쪽으로 정해야 한다고 생각합니다.`;
   if (phase === "event") return "방금 나온 자료는 출처가 어디인가요? 사실인지 먼저 확인해 보고 이야기하면 좋겠어요.";
+  if (phase === "deduce") return "사건 이야기를 할 때 대답을 미룬 사람이 있었어요. 저는 그 사람이 역할 전환자 같아요.";
   return `${other?.name ?? "상대"}의 걱정은 이해해요. 하지만 실제로 다른 학교 사례를 보면 ‘${strip(role.concerns[role.concerns.length > 1 ? 1 : 0])}’라는 점이 더 컸어요. 처음에는 한쪽만 생각했는데, 듣고 보니 두 입장을 함께 봐야겠다고 생각이 바뀌었어요.`;
 }
 
@@ -544,9 +565,9 @@ export function createPracticeAt(nickname: string, topicId: string | null, phase
       s = act(s, "end-turn", {}, t).state;
       continue;
     }
-    if (!held && (room.phase === "event" || room.phase === "rebuttal") && !spoke.has(-ORDER.indexOf(room.phase)) && !(room.floor && room.floor.endsAt > t)) {
+    if (!held && (room.phase === "event" || room.phase === "deduce") && !spoke.has(-ORDER.indexOf(room.phase)) && !(room.floor && room.floor.endsAt > t)) {
       spoke.add(-ORDER.indexOf(room.phase));
-      say(room.phase === "event" ? "question" : "rebuttal");
+      say(room.phase === "event" ? "question" : "opinion");
       s = act(s, "mic-off", {}, t).state;
       continue;
     }

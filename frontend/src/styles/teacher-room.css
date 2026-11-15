@@ -86,6 +86,7 @@ button.teacher-attention { border: 0; cursor: pointer; font: inherit; font-size:
 .stage-panel .speaker-stage { margin: 0; }
 .stage-panel .speaker-now h2, .stage-panel .speaker-timer strong { font-size: clamp(1.5rem, 2.3vw, 2.2rem); }
 .stage-hint { margin: 8px 0 0; }
+.event-secret-note { margin: -6px 0 14px; }
 
 /* Participation */
 .roster-panel { display: flex; flex-direction: column; min-height: 0; }

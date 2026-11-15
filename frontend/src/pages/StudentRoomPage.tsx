@@ -16,7 +16,7 @@ import { MemoPad, QuestionList, StatementList } from "../features/discussion/Dis
 import { useFloor } from "../features/discussion/floor";
 import MicControls from "../features/discussion/MicControls";
 import type { SpeechEngine } from "../features/discussion/useSpeechCapture";
-import { RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
+import { eventFor, RULES, SPEAKING, STUDENT_TODO } from "../features/game/phases";
 import TableView from "../features/game/TableView";
 import { allReady, StartCountdown, useAutoStart } from "../features/game/useAutoStart";
 import type { TableCard } from "../features/game/CardStrip";
@@ -26,7 +26,7 @@ import type { RoomApi } from "../features/room/useRoom";
 import RevealView from "../features/voting/RevealView";
 import VotePanel, { togglePick } from "../features/voting/VotePanel";
 import { roleName } from "../features/roles/roleName";
-import type { Me, Participant, Reveal, Role, Room, Rounds } from "../types/game";
+import type { EventCard as Event, Me, Participant, Reveal, Role, Room, Rounds } from "../types/game";
 
 /** Where a practice player is before the game (0 briefing, 1 rules, 2 roles), for the classroom screen. */
 export const lobbyStepKey = (room: Room) => `bridge.lobbyStep.${room.roomId}.${room.createdAt}`;
@@ -72,6 +72,8 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
   const myRole = room.topic.roles.find((r) => r.id === me.roleId);
   const others = participants.filter((p) => p.uid !== me.uid);
   const phase = room.phase;
+  // A role switcher plays without the event card: they get the hidden one instead.
+  const { event } = eventFor(state!);
   const secretStillHidden = phase !== "reveal" && phase !== "ended";
   // At the 3D table the table fills the screen and everything else floats over it.
   const fullStage = show3d;
@@ -129,8 +131,8 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
         </p>
       )}
       {SPEAKING.includes(phase) && <MicPopup room={room} me={me} api={api} micEngine={micEngine} allowTyping={allowTyping} />}
-      {!show3d && room.event && SPEAKING.includes(phase) && <EventCard key={phase} event={room.event} collapsible defaultOpen={phase === "event"} />}
-      {(phase === "event" || (phase === "statement" && room.turn?.stage === "qa")) && <QuestionsPopup rounds={rounds} participants={participants} me={me} room={room} offset={offset} />}
+      {!show3d && event && SPEAKING.includes(phase) && <EventCard key={phase} event={event} collapsible defaultOpen={phase === "event"} />}
+      {(phase === "event" || phase === "deduce" || (phase === "statement" && room.turn?.stage === "qa")) && <QuestionsPopup rounds={rounds} participants={participants} me={me} room={room} offset={offset} />}
       {!show3d && SPEAKING.includes(phase) && (
         <details className="panel float-pop" open={phase === "statement"}>
           <summary>입장 발표 정리</summary>
@@ -189,6 +191,7 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
               hand={ownHand(room, me)}
               pointAt={pointAt}
               voteCardsOpen={voteCardsOpen}
+              event={event}
             />
             {fullStage && (
               <>
@@ -226,8 +229,9 @@ export default function StudentRoomPage({ api, startIn, barControls, micEngine =
         {room.paused && <PauseOverlay />}
       </div>
 
-      {/* Everyone reads the event card before the questions open; then the questions are announced. */}
-      {phase === "event" && room.event && room.reading && <EventPopup room={room} participants={participants} read={Boolean(self?.submitted.includes("event"))} busy={busy} onRead={() => void action("read-event")} />}
+      {/* Everyone reads the event card before the questions open; then the questions are announced.
+          A role switcher reads the hidden card, which only says the card is not for them. */}
+      {phase === "event" && event && room.reading && <EventPopup room={room} event={event} participants={participants} read={Boolean(self?.submitted.includes("event"))} busy={busy} onRead={() => void action("read-event")} />}
       <PhaseBanner room={room} offset={offset} />
       {roleOpen && myRole && (
         <Sheet title="나의 역할" onClose={() => setRoleOpen(false)}>
@@ -511,15 +515,15 @@ function MicPopup({ room, me, api, micEngine, allowTyping }: { room: Room; me: M
 
 /**
  * The event card, over everything, until every student has read it. "다 읽었어요" counts me in;
- * then it waits for the others, so nobody gets a head start on the questions.
+ * then it waits for the others, so nobody gets a head start on the questions. A role switcher gets
+ * the hidden card here: told, at the same moment as everyone, that they play without it.
  */
-function EventPopup({ room, participants, read, busy, onRead }: { room: Room; participants: Participant[]; read: boolean; busy: boolean; onRead: () => void }) {
-  if (!room.event) return null;
+function EventPopup({ event, participants, read, busy, onRead }: { room: Room; event: Event; participants: Participant[]; read: boolean; busy: boolean; onRead: () => void }) {
   const done = participants.filter((p) => p.submitted.includes("event")).length;
   return (
-    <div className="event-pop" role="dialog" aria-modal="true" aria-label={`사건 카드: ${room.event.title}`} data-testid="event-popup">
+    <div className="event-pop" role="dialog" aria-modal="true" aria-label={`사건 카드: ${event.title}`} data-testid="event-popup">
       <div className="event-pop-card">
-        <EventCard event={room.event} />
+        <EventCard event={event} />
         {read ? (
           <p className="event-pop-wait" role="status">
             <span className="spinner" aria-hidden /> 친구들이 읽고 있어요 · {done}/{participants.length}명
@@ -538,7 +542,7 @@ function QuestionsPopup({ rounds, participants, me, room, offset }: { rounds: Ro
   const { floor } = useFloor(room, offset);
   return (
     <details className="panel float-pop questions" open>
-      <summary>질문</summary>
+      <summary>{room.phase === "deduce" ? "의견과 질문" : "질문"}</summary>
       <QuestionList room={room} participants={participants} rounds={rounds} floor={floor} myUid={me.uid} />
     </details>
   );
