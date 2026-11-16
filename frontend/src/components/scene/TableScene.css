@@ -191,16 +191,18 @@
   max-width: 220px;
 }
 
-.table-nick { font-weight: 800; }
+.table-nick { font-size: 11px; font-weight: 600; color: #c9cfca; }
 .table-order { margin-right: 5px; color: #f0cf8a; }
 
+/* The role is what matters at the table, so it sits on top and reads first. */
 .table-tag {
-  padding: 1px 7px;
-  border-radius: 99px;
-  background: #e6b85c26;
-  color: #f0cf8a;
-  font-size: 11px;
-  font-weight: 700;
+  order: -1;
+  flex-basis: 100%;
+  text-align: center;
+  color: #ffd98f;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .table-status {
@@ -221,7 +223,7 @@
 .table-label.is-active { z-index: 2; }
 
 /* Phones: name only, status as a coloured dot, so plates stay short and tappable. */
-.is-narrow .table-tag { display: none; }
+.is-narrow .table-tag { font-size: 13px; }
 .is-narrow .table-status {
   width: 9px;
   height: 9px;

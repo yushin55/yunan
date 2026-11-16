@@ -196,6 +196,7 @@
 /* Result: who the switcher was and the votes */
 .result-panel h3 { margin-bottom: 10px; }
 .reveal.compact { gap: 10px; font-size: 0.88rem; }
+.reveal.compact .reveal-switcher figcaption strong { font-size: 1.2rem; }
 .ballots-fold summary { cursor: pointer; font-size: 0.8rem; font-weight: 700; color: var(--muted); }
 
 /* Past debates */
