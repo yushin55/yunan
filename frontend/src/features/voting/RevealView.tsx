@@ -45,8 +45,8 @@ export default function RevealView({ reveal, participants, topic, myUid, compact
               <figure key={sw.uid} className={`reveal-switcher ${caught ? "caught" : "escaped"}`} data-testid="reveal-switcher">
                 <BlockAvatar {...lookOf(participants, sw.uid, myUid)} mood={caught ? "slump" : "cheer"} />
                 <figcaption>
-                  <strong>{sw.uid === myUid ? "나" : name(sw.uid)}</strong>
-                  <span>{roleName(topic, sw.roleId)}</span>
+                  <strong className="reveal-role">{roleName(topic, sw.roleId)}</strong>
+                  <span>{sw.uid === myUid ? "나" : name(sw.uid)}</span>
                   <em>{caught ? "정체가 밝혀졌어요" : "정체를 숨겼어요"}</em>
                 </figcaption>
               </figure>
@@ -91,10 +91,11 @@ export function RevealSummary({ reveal, participants, topic }: { reveal: Reveal;
       <p className="reveal-summary-who">
         <VenetianMask size={20} aria-hidden /> 역할 전환자:{" "}
         {reveal.switchers.map((s, i) => (
-          <strong key={s.uid}>
+          <span key={s.uid} className="reveal-summary-person">
             {i > 0 && ", "}
-            {name(s.uid)} ({roleName(topic, s.roleId)})
-          </strong>
+            <strong>{roleName(topic, s.roleId)}</strong>
+            <small>{name(s.uid)}</small>
+          </span>
         ))}
       </p>
       <Tally reveal={reveal} participants={participants} />

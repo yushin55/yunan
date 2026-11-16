@@ -266,7 +266,8 @@ footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8p
 .my-guess { font-weight: 800; color: var(--gold); margin: 0; }
 .tally { list-style: none; padding: 0; display: grid; gap: 6px; }
 .tally li { display: grid; grid-template-columns: minmax(90px, 1.2fr) 2fr auto; gap: 10px; align-items: center; }
-.tally .who em { font-style: normal; font-size: 0.75rem; margin-left: 6px; color: var(--red); }
+.tally .who em { font-style: normal; font-size: 0.85rem; font-weight: 800; margin-left: 6px; padding: 1px 8px; border-radius: 99px; color: #fff; background: var(--red); }
+.tally .is-switcher .who { font-size: 0.85rem; }
 .tally .bar { height: 10px; border-radius: 99px; background: var(--bg-2); overflow: hidden; }
 .tally .bar i { display: block; height: 100%; background: var(--muted); }
 .tally .is-switcher .bar i { background: var(--red); }
